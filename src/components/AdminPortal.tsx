@@ -88,14 +88,14 @@ export default function AdminPortal() {
           <div className="flex items-center gap-3">
             <a
               href="/"
-              className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-neutral-300 hover:text-white"
+              className="flex items-center gap-1.5 text-[11px] font-bold text-sentence tracking-wider text-neutral-300 hover:text-white"
             >
               <span>View Site</span>
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-1.5 py-2 px-4 bg-white/10 hover:bg-white/20 text-white text-xs font-bold uppercase tracking-wider rounded-full cursor-pointer"
+              className="flex items-center gap-1.5 py-2 px-4 bg-white/10 hover:bg-white/20 text-white text-xs font-bold text-sentence tracking-wider rounded-full cursor-pointer"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Logout</span>
@@ -111,9 +111,9 @@ export default function AdminPortal() {
 
   return (
     <div className="min-h-screen bg-neutral-950 flex items-center justify-center p-4">
-      <div className="bg-white border-2 border-neutral-200/90 rounded-[28px] p-8 w-full max-w-sm shadow-xl">
+      <div className="bg-white   rounded-[28px] p-8 w-full max-w-sm shadow-xl">
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="w-12 h-12 bg-[#E34718] rounded-full flex items-center justify-center border-2 border-[#C23A12]/30 shadow-xs mb-3">
+          <div className="w-12 h-12 bg-[#E34718] rounded-full flex items-center justify-center   shadow-xs mb-3">
             <ShieldCheck className="w-5 h-5 text-white" />
           </div>
           <h1 className="font-display font-bold text-lg text-neutral-800">Admin Portal</h1>
@@ -121,13 +121,13 @@ export default function AdminPortal() {
         </div>
 
         {stage === 'denied' && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-semibold flex items-start gap-2">
+          <div className="mb-4 p-3 bg-red-50   text-red-700 rounded-xl text-xs font-semibold flex items-start gap-2">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>That account does not have admin access.</span>
           </div>
         )}
         {loginError && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-semibold flex items-start gap-2">
+          <div className="mb-4 p-3 bg-red-50   text-red-700 rounded-xl text-xs font-semibold flex items-start gap-2">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{loginError}</span>
           </div>
@@ -135,7 +135,7 @@ export default function AdminPortal() {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1 flex items-center gap-1.5">
+            <label className="block text-xs font-semibold text-sentence tracking-wider text-neutral-400 mb-1 flex items-center gap-1.5">
               <Mail className="w-3.5 h-3.5" /> Admin Email
             </label>
             <input
@@ -144,11 +144,11 @@ export default function AdminPortal() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@jazbaticket.com"
               required
-              className="w-full bg-white border-2 border-neutral-200/80 rounded-xl p-3 text-sm font-semibold focus:ring-1 focus:ring-[#E34718] focus:outline-none text-neutral-800 placeholder-neutral-300"
+              className="w-full bg-white   rounded-xl p-3 text-sm font-semibold focus:ring-1 focus:ring-[#E34718] focus:outline-none text-neutral-800 placeholder-neutral-300"
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1 flex items-center gap-1.5">
+            <label className="block text-xs font-semibold text-sentence tracking-wider text-neutral-400 mb-1 flex items-center gap-1.5">
               <Lock className="w-3.5 h-3.5" /> Password
             </label>
             <input
@@ -157,13 +157,13 @@ export default function AdminPortal() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               required
-              className="w-full bg-white border-2 border-neutral-200/80 rounded-xl p-3 text-sm font-semibold focus:ring-1 focus:ring-[#E34718] focus:outline-none text-neutral-800 placeholder-neutral-300"
+              className="w-full bg-white   rounded-xl p-3 text-sm font-semibold focus:ring-1 focus:ring-[#E34718] focus:outline-none text-neutral-800 placeholder-neutral-300"
             />
           </div>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full bg-[#E34718] hover:bg-[#C23A12] disabled:opacity-60 text-white py-3 rounded-xl font-bold text-sm uppercase transition-all shadow-sm cursor-pointer"
+            className="w-full bg-[#E34718] hover:bg-[#C23A12] disabled:opacity-60 text-white py-3 rounded-xl font-bold text-sm text-sentence transition-all shadow-sm cursor-pointer"
           >
             {isSubmitting ? 'Signing In...' : 'Sign In'}
           </button>

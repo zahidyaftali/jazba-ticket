@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { getAllArtists, ArtistProfile } from '../services/backendService';
+import { getAllArtists, ArtistProfile, followTarget, unfollowTarget, getFollowingIds } from '../services/backendService';
+import { auth } from '../firebase';
 import { 
   Search, 
   MapPin, 
@@ -48,6 +49,7 @@ interface ArtistsPageProps {
   onBackToHome: () => void;
   onViewShowDetail: (showTitle: string) => void;
   onSelectArtist: (artist: ArtistItem) => void;
+  onRequireLogin: () => void;
 }
 
 // Maps a Firestore artist profile (managed via the Admin Hub) onto the richer
@@ -76,7 +78,7 @@ function mapArtistProfileToItem(p: ArtistProfile): ArtistItem {
   };
 }
 
-export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectArtist }: ArtistsPageProps) {
+export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectArtist, onRequireLogin }: ArtistsPageProps) {
   // Live artist roster, loaded from Firestore (managed via the Admin Hub)
   const [artists, setArtists] = useState<ArtistItem[]>([]);
 
@@ -93,15 +95,17 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
   const [onlyFeatured, setOnlyFeatured] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  // Favorites list saved locally
-  const [likedArtistIds, setLikedArtistIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('jazba_liked_artists');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
+  // Artists this signed-in user actually follows, loaded from Firestore
+  const [likedArtistIds, setLikedArtistIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) {
+      setLikedArtistIds([]);
+      return;
     }
-  });
+    getFollowingIds(user.uid, 'artist').then((ids) => setLikedArtistIds(Array.from(ids)));
+  }, []);
 
   const [showOnlyLiked, setShowOnlyLiked] = useState(false);
 
@@ -119,20 +123,25 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
     notes: ''
   });
 
-  // Toggle favorite
-  const handleToggleLike = (id: string, e: React.MouseEvent) => {
+  // Toggle follow - requires an authenticated user, persists to Firestore
+  const handleToggleLike = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    let updated: string[];
-    if (likedArtistIds.includes(id)) {
-      updated = likedArtistIds.filter(item => item !== id);
-    } else {
-      updated = [...likedArtistIds, id];
+    const user = auth.currentUser;
+    if (!user) {
+      onRequireLogin();
+      return;
     }
-    setLikedArtistIds(updated);
+    const alreadyLiked = likedArtistIds.includes(id);
     try {
-      localStorage.setItem('jazba_liked_artists', JSON.stringify(updated));
+      if (alreadyLiked) {
+        await unfollowTarget(user.uid, 'artist', id);
+        setLikedArtistIds(prev => prev.filter(item => item !== id));
+      } else {
+        await followTarget(user.uid, 'artist', id);
+        setLikedArtistIds(prev => [...prev, id]);
+      }
     } catch (err) {
-      console.warn('LocalStorage error:', err);
+      console.error('Error updating follow state', err);
     }
   };
 
@@ -212,7 +221,7 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
       
       {/* 1. GORGEOUS HERO SECTION - FULL WIDTH (60vh left-aligned, matching the Home Page style) */}
       <section 
-        className="relative bg-[#121212] min-h-[420px] h-[60vh] px-4 sm:px-6 md:px-8 border-b border-neutral-900 overflow-visible z-10 flex items-center"
+        className="relative bg-[#121212] min-h-[420px] h-[60vh] px-4 sm:px-6 md:px-8   overflow-visible z-10 flex items-center"
         id="artists-hero"
       >
         {/* DARK MUSIC EVENT BACKGROUND PHOTO WITH GRADIENT OVERLAY */}
@@ -231,7 +240,7 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
         {/* Left aligned text / No form / No action buttons */}
         <div className="max-w-7xl mx-auto w-full relative z-10 text-left space-y-4">
           {/* Path Breadcrumb */}
-          <div className="inline-flex items-center gap-2 text-[10px] font-black tracking-wider text-neutral-400 bg-neutral-905 border border-neutral-800 backdrop-blur-md px-3.5 py-1.5 rounded-full">
+          <div className="inline-flex items-center gap-2 text-[10px] font-black tracking-wider text-neutral-400 bg-neutral-905   backdrop-blur-md px-3.5 py-1.5 rounded-full">
             <span onClick={onBackToHome} className="hover:text-white hover:underline cursor-pointer transition-colors text-neutral-450">Home</span>
             <span>/</span>
             <span className="text-white">Performers Marketplace</span>
@@ -242,7 +251,7 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
           </h1>
 
           <p className="text-neutral-300 font-medium text-xs sm:text-sm md:text-base max-w-2xl leading-relaxed">
-            Connect directly with critically acclaimed operatic singers, instrumental quartets, high-affinity keynote presenters, and athletic street performers of supreme status.
+            Discover and book talented musicians, performers, and speakers for your next event.
           </p>
         </div>
       </section>
@@ -259,13 +268,13 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
           <div className="flex items-center gap-2">
             <button
               onClick={onBackToHome}
-              className="bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs uppercase tracking-wider px-5 py-2.5 rounded-full transition-all active:scale-97 cursor-pointer"
+              className="bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs text-sentence tracking-wider px-5 py-2.5 rounded-full transition-all active:scale-97 cursor-pointer"
             >
               ← Back to Shows
             </button>
             <button
               onClick={handleResetFilters}
-              className="bg-white hover:bg-neutral-50 border border-neutral-200 text-neutral-800 font-bold text-xs uppercase tracking-wider px-5 py-2.5 rounded-full transition-all active:scale-97 cursor-pointer"
+              className="bg-white hover:bg-neutral-50   text-neutral-800 font-bold text-xs text-sentence tracking-wider px-5 py-2.5 rounded-full transition-all active:scale-97 cursor-pointer"
             >
               Reset Filters
             </button>
@@ -273,15 +282,15 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
         </div>
 
         {/* BOLD SEARCH BAR & QUICK OPTION TILES */}
-        <div className="bg-white border border-neutral-200 rounded-2xl p-5 mb-8 shadow-xs flex flex-col md:flex-row items-stretch md:items-center gap-4">
+        <div className="bg-white   rounded-2xl p-5 mb-8 shadow-xs flex flex-col md:flex-row items-stretch md:items-center gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-neutral-400" />
             <input 
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search for vocalists, instrumentalists, sand designers, strings, keynoters..."
-              className="w-full bg-neutral-50 border border-neutral-200 hover:border-neutral-300 focus:border-neutral-400 rounded-2xl pl-11 pr-5 py-3 text-sm font-semibold text-neutral-850 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-400 transition-all shadow-inner"
+              placeholder="Search for vocalists, instrumentalists, speakers, performers..."
+              className="w-full bg-neutral-50     rounded-2xl pl-11 pr-5 py-3 text-sm font-semibold text-neutral-850 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-400 transition-all shadow-inner"
             />
             {searchQuery && (
               <button 
@@ -301,10 +310,10 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
               onClick={() => {
                 setShowOnlyLiked(!showOnlyLiked);
               }}
-              className={`flex items-center gap-2.5 px-4.5 py-3 rounded-2xl border transition-all text-xs font-extrabold ${
+              className={`flex items-center gap-2.5 px-4.5 py-3 rounded-2xl  transition-all text-xs font-extrabold ${
                 showOnlyLiked 
-                  ? 'border-neutral-900 bg-red-50 text-neutral-900 shadow-sm' 
-                  : 'border-neutral-200/90 hover:bg-neutral-50 text-neutral-700'
+                  ? ' bg-red-50 text-neutral-900 shadow-sm' 
+                  : ' hover:bg-neutral-50 text-neutral-700'
               }`}
             >
               <Heart className={`w-3.5 h-3.5 ${showOnlyLiked ? 'text-red-500 fill-red-500' : 'text-neutral-400'}`} />
@@ -312,7 +321,7 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
             </button>
 
             {/* GRID VS LIST SELECTOR */}
-            <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-1.5 flex items-center">
+            <div className="bg-neutral-50   rounded-2xl p-1.5 flex items-center">
               <button
                 onClick={() => setViewMode('grid')}
                 className={`p-1.5 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-white text-neutral-950 shadow-xs' : 'text-neutral-400 hover:text-neutral-600'}`}
@@ -338,10 +347,10 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
           <aside className="space-y-6">
             
             {/* 1. SELECTION DESK categories */}
-            <div className="bg-white border border-neutral-200 rounded-2xl p-5 shadow-xs">
-              <h3 className="text-xs font-black uppercase tracking-widest text-[#C23A12] mb-4.5 flex items-center gap-1.5">
+            <div className="bg-white   rounded-2xl p-5 shadow-xs">
+              <h3 className="text-xs font-black text-sentence tracking-widest text-[#C23A12] mb-4.5 flex items-center gap-1.5">
                 <Sliders className="w-4 h-4 text-[#E34718]" />
-                <span>Creative Realm</span>
+                <span>Category</span>
               </h3>
               <div className="space-y-1.5">
                 {categoriesConfig.map(cat => {
@@ -365,17 +374,17 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
             </div>
 
             {/* 2. REGION FILTER & HOURLY RATE */}
-            <div className="bg-white border border-neutral-200 rounded-2xl p-5 shadow-xs space-y-5">
+            <div className="bg-white   rounded-2xl p-5 shadow-xs space-y-5">
               
               {/* Location Select */}
               <div>
-                <label className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2 block">Region City</label>
+                <label className="text-xs font-black text-sentence tracking-widest text-neutral-400 mb-2 block">Region City</label>
                 <select
                   value={selectedLocation}
                   onChange={(e) => setSelectedLocation(e.target.value)}
-                  className="w-full bg-neutral-50 border border-neutral-200 hover:border-neutral-300 rounded-xl px-3 py-2.5 text-xs font-bold focus:outline-none"
+                  className="w-full bg-neutral-50    rounded-xl px-3 py-2.5 text-xs font-bold focus:outline-none"
                 >
-                  <option value="all">All Locations (UK wide)</option>
+                  <option value="all">All Locations</option>
                   <option value="London">London, UK</option>
                   <option value="Hamilton">Hamilton, UK</option>
                   <option value="Bristol">Bristol, UK</option>
@@ -384,7 +393,7 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
 
               {/* Price Tier Select */}
               <div>
-                <label className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2.5 block">Booking Rate Tier</label>
+                <label className="text-xs font-black text-sentence tracking-widest text-neutral-400 mb-2.5 block">Booking Rate Tier</label>
                 <div className="grid grid-cols-2 gap-1.5">
                   {(['all', 'under-150', '150-250', 'over-250'] as const).map(tier => {
                     const label = tier === 'all' ? 'All' :
@@ -395,10 +404,10 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                       <button
                         key={tier}
                         onClick={() => setHourlyRateTier(tier)}
-                        className={`py-2 px-1 rounded-xl text-[11px] font-black uppercase border-1.5 text-center transition-all ${
+                        className={`py-2 px-1 rounded-xl text-[11px] font-black text-sentence  text-center transition-all ${
                           active 
-                            ? 'border-neutral-900 bg-neutral-900 text-white' 
-                            : 'border-neutral-200 text-neutral-600 bg-white hover:border-neutral-300'
+                            ? ' bg-neutral-900 text-white' 
+                            : ' text-neutral-600 bg-white '
                         }`}
                       >
                         {label}
@@ -409,16 +418,16 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
               </div>
 
               {/* Toggle checklist checkmarks */}
-              <div className="border-t border-neutral-100 pt-4.5 space-y-3">
+              <div className="  pt-4.5 space-y-3">
                 <label className="flex items-center gap-2.5 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={onlyAvailable}
                     onChange={(e) => setOnlyAvailable(e.target.checked)}
-                    className="rounded border-neutral-300 text-[#E34718] focus:ring-[#E34718] cursor-pointer"
+                    className="rounded  text-[#E34718] focus:ring-[#E34718] cursor-pointer"
                   />
                   <span className="text-xs font-bold text-neutral-600 group-hover:text-black transition-colors">
-                    Instantly Bookable (Available)
+                    Available Now
                   </span>
                 </label>
 
@@ -427,10 +436,10 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                     type="checkbox"
                     checked={onlyFeatured}
                     onChange={(e) => setOnlyFeatured(e.target.checked)}
-                    className="rounded border-neutral-300 text-[#E34718] focus:ring-[#E34718] cursor-pointer"
+                    className="rounded  text-[#E34718] focus:ring-[#E34718] cursor-pointer"
                   />
                   <span className="text-xs font-bold text-neutral-600 group-hover:text-black transition-colors">
-                    Featured/Hot Talents
+                    Featured Artists
                   </span>
                 </label>
               </div>
@@ -438,11 +447,11 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
             </div>
 
             {/* DYNAMIC METRIC CALLOUT BOX */}
-            <div className="bg-[#E34718]/5 border border-dashed border-[#E34718]/30 rounded-2xl p-5.5 text-center">
+            <div className="bg-[#E34718]/5    rounded-2xl p-5.5 text-center">
               <Sparkles className="w-5 h-5 text-[#C23A12] mx-auto mb-2" />
-              <h4 className="text-xs font-black uppercase text-neutral-800">Agency Booking Guarantees</h4>
+              <h4 className="text-xs font-black text-sentence text-neutral-800">Booking Made Easy</h4>
               <p className="text-[11px] text-neutral-500 font-semibold mt-1.5 leading-relaxed">
-                We handle fully escrowed contract processing, premium insurance compliance, and substitution backups so your private show goes pristine!
+                We handle contracts and payment securely, so you can focus on planning a great show.
               </p>
             </div>
 
@@ -451,18 +460,17 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
           {/* MAIN RESULTS CONTAINER (RIGHT SIDE) */}
           <main className="lg:col-span-3">
             
-            <div className="flex items-center justify-between mb-5.5 text-xs font-bold text-neutral-450 uppercase tracking-widest">
-              <span>Verified Superstars Localized: {filteredArtists.length}</span>
-              <span>Updated live 11:05 am UTC</span>
+            <div className="flex items-center justify-between mb-5.5 text-xs font-bold text-neutral-450 text-sentence tracking-widest">
+              <span>{filteredArtists.length} Artists Found</span>
             </div>
 
             {/* ARTIST CHANNELS LIST OR GRID VIEWPORT */}
             {filteredArtists.length === 0 ? (
-              <div className="bg-white border border-dashed border-neutral-300 rounded-2xl p-12 text-center max-w-xl mx-auto my-6">
+              <div className="bg-white    rounded-2xl p-12 text-center max-w-xl mx-auto my-6">
                 <Award className="w-12 h-12 text-neutral-300 mx-auto mb-3" />
-                <h4 className="text-lg font-bold text-neutral-800 font-display">No Creators Match Parameters</h4>
+                <h4 className="text-lg font-bold text-neutral-800 font-display">No Artists Match Your Filters</h4>
                 <p className="text-xs text-neutral-400 font-medium max-w-xs mx-auto mt-1 leading-normal">
-                  No performer profile is configured under these exact combinations. Clear filters to reload full platform roster.
+                  Try adjusting your filters, or reset them to see all artists.
                 </p>
                 <button
                   onClick={handleResetFilters}
@@ -483,7 +491,7 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.2 }}
                       onClick={() => onSelectArtist(artist)}
-                      className="bg-white border border-neutral-200 hover:border-neutral-300 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between group relative"
+                      className="bg-white    rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between group relative"
                     >
                       {/* Header Avatar card segment */}
                       <div className="relative h-48 bg-neutral-100 overflow-hidden shrink-0">
@@ -509,15 +517,15 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                         </div>
 
                         {/* Elegant prominently styled Follow action button */}
-                        <div className="mt-4.5 pt-3.5 border-t border-neutral-100">
+                        <div className="mt-4.5 pt-3.5  ">
                           <button
                             onClick={(e) => {
                               handleToggleLike(artist.id, e);
                               onSelectArtist(artist);
                             }}
-                            className={`w-full py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 active:scale-97 cursor-pointer flex items-center justify-center gap-1.5 ${
+                            className={`w-full py-2.5 px-4 rounded-xl text-xs font-black text-sentence tracking-wider transition-all duration-200 active:scale-97 cursor-pointer flex items-center justify-center gap-1.5 ${
                               isLiked
-                                ? 'bg-orange-50 text-[#C23A12] border border-orange-200/50'
+                                ? 'bg-orange-50 text-[#C23A12]  '
                                 : 'bg-[#E34718] text-white hover:bg-[#C23A12] shadow-3xs'
                             }`}
                           >
@@ -541,10 +549,10 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                       layout
                       initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="bg-white border border-neutral-200 hover:border-neutral-300 rounded-2xl p-5 flex flex-col sm:flex-row gap-5 hover:shadow-xs cursor-pointer justify-between group"
+                      className="bg-white    rounded-2xl p-5 flex flex-col sm:flex-row gap-5 hover:shadow-xs cursor-pointer justify-between group"
                       onClick={() => onSelectArtist(artist)}
                     >
-                      <div className="w-full sm:w-40 h-32 rounded-2xl overflow-hidden shrink-0 relative bg-neutral-50 border border-neutral-100">
+                      <div className="w-full sm:w-40 h-32 rounded-2xl overflow-hidden shrink-0 relative bg-neutral-50  ">
                         <img 
                           src={artist.avatar} 
                           alt={artist.name} 
@@ -571,9 +579,9 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                             handleToggleLike(artist.id, e);
                             onSelectArtist(artist);
                           }}
-                          className={`w-36 py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 active:scale-97 cursor-pointer flex items-center justify-center gap-1.5 ${
+                          className={`w-36 py-2.5 px-4 rounded-xl text-xs font-black text-sentence tracking-wider transition-all duration-200 active:scale-97 cursor-pointer flex items-center justify-center gap-1.5 ${
                             isLiked
-                              ? 'bg-orange-50 text-[#C23A12] border border-orange-200/50'
+                              ? 'bg-orange-50 text-[#C23A12]  '
                               : 'bg-[#E34718] text-white hover:bg-[#C23A12] shadow-3xs'
                           }`}
                         >
@@ -619,8 +627,8 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
             >
               {/* Profile Card Header */}
               <div>
-                <div className="flex items-center justify-between pb-4 border-b border-neutral-200/60 mb-6">
-                  <div className="flex items-center gap-2 text-xs font-black text-neutral-400 uppercase tracking-widest">
+                <div className="flex items-center justify-between pb-4   mb-6">
+                  <div className="flex items-center gap-2 text-xs font-black text-neutral-400 text-sentence tracking-widest">
                     <span>Artist Portals</span>
                     <span>/</span>
                     <span className="text-[#E34718]">{activeArtistDetail.name}</span>
@@ -630,7 +638,7 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                       setActiveArtistDetail(null);
                       setIsInquirySubmitted(false);
                     }}
-                    className="w-9 h-9 rounded-full border border-neutral-200 flex items-center justify-center hover:bg-neutral-50 text-neutral-500 transition-colors"
+                    className="w-9 h-9 rounded-full   flex items-center justify-center hover:bg-neutral-50 text-neutral-500 transition-colors"
                   >
                     <X className="w-4.5 h-4.5" />
                   </button>
@@ -641,11 +649,11 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                   <img 
                     src={activeArtistDetail.avatar} 
                     alt={activeArtistDetail.name} 
-                    className="w-18 h-18 rounded-2xl object-cover border border-neutral-200 shadow-sm shrink-0"
+                    className="w-18 h-18 rounded-2xl object-cover   shadow-sm shrink-0"
                     referrerPolicy="no-referrer"
                   />
                   <div>
-                    <span className="text-[10px] bg-[#E34718]/10 text-neutral-800 px-3 py-1 rounded font-black uppercase tracking-wider">
+                    <span className="text-[10px] bg-[#E34718]/10 text-neutral-800 px-3 py-1 rounded font-black text-sentence tracking-wider">
                       {activeArtistDetail.subCategory}
                     </span>
                     <h2 className="font-display font-black text-xl text-neutral-900 mt-2">{activeArtistDetail.name}</h2>
@@ -657,22 +665,22 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                 </div>
 
                 {/* Artist stats dashboard overview */}
-                <div className="grid grid-cols-3 gap-3 bg-neutral-50 border border-neutral-200/90 rounded-2xl p-4.5 mb-6 text-center">
+                <div className="grid grid-cols-3 gap-3 bg-neutral-50   rounded-2xl p-4.5 mb-6 text-center">
                   <div>
-                    <span className="text-[10px] font-bold text-neutral-400 uppercase block">Rating Score</span>
+                    <span className="text-[10px] font-bold text-neutral-400 text-sentence block">Rating Score</span>
                     <span className="text-base font-black text-neutral-900 flex items-center justify-center gap-1 mt-1">
                       ⭐ {activeArtistDetail.rating}
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-neutral-400 uppercase block">Hourly Estimation</span>
+                    <span className="text-[10px] font-bold text-neutral-400 text-sentence block">Hourly Estimation</span>
                     <span className="text-base font-black text-neutral-900 block mt-1">
                       ${activeArtistDetail.hourlyRate}
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-neutral-400 uppercase block">Recent Gigs</span>
-                    <span className="text-xs font-black text-[#E34718] block mt-1.5 uppercase">
+                    <span className="text-[10px] font-bold text-neutral-400 text-sentence block">Recent Gigs</span>
+                    <span className="text-xs font-black text-[#E34718] block mt-1.5 text-sentence">
                       {activeArtistDetail.recentShows.length} Concerts
                     </span>
                   </div>
@@ -680,15 +688,15 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
 
                 {/* Full Biography story */}
                 <div className="mb-6">
-                  <h4 className="text-xs font-black tracking-widest uppercase text-neutral-400 mb-2">Detailed Portfolio Profile</h4>
-                  <p className="text-xs text-neutral-600 font-medium leading-relaxed bg-neutral-50/50 p-4 rounded-xl border border-neutral-100">
+                  <h4 className="text-xs font-black tracking-widest text-sentence text-neutral-400 mb-2">Detailed Portfolio Profile</h4>
+                  <p className="text-xs text-neutral-600 font-medium leading-relaxed bg-neutral-50/50 p-4 rounded-xl  ">
                     {activeArtistDetail.bio}
                   </p>
                 </div>
 
                 {/* Recent platform events listing */}
                 <div className="mb-6 space-y-2">
-                  <h4 className="text-xs font-black tracking-widest uppercase text-neutral-400">Featured Platform Works</h4>
+                  <h4 className="text-xs font-black tracking-widest text-sentence text-neutral-400">Featured Platform Works</h4>
                   <div className="space-y-2">
                     {activeArtistDetail.recentShows.map((show, i) => (
                       <div 
@@ -697,13 +705,13 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                           onViewShowDetail(show);
                           setActiveArtistDetail(null);
                         }}
-                        className="p-3.5 bg-white border border-neutral-200 rounded-xl flex items-center justify-between hover:border-neutral-300 hover:bg-neutral-50 cursor-pointer group transition-all"
+                        className="p-3.5 bg-white   rounded-xl flex items-center justify-between  hover:bg-neutral-50 cursor-pointer group transition-all"
                       >
                         <div className="flex items-center gap-2.5">
                           <Play className="w-3.5 h-3.5 text-[#E34718] fill-[#E34718]" />
                           <span className="text-xs font-bold text-neutral-850 group-hover:underline">{show}</span>
                         </div>
-                        <span className="text-[10px] bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded font-black uppercase">
+                        <span className="text-[10px] bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded font-black text-sentence">
                           Featured Booking
                         </span>
                       </div>
@@ -712,10 +720,10 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                 </div>
 
                 {/* Dynamic Inline proposal Inquiry Hire form */}
-                <div className="border-t border-neutral-200/60 pt-5 mt-4">
-                  <h3 className="text-sm font-black text-[#E34718] flex items-center gap-1.5 lowercase uppercase mb-4 tracking-wider">
+                <div className="  pt-5 mt-4">
+                  <h3 className="text-sm font-black text-[#E34718] flex items-center gap-1.5 lowercase text-sentence mb-4 tracking-wider">
                     <Send className="w-4.5 h-4.5 text-[#E34718]" />
-                    <span>Inquire Interactive Booking Contract</span>
+                    <span>Send a Booking Inquiry</span>
                   </h3>
 
                   <AnimatePresence mode="wait">
@@ -727,17 +735,17 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                       >
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="text-[10px] font-bold text-neutral-450 uppercase mb-1.5 block">Project Date</label>
+                            <label className="text-[10px] font-bold text-neutral-450 text-sentence mb-1.5 block">Project Date</label>
                             <input 
                               type="date" 
                               required
                               value={inquiryFormData.date}
                               onChange={(e) => setInquiryFormData(prev => ({ ...prev, date: e.target.value }))}
-                              className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-bold"
+                              className="w-full bg-neutral-50   rounded-xl px-3 py-2 text-xs font-bold"
                             />
                           </div>
                           <div>
-                            <label className="text-[10px] font-bold text-neutral-450 uppercase mb-1.5 block">Estimated Hours</label>
+                            <label className="text-[10px] font-bold text-neutral-450 text-sentence mb-1.5 block">Estimated Hours</label>
                             <input 
                               type="number" 
                               required
@@ -745,45 +753,45 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                               max="24"
                               value={inquiryFormData.hours}
                               onChange={(e) => setInquiryFormData(prev => ({ ...prev, hours: e.target.value }))}
-                              className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-bold"
+                              className="w-full bg-neutral-50   rounded-xl px-3 py-2 text-xs font-bold"
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="text-[10px] font-bold text-neutral-450 uppercase mb-1.5 block">Event Venue Type</label>
+                          <label className="text-[10px] font-bold text-neutral-450 text-sentence mb-1.5 block">Event Venue Type</label>
                           <input 
                             type="text" 
                             placeholder="e.g. Auditorium Hall, Back Garden, Hotel"
                             value={inquiryFormData.venueType}
                             onChange={(e) => setInquiryFormData(prev => ({ ...prev, venueType: e.target.value }))}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-semibold placeholder-neutral-400 text-neutral-800"
+                            className="w-full bg-neutral-50   rounded-xl px-3 py-2 text-xs font-semibold placeholder-neutral-400 text-neutral-800"
                           />
                         </div>
 
                         <div>
-                          <label className="text-[10px] font-bold text-neutral-450 uppercase mb-1.5 block">Venue Location Specifics</label>
+                          <label className="text-[10px] font-bold text-neutral-450 text-sentence mb-1.5 block">Venue Location Specifics</label>
                           <input 
                             type="text" 
                             placeholder="e.g. London Westminster Suite"
                             value={inquiryFormData.location}
                             onChange={(e) => setInquiryFormData(prev => ({ ...prev, location: e.target.value }))}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-semibold placeholder-neutral-400 text-neutral-800"
+                            className="w-full bg-neutral-50   rounded-xl px-3 py-2 text-xs font-semibold placeholder-neutral-400 text-neutral-800"
                           />
                         </div>
 
                         <div>
-                          <label className="text-[10px] font-bold text-neutral-450 uppercase mb-1.5 block">Special Custom Demands &amp; Songs (Optional)</label>
+                          <label className="text-[10px] font-bold text-neutral-450 text-sentence mb-1.5 block">Special Custom Demands &amp; Songs (Optional)</label>
                           <textarea 
                             rows={2}
                             placeholder="Specify special timing loops or song lists..."
                             value={inquiryFormData.notes}
                             onChange={(e) => setInquiryFormData(prev => ({ ...prev, notes: e.target.value }))}
-                            className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-semibold placeholder-neutral-400 text-neutral-800"
+                            className="w-full bg-neutral-50   rounded-xl px-3 py-2 text-xs font-semibold placeholder-neutral-400 text-neutral-800"
                           />
                         </div>
 
-                        <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-3 flex justify-between items-center text-xs">
+                        <div className="bg-neutral-50   rounded-xl p-3 flex justify-between items-center text-xs">
                           <span className="font-bold text-neutral-500">Estimate Guarantee:</span>
                           <span className="font-black text-neutral-950">
                             ${(activeArtistDetail.hourlyRate * Number(inquiryFormData.hours || 1)).toLocaleString()} USD Max
@@ -793,9 +801,9 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                         <button
                           type="submit"
                           disabled={inquiryLoading}
-                          className="w-full bg-neutral-900 hover:bg-neutral-800 disabled:bg-neutral-600 text-white hover:text-[#C5E85C] font-black text-xs py-3 rounded-full uppercase tracking-wider shadow-md transition-all active:scale-95"
+                          className="w-full bg-neutral-900 hover:bg-neutral-800 disabled:bg-neutral-600 text-white hover:text-[#C5E85C] font-black text-xs py-3 rounded-full text-sentence tracking-wider shadow-md transition-all active:scale-95"
                         >
-                          {inquiryLoading ? 'Verifying Agency Slots...' : 'Submit Booking Inquiry'}
+                          {inquiryLoading ? 'Sending...' : 'Submit Booking Inquiry'}
                         </button>
                       </motion.form>
                     ) : (
@@ -803,18 +811,18 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                         key="success"
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="bg-orange-50 border border-orange-200 rounded-2xl p-5 text-center my-2 shadow-xs"
+                        className="bg-orange-50   rounded-2xl p-5 text-center my-2 shadow-xs"
                       >
                         <CheckCircle2 className="w-10 h-10 text-[#E34718] mx-auto mb-2.5" />
-                        <h4 className="text-sm font-black text-neutral-900 uppercase">Inquiry Filed Successfully!</h4>
+                        <h4 className="text-sm font-black text-neutral-900 text-sentence">Inquiry Filed Successfully!</h4>
                         <p className="text-[11px] text-neutral-600 font-semibold mt-1.5 leading-relaxed">
                           Your contract draft booking request for <strong>{activeArtistDetail.name}</strong> on {inquiryFormData.date} has been registered securely.
                         </p>
-                        <div className="mt-3.5 bg-white border border-orange-100 rounded-lg p-2 font-mono text-xs font-black text-[#E34718] inline-block uppercase tracking-wider">
+                        <div className="mt-3.5 bg-white   rounded-lg p-2 font-mono text-xs font-black text-[#E34718] inline-block text-sentence tracking-wider">
                           #JT-AGENCY-{Math.floor(Math.random() * 89999 + 10000)}
                         </div>
                         <p className="text-[10px] text-neutral-400 font-bold mt-2.5">
-                          Our agency account manager will dispatch premium pricing proposal schedules within 2 hours!
+                          Our booking team will reach out with pricing and availability within 2 hours.
                         </p>
                       </motion.div>
                     )}
@@ -824,9 +832,9 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
               </div>
 
               {/* Drawer Sticky bottom */}
-              <div className="pt-4 border-t border-neutral-100 flex items-center justify-between text-[11px] text-neutral-400 font-bold">
-                <span>Verified Creative Partner ID: {activeArtistDetail.id}</span>
-                <span>Secure Escrow Protection</span>
+              <div className="pt-4   flex items-center justify-between text-[11px] text-neutral-400 font-bold">
+                <span>Artist ID: {activeArtistDetail.id}</span>
+                <span>Secure Payments</span>
               </div>
 
             </motion.div>

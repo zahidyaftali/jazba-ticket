@@ -17,6 +17,8 @@ import {
 import { ArtistItem } from './ArtistsPage';
 import { EventItem } from '../types';
 import EventCard from './EventCard';
+import { auth } from '../firebase';
+import { followTarget, unfollowTarget, isFollowingTarget, getFollowerCount } from '../services/backendService';
 
 interface ArtistDetailPageProps {
   artist: ArtistItem;
@@ -24,19 +26,30 @@ interface ArtistDetailPageProps {
   onBack: () => void;
   onViewShowDetail: (showTitle: string) => void;
   onBookEvent?: (event: EventItem) => void;
+  onRequireLogin: () => void;
 }
 
-export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShowDetail, onBookEvent }: ArtistDetailPageProps) {
-  const [isLiked, setIsLiked] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem('jazba_liked_artists');
-      if (saved) {
-        const ids = JSON.parse(saved);
-        return ids.includes(artist.id);
-      }
-    } catch {}
-    return false;
-  });
+export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShowDetail, onBookEvent, onRequireLogin }: ArtistDetailPageProps) {
+  const [isLiked, setIsLiked] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followBusy, setFollowBusy] = useState(false);
+
+  // Load real follow state & follower count for this artist on mount/artist change
+  useEffect(() => {
+    let cancelled = false;
+    getFollowerCount('artist', artist.id).then((count) => {
+      if (!cancelled) setFollowerCount(count);
+    });
+    const user = auth.currentUser;
+    if (user) {
+      isFollowingTarget(user.uid, 'artist', artist.id).then((following) => {
+        if (!cancelled) setIsLiked(following);
+      });
+    } else {
+      setIsLiked(false);
+    }
+    return () => { cancelled = true; };
+  }, [artist]);
 
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past' | 'collections'>('upcoming');
   const [showContactModal, setShowContactModal] = useState(false);
@@ -52,22 +65,30 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [artist]);
 
-  // Handle follow toggle
-  const handleToggleFollow = (e: React.MouseEvent) => {
+  // Handle follow toggle - requires an authenticated user, persists to Firestore
+  const handleToggleFollow = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    const user = auth.currentUser;
+    if (!user) {
+      onRequireLogin();
+      return;
+    }
+    if (followBusy) return;
+    setFollowBusy(true);
     try {
-      const saved = localStorage.getItem('jazba_liked_artists');
-      let ids = saved ? JSON.parse(saved) : [];
       if (isLiked) {
-        ids = ids.filter((id: string) => id !== artist.id);
+        await unfollowTarget(user.uid, 'artist', artist.id);
         setIsLiked(false);
+        setFollowerCount((c) => Math.max(0, c - 1));
       } else {
-        ids.push(artist.id);
+        await followTarget(user.uid, 'artist', artist.id);
         setIsLiked(true);
+        setFollowerCount((c) => c + 1);
       }
-      localStorage.setItem('jazba_liked_artists', JSON.stringify(ids));
     } catch (err) {
-      console.log('Error saving liked state', err);
+      console.error('Error updating follow state', err);
+    } finally {
+      setFollowBusy(false);
     }
   };
 
@@ -92,15 +113,13 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
     });
   }, [artist]);
 
-  // Determinstic Statistics mapping based on the attached design picture
+  // Display statistics; followers come from real Firestore counts, the rest are derived from profile data
   const stats = useMemo(() => {
-    const followerCount = Math.round(artist.rating * 160 + artist.experienceYears * 120 + artist.name.length * 15);
     const hostingDuration = `${artist.experienceYears || 3} years`;
     const totalEventsCount = artist.recentShows.length + 3;
     const totalAttendeesCount = `${((artist.name.length * 280 + artist.experienceYears * 540) / 1000).toFixed(1)}k`;
 
     return {
-      followers: followerCount,
       hosting: hostingDuration,
       totalEvents: totalEventsCount,
       totalAttendees: totalAttendeesCount
@@ -139,7 +158,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
     <div className="bg-[#FAFBFD] min-h-screen text-neutral-900 font-sans pb-24" id={`artist-detail-${artist.id}`}>
       
       {/* 1. HEADER NAVIGATION */}
-      <div className="bg-white border-b border-neutral-200 sticky top-0 z-30 shadow-xs" id="artist-navigator-header">
+      <div className="bg-white   sticky top-0 z-30 shadow-xs" id="artist-navigator-header">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <button 
             onClick={onBack}
@@ -156,7 +175,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
       </div>
 
       {/* 2. GORGEOUS STYLED BANNER BACKDROP */}
-      <div className="w-full h-44 sm:h-52 md:h-60 bg-gradient-to-r from-neutral-100 to-neutral-200/50 relative overflow-hidden border-b border-neutral-200" id="artist-profile-banner">
+      <div className="w-full h-44 sm:h-52 md:h-60 bg-gradient-to-r from-neutral-100 to-neutral-200/50 relative overflow-hidden  " id="artist-profile-banner">
         {/* Subtle geometric grid backdrop matching home page */}
         <div className="absolute inset-0 bg-[radial-gradient(rgba(227,71,24,0.03)_1px,transparent_1px)] [background-size:24px_24px] opacity-80" />
         <div className="absolute -right-20 -top-20 w-80 h-80 bg-[#E34718]/5 rounded-full blur-[90px] pointer-events-none" />
@@ -167,11 +186,11 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
         {/* Main Header flex container matching layout precisely */}
-        <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6 pt-6 pb-8 border-b border-neutral-200" id="artist-profile-header-meta">
+        <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6 pt-6 pb-8  " id="artist-profile-header-meta">
           
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left w-full md:w-auto">
             {/* Elegant avatar presentation with pristine thick white padding, straddling the banner bottom divider */}
-            <div className="w-32 h-32 md:w-36 md:h-36 rounded-full border-[5px] border-white bg-white shadow-md relative z-20 select-none overflow-hidden shrink-0 -mt-16 md:-mt-22">
+            <div className="w-32 h-32 md:w-36 md:h-36 rounded-full   bg-white shadow-md relative z-20 select-none overflow-hidden shrink-0 -mt-16 md:-mt-22">
               <img 
                 src={artist.avatar} 
                 alt={artist.name} 
@@ -192,28 +211,28 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-6 gap-y-2 text-xs font-sans">
                 
                 <div className="flex flex-col items-center md:items-start min-w-[70px]">
-                  <span className="text-[10px] text-neutral-400 font-medium uppercase tracking-wider">followers</span>
-                  <span className="font-bold text-neutral-800 text-sm mt-0.5">{stats.followers}</span>
+                  <span className="text-[10px] text-neutral-400 font-medium text-sentence tracking-wider">followers</span>
+                  <span className="font-bold text-neutral-800 text-sm mt-0.5">{followerCount}</span>
                 </div>
 
                 <div className="w-px h-6 bg-neutral-200 hidden md:block" />
 
                 <div className="flex flex-col items-center md:items-start min-w-[70px]">
-                  <span className="text-[10px] text-neutral-400 font-medium uppercase tracking-wider">hosting</span>
+                  <span className="text-[10px] text-neutral-400 font-medium text-sentence tracking-wider">hosting</span>
                   <span className="font-bold text-neutral-800 text-sm mt-0.5">{stats.hosting}</span>
                 </div>
 
                 <div className="w-px h-6 bg-neutral-200 hidden md:block" />
 
                 <div className="flex flex-col items-center md:items-start min-w-[70px]">
-                  <span className="text-[10px] text-neutral-400 font-medium uppercase tracking-wider">total events</span>
+                  <span className="text-[10px] text-neutral-400 font-medium text-sentence tracking-wider">total events</span>
                   <span className="font-bold text-neutral-800 text-sm mt-0.5">{stats.totalEvents}</span>
                 </div>
 
                 <div className="w-px h-6 bg-neutral-200 hidden md:block" />
 
                 <div className="flex flex-col items-center md:items-start min-w-[70px]">
-                  <span className="text-[10px] text-neutral-400 font-medium uppercase tracking-wider">total attendees</span>
+                  <span className="text-[10px] text-neutral-400 font-medium text-sentence tracking-wider">total attendees</span>
                   <span className="font-bold text-neutral-800 text-sm mt-0.5">{stats.totalAttendees}</span>
                 </div>
 
@@ -241,10 +260,11 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
             {/* Follow action - solid orange accent matching your home page theme */}
             <button
               onClick={handleToggleFollow}
-              className={`py-2 px-6 rounded-full text-xs font-bold tracking-wide transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 border min-h-[40px] shadow-xs ${
+              disabled={followBusy}
+              className={`py-2 px-6 rounded-full text-xs font-bold tracking-wide transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5  min-h-[40px] shadow-xs disabled:opacity-60 ${
                 isLiked
-                  ? 'bg-neutral-100 text-neutral-800 border-neutral-300 hover:bg-neutral-200'
-                  : 'bg-[#E34718] text-white border-[#E34718] hover:bg-[#C23A12]'
+                  ? 'bg-neutral-100 text-neutral-800  hover:bg-neutral-200'
+                  : 'bg-[#E34718] text-white  hover:bg-[#C23A12]'
               }`}
               id="artist-detail-follow"
             >
@@ -261,7 +281,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
             {/* Contact Action */}
             <button
               onClick={() => setShowContactModal(true)}
-              className="bg-white hover:bg-neutral-50 text-neutral-900 border border-neutral-300 hover:border-neutral-400 py-2 px-6 rounded-full text-xs font-bold tracking-wide transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 min-h-[40px] shadow-xs"
+              className="bg-white hover:bg-neutral-50 text-neutral-900    py-2 px-6 rounded-full text-xs font-bold tracking-wide transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 min-h-[40px] shadow-xs"
               id="artist-detail-contact"
             >
               <span>Contact</span>
@@ -270,7 +290,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
             {/* Share profile with copy clipboard */}
             <button
               onClick={handleShare}
-              className="p-2.5 bg-white hover:bg-neutral-50 text-neutral-600 border border-neutral-200 hover:border-neutral-300 rounded-full transition-all active:scale-95 cursor-pointer relative shadow-xs"
+              className="p-2.5 bg-white hover:bg-neutral-50 text-neutral-600    rounded-full transition-all active:scale-95 cursor-pointer relative shadow-xs"
               title="Share profile link"
               id="artist-detail-share"
             >
@@ -287,15 +307,15 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
         </div>
 
         {/* 4. TABS COMPONENT ROW - Upcoming, Past, Collections */}
-        <div className="flex border-b border-neutral-200 mt-10" id="artist-tabs-row">
+        <div className="flex   mt-10" id="artist-tabs-row">
           {(['upcoming', 'past', 'collections'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-6 py-4 font-display text-xs sm:text-sm font-bold tracking-tight border-b-2 transition-all relative cursor-pointer uppercase ${
+              className={`px-6 py-4 font-display text-xs sm:text-sm font-bold tracking-tight  transition-all relative cursor-pointer text-sentence ${
                 activeTab === tab
-                  ? 'border-neutral-900 text-neutral-900'
-                  : 'border-transparent text-neutral-400 hover:text-neutral-600'
+                  ? ' text-neutral-900'
+                  : ' text-neutral-400 hover:text-neutral-600'
               }`}
             >
               {tab === 'collections' ? 'Collections & Bio' : tab}
@@ -340,7 +360,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                       ))}
                     </div>
                   ) : (
-                    <div className="py-12 text-center bg-white border border-neutral-200 rounded-3xl space-y-2">
+                    <div className="py-12 text-center bg-white   rounded-3xl space-y-2">
                       <p className="font-semibold text-neutral-500 text-sm">No scheduled live dates currently.</p>
                       <button 
                         onClick={() => setShowContactModal(true)}
@@ -366,11 +386,11 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                     {pastShowsMapped.map((show, idx) => (
                       <div 
                         key={idx}
-                        className="bg-white border border-neutral-200 rounded-2xl p-5 flex items-center justify-between shadow-xs hover:border-neutral-300 transition-all"
+                        className="bg-white   rounded-2xl p-5 flex items-center justify-between shadow-xs  transition-all"
                       >
                         <div className="space-y-1.5 pr-4">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="bg-neutral-100 text-neutral-600 text-[9px] font-bold px-2 py-0.5 rounded-full border border-neutral-200 uppercase tracking-widest font-mono">
+                            <span className="bg-neutral-100 text-neutral-600 text-[9px] font-bold px-2 py-0.5 rounded-full   text-sentence tracking-widest font-mono">
                               ARCHIVED SHOW
                             </span>
                             <span className="text-[11px] font-bold text-neutral-400">{show.date}</span>
@@ -384,7 +404,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                           </div>
                         </div>
 
-                        <span className="text-[10px] bg-neutral-100/85 text-neutral-500 font-bold px-3.5 py-1.5 rounded-full border border-neutral-200 shrink-0 select-none">
+                        <span className="text-[10px] bg-neutral-100/85 text-neutral-500 font-bold px-3.5 py-1.5 rounded-full   shrink-0 select-none">
                           Completed
                         </span>
                       </div>
@@ -398,7 +418,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                   
                   {/* Biography text content */}
                   <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-white border border-neutral-200 rounded-3xl p-6 sm:p-8 space-y-4 shadow-xs">
+                    <div className="bg-white   rounded-3xl p-6 sm:p-8 space-y-4 shadow-xs">
                       <h4 className="text-lg font-display font-bold text-neutral-900">Artist biography</h4>
                       <p className="text-xs sm:text-[13px] text-neutral-600 font-medium leading-relaxed font-sans whitespace-pre-line">
                         {artist.bio}
@@ -406,17 +426,17 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                     </div>
 
                     {/* Rates & Specifications card */}
-                    <div className="bg-white border border-neutral-200 rounded-3xl p-6 sm:p-8 grid grid-cols-2 sm:grid-cols-3 gap-4 shadow-xs">
+                    <div className="bg-white   rounded-3xl p-6 sm:p-8 grid grid-cols-2 sm:grid-cols-3 gap-4 shadow-xs">
                       <div>
-                        <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest block">Booking rate</span>
+                        <span className="text-[10px] text-neutral-400 font-bold text-sentence tracking-widest block">Booking rate</span>
                         <span className="text-base font-bold text-neutral-800 mt-1 block">${artist.hourlyRate}/Hr</span>
                       </div>
                       <div>
-                        <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest block">experience</span>
+                        <span className="text-[10px] text-neutral-400 font-bold text-sentence tracking-widest block">experience</span>
                         <span className="text-base font-bold text-neutral-800 mt-1 block">{artist.experienceYears} Years Active</span>
                       </div>
                       <div className="col-span-2 sm:col-span-1">
-                        <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest block">location</span>
+                        <span className="text-[10px] text-neutral-400 font-bold text-sentence tracking-widest block">location</span>
                         <span className="text-base font-bold text-neutral-800 mt-1 block">{artist.location || 'London'}</span>
                       </div>
                     </div>
@@ -426,50 +446,50 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                   <div className="space-y-6">
                     
                     {/* Verified system badge */}
-                    <div className="bg-white border border-neutral-200 rounded-3xl p-6 sm:p-8 space-y-4 shadow-xs">
-                      <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Verify stats</h4>
+                    <div className="bg-white   rounded-3xl p-6 sm:p-8 space-y-4 shadow-xs">
+                      <h4 className="text-xs font-bold text-neutral-400 text-sentence tracking-widest">Rating</h4>
                       <div className="flex items-center gap-2">
                         <div className="flex items-center text-amber-500">
                           <Star className="w-5 h-5 fill-current" />
                         </div>
                         <span className="font-extrabold text-xl text-neutral-900">{artist.rating.toFixed(1)}</span>
-                        <span className="text-xs text-neutral-400 font-medium mt-0.5">({artist.totalReviews} total audits)</span>
+                        <span className="text-xs text-neutral-400 font-medium mt-0.5">({artist.totalReviews} reviews)</span>
                       </div>
 
-                      <div className="pt-3.5 border-t border-neutral-100 flex items-center gap-3">
+                      <div className="pt-3.5   flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-[#E34718]/10 flex items-center justify-center shrink-0">
                           <Sparkles className="w-4 h-4 text-[#E34718]" />
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-neutral-800">100% Verified Curation</p>
-                          <p className="text-[11px] text-neutral-500 font-medium">Fast-track direct pricing system.</p>
+                          <p className="text-xs font-bold text-neutral-800">Verified Profile</p>
+                          <p className="text-[11px] text-neutral-500 font-medium">Transparent, upfront pricing.</p>
                         </div>
                       </div>
                     </div>
 
                     {/* Streaming indicators */}
-                    <div className="bg-white border border-neutral-200 rounded-3xl p-6 sm:p-8 space-y-3.5 shadow-xs">
-                      <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Connected streams</h4>
+                    <div className="bg-white   rounded-3xl p-6 sm:p-8 space-y-3.5 shadow-xs">
+                      <h4 className="text-xs font-bold text-neutral-400 text-sentence tracking-widest">Connected streams</h4>
                       
                       <div className="space-y-2">
                         <a 
                           href={artist.socials?.spotify || "https://spotify.com"} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="flex items-center justify-between p-2.5 hover:bg-neutral-50 rounded-xl transition-all border border-transparent hover:border-neutral-100"
+                          className="flex items-center justify-between p-2.5 hover:bg-neutral-50 rounded-xl transition-all   "
                         >
                           <span className="text-xs font-bold text-neutral-700 font-sans">Spotify Profile</span>
-                          <span className="text-[10px] font-extrabold text-[#E34718] uppercase tracking-wide">Listen Now</span>
+                          <span className="text-[10px] font-extrabold text-[#E34718] text-sentence tracking-wide">Listen Now</span>
                         </a>
 
                         <a 
                           href={artist.socials?.youtube || "https://youtube.com"} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="flex items-center justify-between p-2.5 hover:bg-neutral-50 rounded-xl transition-all border border-transparent hover:border-neutral-100"
+                          className="flex items-center justify-between p-2.5 hover:bg-neutral-50 rounded-xl transition-all   "
                         >
                           <span className="text-xs font-bold text-neutral-700 font-sans">YouTube Channel</span>
-                          <span className="text-[10px] font-extrabold text-[#E34718] uppercase tracking-wide">Watch video</span>
+                          <span className="text-[10px] font-extrabold text-[#E34718] text-sentence tracking-wide">Watch video</span>
                         </a>
                       </div>
                     </div>
@@ -492,21 +512,21 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
               initial={{ opacity: 0, scale: 0.96, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 15 }}
-              className="bg-white border border-neutral-205 rounded-[2rem] max-w-md w-full p-6 sm:p-8 relative shadow-xl overflow-hidden"
+              className="bg-white   rounded-[2rem] max-w-md w-full p-6 sm:p-8 relative shadow-xl overflow-hidden"
               id="contact-artist-modal"
             >
               
               {/* Corner Close button */}
               <button 
                 onClick={() => setShowContactModal(false)}
-                className="absolute top-5 right-5 text-neutral-400 hover:text-black w-8 h-8 rounded-full border border-neutral-200 flex items-center justify-center transition-colors hover:bg-neutral-50 cursor-pointer"
+                className="absolute top-5 right-5 text-neutral-400 hover:text-black w-8 h-8 rounded-full   flex items-center justify-center transition-colors hover:bg-neutral-50 cursor-pointer"
                 aria-label="Close message window"
               >
                 <X className="w-4 h-4" />
               </button>
 
               <div className="space-y-2 mb-6 text-left">
-                <span className="text-[10px] font-bold text-[#E34718] flex items-center gap-1 uppercase tracking-widest">
+                <span className="text-[10px] font-bold text-[#E34718] flex items-center gap-1 text-sentence tracking-widest">
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Inquiry dispatch</span>
                 </span>
@@ -520,7 +540,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
 
               {sendSuccess ? (
                 <div className="py-8 text-center space-y-3" id="contact-success-notice">
-                  <div className="w-12 h-12 bg-orange-50 text-[#C23A12] rounded-full flex items-center justify-center mx-auto border border-orange-250/30">
+                  <div className="w-12 h-12 bg-orange-50 text-[#C23A12] rounded-full flex items-center justify-center mx-auto  ">
                     <Check className="w-6 h-6 stroke-[3]" />
                   </div>
                   <div>
@@ -535,7 +555,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                   
                   {/* Name field */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-neutral-450 uppercase tracking-widest pl-1 block">
+                    <label className="text-[10px] font-bold text-neutral-450 text-sentence tracking-widest pl-1 block">
                       Inquirer name
                     </label>
                     <input 
@@ -544,13 +564,13 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                       value={contactName}
                       onChange={(e) => setContactName(e.target.value)}
                       placeholder="e.g. Liam Hall"
-                      className="w-full bg-neutral-50 hover:bg-neutral-100/60 border border-neutral-200 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-[#E34718] focus:ring-1 focus:ring-[#E34718]/45 placeholder-neutral-400 min-h-[40px]"
+                      className="w-full bg-neutral-50 hover:bg-neutral-100/60   focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none  focus:ring-1 focus:ring-[#E34718]/45 placeholder-neutral-400 min-h-[40px]"
                     />
                   </div>
 
                   {/* Email address */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-neutral-450 uppercase tracking-widest pl-1 block">
+                    <label className="text-[10px] font-bold text-neutral-450 text-sentence tracking-widest pl-1 block">
                       Your email address
                     </label>
                     <input 
@@ -559,13 +579,13 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                       value={contactEmail}
                       onChange={(e) => setContactEmail(e.target.value)}
                       placeholder="name@gmail.com"
-                      className="w-full bg-neutral-50 hover:bg-neutral-100/60 border border-neutral-200 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-[#E34718] focus:ring-1 focus:ring-[#E34718]/45 placeholder-neutral-400 min-h-[40px]"
+                      className="w-full bg-neutral-50 hover:bg-neutral-100/60   focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none  focus:ring-1 focus:ring-[#E34718]/45 placeholder-neutral-400 min-h-[40px]"
                     />
                   </div>
 
                   {/* Message body */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-neutral-450 uppercase tracking-widest pl-1 block">
+                    <label className="text-[10px] font-bold text-neutral-450 text-sentence tracking-widest pl-1 block">
                       Request description
                     </label>
                     <textarea 
@@ -574,7 +594,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                       value={contactMessage}
                       onChange={(e) => setContactMessage(e.target.value)}
                       placeholder="Share details of your upcoming gig, date, and venue requirements..."
-                      className="w-full bg-neutral-50 hover:bg-neutral-100/60 border border-neutral-200 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-[#E34718] focus:ring-1 focus:ring-[#E34718]/45 placeholder-neutral-400 resize-none"
+                      className="w-full bg-neutral-50 hover:bg-neutral-100/60   focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none  focus:ring-1 focus:ring-[#E34718]/45 placeholder-neutral-400 resize-none"
                     />
                   </div>
 
@@ -582,7 +602,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                   <button
                     type="submit"
                     disabled={isSending}
-                    className="w-full bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 text-white font-extrabold text-[10px] uppercase py-3.5 px-5 rounded-full tracking-widest transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-98 min-h-[40px]"
+                    className="w-full bg-neutral-900   hover:bg-neutral-800 text-white font-extrabold text-[10px] text-sentence py-3.5 px-5 rounded-full tracking-widest transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-98 min-h-[40px]"
                     id="submit-contact-form"
                   >
                     <span>{isSending ? 'Sending inquiry...' : 'Verify & dispatch message'}</span>

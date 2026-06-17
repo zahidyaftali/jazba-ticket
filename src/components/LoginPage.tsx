@@ -9,7 +9,7 @@ import {
   ArrowRight,
   AlertCircle
 } from 'lucide-react';
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../firebase';
 
 interface LoginPageProps {
@@ -25,6 +25,13 @@ export default function LoginPage({ onBack, onSuccess, onSwitchToSignup }: Login
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Forgot password flow
+  const [showResetForm, setShowResetForm] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState('');
+  const [resetError, setResetError] = useState('');
 
   // Simple validation
   const validateEmail = (val: string) => {
@@ -62,13 +69,40 @@ export default function LoginPage({ onBack, onSuccess, onSwitchToSignup }: Login
       });
     } catch (err: any) {
       setLoading(false);
-      let friendlyMessage = 'Authentication failed. Please verify your passcode credentials.';
+      let friendlyMessage = 'Sign-in failed. Please check your email and password and try again.';
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        friendlyMessage = 'Invalid credentials. If you do not have an profile, please register first.';
+        friendlyMessage = "Incorrect email or password. If you don't have an account yet, sign up first.";
       } else if (err.message) {
         friendlyMessage = err.message;
       }
       setErrorMessage(friendlyMessage);
+    }
+  };
+
+  const handleResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetError('');
+    setResetMessage('');
+
+    if (!validateEmail(resetEmail)) {
+      setResetError('Enter a valid email address to receive the reset link.');
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, resetEmail);
+      setResetMessage('Password reset link sent. Check your inbox.');
+    } catch (err: any) {
+      let friendlyMessage = 'Could not send reset link. Please try again.';
+      if (err.code === 'auth/user-not-found') {
+        friendlyMessage = "No account found with that email.";
+      } else if (err.message) {
+        friendlyMessage = err.message;
+      }
+      setResetError(friendlyMessage);
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -86,7 +120,7 @@ export default function LoginPage({ onBack, onSuccess, onSwitchToSignup }: Login
     } catch (err: any) {
       setLoading(false);
       if (err.code !== 'auth/popup-closed-by-user') {
-        setErrorMessage(err.message || 'Google check-in failed.');
+        setErrorMessage(err.message || 'Google sign-in failed.');
       }
     }
   };
@@ -107,38 +141,115 @@ export default function LoginPage({ onBack, onSuccess, onSwitchToSignup }: Login
         <div className="w-full mb-6 flex justify-start">
           <button 
             onClick={onBack}
-            className="flex items-center gap-2 text-neutral-550 hover:text-[#E34718] font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer group bg-white border border-neutral-200 hover:bg-neutral-50 px-4 py-2 rounded-full shadow-xs"
+            className="flex items-center gap-2 text-neutral-550 hover:text-[#E34718] font-bold text-xs text-sentence tracking-wider transition-colors cursor-pointer group bg-white   hover:bg-neutral-50 px-4 py-2 rounded-full shadow-xs"
             id="login-breadcrumb-return"
           >
             <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5 text-neutral-500 group-hover:text-[#E34718]" />
-            <span>Return to Arena</span>
+            <span>Back to Home</span>
           </button>
         </div>
 
         {/* Polished Card */}
-        <div className="w-full bg-white border border-neutral-200/80 rounded-[2rem] p-8 sm:p-10 shadow-xs space-y-6 relative overflow-hidden transition-all duration-300">
+        <div className="w-full bg-white   rounded-[2rem] p-8 sm:p-10 shadow-xs space-y-6 relative overflow-hidden transition-all duration-300">
           
+          {showResetForm ? (
+            <>
+              {/* Reset Password Header */}
+              <div className="space-y-2 text-center">
+                <h1 className="text-3xl sm:text-4xl font-display font-bold tracking-tight text-neutral-900" id="reset-heading-custom">
+                  Reset Password
+                </h1>
+                <p className="text-xs text-neutral-500 font-medium max-w-sm mx-auto leading-normal">
+                  Enter your email address and we'll send you a link to reset your password.
+                </p>
+              </div>
+
+              {resetError && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-3.5 bg-red-50   text-red-800 rounded-2xl flex items-start gap-2.5 text-xs text-left leading-normal"
+                  id="reset-error-alert"
+                >
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <p className="font-medium">{resetError}</p>
+                </motion.div>
+              )}
+
+              {resetMessage && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-3.5 bg-emerald-50   text-emerald-800 rounded-2xl flex items-start gap-2.5 text-xs text-left leading-normal"
+                  id="reset-success-alert"
+                >
+                  <p className="font-medium">{resetMessage}</p>
+                </motion.div>
+              )}
+
+              <form onSubmit={handleResetSubmit} className="space-y-4 text-left">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-neutral-450 text-sentence tracking-widest block pl-1 font-sans">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                      <Mail className="w-4 h-4 text-neutral-400" />
+                    </div>
+                    <input
+                      type="email"
+                      required
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="w-full bg-neutral-50 hover:bg-neutral-100/60   focus:bg-white rounded-2xl pl-11 pr-4 py-3.5 text-xs font-semibold focus:outline-none  focus:ring-1 focus:ring-[#E34718]/40 placeholder-neutral-405 text-neutral-800 tracking-wide transition-all min-h-[44px]"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={resetLoading}
+                  className="w-full bg-[#E34718] hover:bg-[#C23A12] disabled:bg-[#E34718]/50 text-white font-extrabold text-xs text-sentence py-4 px-6 rounded-full tracking-widest transition-all shadow-md hover:shadow-lg hover:shadow-[#E34718]/10 active:scale-98 cursor-pointer flex items-center justify-center gap-2 mt-2 min-h-[44px]"
+                  id="submit-reset-password"
+                >
+                  <span>{resetLoading ? 'Sending...' : 'Send Reset Link'}</span>
+                </button>
+              </form>
+
+              <div className="pt-2 text-center text-xs font-bold text-neutral-400 font-sans">
+                <button
+                  onClick={() => setShowResetForm(false)}
+                  className="text-[#E34718] hover:underline font-extrabold cursor-pointer transition-colors"
+                  id="reset-back-to-login-trigger"
+                >
+                  Back to sign in
+                </button>
+              </div>
+            </>
+          ) : (
+          <>
           {/* Header */}
           <div className="space-y-2 text-center">
             <h1 className="text-3xl sm:text-4xl font-display font-bold tracking-tight text-neutral-900" id="login-heading-custom">
-              Gate check-in
+              Welcome Back
             </h1>
             <p className="text-xs text-neutral-500 font-medium max-w-sm mx-auto leading-normal">
-              Unlock your secured concert passes, transaction history, and custom ticket stubs instantly.
+              Sign in to manage your tickets, bookings, and account.
             </p>
           </div>
 
           {/* Validation Warnings */}
           {errorMessage && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
-              className="p-3.5 bg-red-50 border border-red-200 text-red-800 rounded-2xl flex items-start gap-2.5 text-xs text-left leading-normal"
+              className="p-3.5 bg-red-50   text-red-800 rounded-2xl flex items-start gap-2.5 text-xs text-left leading-normal"
               id="login-error-alert"
             >
               <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
               <div>
-                <span className="font-extrabold uppercase tracking-widest text-[9px] text-red-600 block font-mono">Check-in error</span>
+                <span className="font-extrabold text-sentence tracking-widest text-[9px] text-red-600 block font-mono">Sign-in error</span>
                 <p className="font-medium mt-0.5">{errorMessage}</p>
               </div>
             </motion.div>
@@ -149,7 +260,7 @@ export default function LoginPage({ onBack, onSuccess, onSwitchToSignup }: Login
             
             {/* Email Address */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-neutral-450 uppercase tracking-widest block pl-1 font-sans">
+              <label className="text-[10px] font-bold text-neutral-450 text-sentence tracking-widest block pl-1 font-sans">
                 Email Address
               </label>
               <div className="relative">
@@ -161,16 +272,16 @@ export default function LoginPage({ onBack, onSuccess, onSwitchToSignup }: Login
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@gmail.com"
-                  className="w-full bg-neutral-50 hover:bg-neutral-100/60 border border-neutral-200 focus:bg-white rounded-2xl pl-11 pr-4 py-3.5 text-xs font-semibold focus:outline-none focus:border-[#E34718] focus:ring-1 focus:ring-[#E34718]/40 placeholder-neutral-405 text-neutral-800 tracking-wide transition-all min-h-[44px]"
+                  placeholder="you@example.com"
+                  className="w-full bg-neutral-50 hover:bg-neutral-100/60   focus:bg-white rounded-2xl pl-11 pr-4 py-3.5 text-xs font-semibold focus:outline-none  focus:ring-1 focus:ring-[#E34718]/40 placeholder-neutral-405 text-neutral-800 tracking-wide transition-all min-h-[44px]"
                 />
               </div>
             </div>
 
             {/* Password input */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-neutral-450 uppercase tracking-widest block pl-1 font-sans">
-                Passcode Key
+              <label className="text-[10px] font-bold text-neutral-450 text-sentence tracking-widest block pl-1 font-sans">
+                Password
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -182,7 +293,7 @@ export default function LoginPage({ onBack, onSuccess, onSwitchToSignup }: Login
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Minimum 6 characters"
-                  className="w-full bg-neutral-50 hover:bg-neutral-100/60 border border-neutral-200 focus:bg-white rounded-2xl pl-11 pr-11 py-3.5 text-xs font-semibold focus:outline-none focus:border-[#E34718] focus:ring-1 focus:ring-[#E34718]/40 placeholder-neutral-405 text-neutral-800 tracking-wide transition-all min-h-[44px]"
+                  className="w-full bg-neutral-50 hover:bg-neutral-100/60   focus:bg-white rounded-2xl pl-11 pr-11 py-3.5 text-xs font-semibold focus:outline-none  focus:ring-1 focus:ring-[#E34718]/40 placeholder-neutral-405 text-neutral-800 tracking-wide transition-all min-h-[44px]"
                 />
                 <button
                   type="button"
@@ -193,16 +304,31 @@ export default function LoginPage({ onBack, onSuccess, onSwitchToSignup }: Login
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              <div className="flex justify-end pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetEmail(email);
+                    setResetMessage('');
+                    setResetError('');
+                    setShowResetForm(true);
+                  }}
+                  className="text-[11px] font-bold text-neutral-450 hover:text-[#E34718] hover:underline transition-colors cursor-pointer"
+                  id="login-forgot-password-trigger"
+                >
+                  Forgot password?
+                </button>
+              </div>
             </div>
 
             {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#E34718] hover:bg-[#C23A12] disabled:bg-[#E34718]/50 text-white font-extrabold text-xs uppercase py-4 px-6 rounded-full tracking-widest transition-all shadow-md hover:shadow-lg hover:shadow-[#E34718]/10 active:scale-98 cursor-pointer flex items-center justify-center gap-2 mt-6 min-h-[44px]"
+              className="w-full bg-[#E34718] hover:bg-[#C23A12] disabled:bg-[#E34718]/50 text-white font-extrabold text-xs text-sentence py-4 px-6 rounded-full tracking-widest transition-all shadow-md hover:shadow-lg hover:shadow-[#E34718]/10 active:scale-98 cursor-pointer flex items-center justify-center gap-2 mt-6 min-h-[44px]"
               id="submit-login-primary"
             >
-              <span>{loading ? 'Decrypting Access Keys...' : 'Verify Access Portal'}</span>
+              <span>{loading ? 'Signing In...' : 'Sign In'}</span>
               <ArrowRight className="w-4 h-4 stroke-[2.5]" />
             </button>
           </form>
@@ -211,9 +337,9 @@ export default function LoginPage({ onBack, onSuccess, onSwitchToSignup }: Login
           <div className="space-y-4 pt-2">
             <div className="relative flex items-center justify-center">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-neutral-200"></div>
+                <div className="w-full  "></div>
               </div>
-              <div className="relative bg-white px-3 text-[9px] uppercase font-bold text-neutral-400 tracking-widest font-sans">
+              <div className="relative bg-white px-3 text-[9px] text-sentence font-bold text-neutral-400 tracking-widest font-sans">
                 Or Continue With Google
               </div>
             </div>
@@ -221,7 +347,7 @@ export default function LoginPage({ onBack, onSuccess, onSwitchToSignup }: Login
             <button
               type="button"
               onClick={handleGoogleSignIn}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50 bg-white rounded-2xl transition-all cursor-pointer shadow-xs font-semibold text-xs text-neutral-750"
+              className="w-full flex items-center justify-center gap-2 py-3 px-4    hover:bg-neutral-50 bg-white rounded-2xl transition-all cursor-pointer shadow-xs font-semibold text-xs text-neutral-750"
               title="Continue with Google"
             >
               <svg className="w-4.5 h-4.5 shrink-0" viewBox="0 0 24 24">
@@ -230,17 +356,19 @@ export default function LoginPage({ onBack, onSuccess, onSwitchToSignup }: Login
               <span>Google Account</span>
             </button>
           </div>
+          </>
+          )}
 
           {/* Switch View Trigger */}
           <div className="pt-2 text-center text-xs font-bold text-neutral-400 font-sans">
             <span>
-              Don't have an entrance account?{' '}
-              <button 
+              Don't have an account?{' '}
+              <button
                 onClick={onSwitchToSignup}
                 className="text-[#E34718] hover:underline font-extrabold cursor-pointer transition-colors"
                 id="login-switch-signup-trigger"
               >
-                Claim backstage pass here
+                Sign up here
               </button>
             </span>
           </div>
@@ -248,8 +376,8 @@ export default function LoginPage({ onBack, onSuccess, onSwitchToSignup }: Login
         </div>
 
         {/* Footer Brand Statement */}
-        <div className="mt-6 text-neutral-400 text-[10px] font-sans font-bold uppercase tracking-widest text-center select-none">
-          Jazba Classical &middot; Secure Decentralized Admissions v4.0.2
+        <div className="mt-6 text-neutral-400 text-[10px] font-sans font-bold text-sentence tracking-widest text-center select-none">
+          Jazbaticket &middot; Secure Ticketing
         </div>
 
       </div>

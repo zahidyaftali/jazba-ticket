@@ -17,7 +17,7 @@ export default function FaqAccordion({ faqs }: FaqAccordionProps) {
 
   return (
     <section 
-      className="bg-white py-18 px-4 sm:px-6 md:px-8 border-b border-neutral-200/50" 
+      className="bg-white py-18 px-4 sm:px-6 md:px-8  " 
       id="faq"
     >
       <div className="max-w-3xl mx-auto">
@@ -28,12 +28,12 @@ export default function FaqAccordion({ faqs }: FaqAccordionProps) {
             Frequently Asked Questions
           </h2>
           <p className="text-[17px] text-neutral-500 mt-2 font-normal">
-            Find immediate answers regarding premium passes, verification, and orders.
+            Quick answers about tickets, bookings, and your account.
           </p>
         </div>
 
         {/* ACCORDION WRAPPER */}
-        <div className="divide-y divide-neutral-200/70 border-t border-b border-neutral-200/70">
+        <div className="    ">
           {faqs.map((faq) => {
             const isOpen = openId === faq.id;
 
@@ -50,7 +50,7 @@ export default function FaqAccordion({ faqs }: FaqAccordionProps) {
                   className="w-full flex items-center justify-between py-5 px-1 bg-white text-left font-bold text-sm sm:text-base text-neutral-800 hover:text-black focus:outline-none transition-colors cursor-pointer"
                 >
                   <span className="pr-4 leading-tight font-display font-medium text-neutral-950">{faq.question}</span>
-                  <div className="shrink-0 w-8 h-8 rounded-full border border-neutral-100 flex items-center justify-center bg-neutral-50 text-neutral-600">
+                  <div className="shrink-0 w-8 h-8 rounded-full   flex items-center justify-center bg-neutral-50 text-neutral-600">
                     {isOpen ? <Minus className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                   </div>
                 </button>

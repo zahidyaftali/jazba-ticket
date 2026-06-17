@@ -1,20 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Music, User, Edit3, CheckCircle, AlertCircle, RefreshCw, 
-  Globe, Instagram, Twitter, Facebook, ArrowLeft, Camera, FileText 
+  Music, User, Edit3, CheckCircle, AlertCircle, RefreshCw,
+  Globe, Instagram, Twitter, Facebook, ArrowLeft, Camera, FileText, Loader2
 } from 'lucide-react';
-import { 
-  getArtistProfile, 
-  createArtistProfile, 
-  updateArtistProfile, 
+import {
+  getArtistProfile,
+  createArtistProfile,
+  updateArtistProfile,
   getEvents,
-  ArtistProfile 
+  getFollowerCount,
+  ArtistProfile
 } from '../services/backendService';
 import { auth } from '../firebase';
 
 export default function ArtistHub() {
   const [profile, setProfile] = useState<ArtistProfile | null>(null);
   const [events, setEvents] = useState<any[]>([]);
+  const [followerCount, setFollowerCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -62,10 +64,13 @@ export default function ArtistHub() {
           twitter: artistData.socialLinks?.twitter || '',
           facebook: artistData.socialLinks?.facebook || ''
         });
+        if (artistData.id) {
+          getFollowerCount('artist', artistData.id).then(setFollowerCount);
+        }
       }
     } catch (err) {
       console.error(err);
-      setErrorMessage('Failed to fetch artist profile records.');
+      setErrorMessage('Failed to load your profile.');
     } finally {
       setLoading(false);
     }
@@ -82,7 +87,7 @@ export default function ArtistHub() {
     if (!user) return;
 
     if (!stageName.trim()) {
-      setErrorMessage('Performance Stage Name is required.');
+      setErrorMessage('Stage name is required.');
       return;
     }
 
@@ -102,7 +107,7 @@ export default function ArtistHub() {
       loadData();
       setTimeout(() => setSuccessMessage(''), 4000);
     } catch (err) {
-      setErrorMessage('Failed to create artist portfolio database record.');
+      setErrorMessage('Failed to create profile. Please try again.');
     }
   };
 
@@ -112,7 +117,7 @@ export default function ArtistHub() {
     if (!profile?.id) return;
 
     if (!stageName.trim()) {
-      setErrorMessage('Performance Stage Name is required.');
+      setErrorMessage('Stage name is required.');
       return;
     }
 
@@ -126,11 +131,11 @@ export default function ArtistHub() {
         socialLinks
       });
       setIsEditing(false);
-      setSuccessMessage('Artist specifications updated successfully!');
+      setSuccessMessage('Profile updated successfully!');
       loadData();
       setTimeout(() => setSuccessMessage(''), 4000);
     } catch (err) {
-      setErrorMessage('Failed to save artist specifications.');
+      setErrorMessage('Failed to save profile. Please try again.');
     }
   };
 
@@ -162,39 +167,39 @@ export default function ArtistHub() {
     <div className="space-y-6 text-left" id="artist-hub-root">
       
       {/* Header Status */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4   pb-4">
         <div>
           <h2 className="font-display font-medium text-2xl text-neutral-900 flex items-center gap-2">
-            Artist Portfolio Portal
-            <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2.5 py-0.5 rounded-full uppercase border border-indigo-200">
-              Verified Performer Account
+            Your Artist Profile
+            <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2.5 py-0.5 rounded-full text-sentence  ">
+              Artist
             </span>
           </h2>
           <p className="text-xs text-neutral-505 mt-1">
-            Build your concert lineup biography, specify performance genres, modify active cover banner links, and review mapped live showcase gigs.
+            Update your bio, genres, and photos, and see which events you're linked to.
           </p>
         </div>
 
         {profile && !isEditing && (
-          <button 
+          <button
             onClick={() => setIsEditing(true)}
-            className="flex items-center gap-1.5 py-2.5 px-5 bg-neutral-950 hover:bg-neutral-850 text-white text-xs font-bold uppercase tracking-wider rounded-full shadow-md cursor-pointer transition-transform active:scale-97"
+            className="flex items-center gap-1.5 py-2.5 px-5 bg-neutral-950 hover:bg-neutral-850 text-white text-xs font-bold text-sentence tracking-wider rounded-full shadow-md cursor-pointer transition-transform active:scale-97"
           >
             <Edit3 className="w-4 h-4" />
-            <span>Customize specifications</span>
+            <span>Edit Profile</span>
           </button>
         )}
       </div>
 
       {/* Success / Error Banners */}
       {successMessage && (
-        <div className="bg-emerald-50 border border-emerald-250 text-emerald-800 text-xs py-3 px-4 rounded-xl flex items-center gap-2 font-medium">
+        <div className="bg-emerald-50   text-emerald-800 text-xs py-3 px-4 rounded-xl flex items-center gap-2 font-medium">
           <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>{successMessage}</span>
         </div>
       )}
       {errorMessage && (
-        <div className="bg-red-50 border border-red-250 text-red-800 text-xs py-3 px-4 rounded-xl flex items-center gap-2 font-medium">
+        <div className="bg-red-50   text-red-800 text-xs py-3 px-4 rounded-xl flex items-center gap-2 font-medium">
           <AlertCircle className="w-4 h-4 text-red-650 shrink-0" />
           <span>{errorMessage}</span>
         </div>
@@ -202,33 +207,33 @@ export default function ArtistHub() {
 
       {loading ? (
         <div className="py-24 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-650 mx-auto mb-3"></div>
-          <p className="text-xs text-neutral-450 uppercase tracking-widest font-bold font-mono">Synchronizing Performer portfolio...</p>
+          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto mb-3" />
+          <p className="text-xs text-neutral-450 text-sentence tracking-widest font-bold font-mono">Loading your profile...</p>
         </div>
       ) : (
         <div className="transition-all duration-300">
           
           {/* PROFILE FORM (CREATING OR EDITING) */}
           {(isEditing || !profile) && (
-            <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-8 shadow-3xs max-w-2xl text-left font-semibold text-neutral-800">
-              <div className="flex items-center gap-2 border-b border-neutral-100 pb-3.5 mb-6">
+            <div className="bg-white   rounded-2xl p-6 sm:p-8 shadow-3xs max-w-2xl text-left font-semibold text-neutral-800">
+              <div className="flex items-center gap-2   pb-3.5 mb-6">
                 {profile && (
-                  <button onClick={() => setIsEditing(false)} className="text-neutral-500 hover:text-black font-bold uppercase tracking-wider text-xs flex items-center gap-1 hover:underline cursor-pointer">
+                  <button onClick={() => setIsEditing(false)} className="text-neutral-500 hover:text-black font-bold text-sentence tracking-wider text-xs flex items-center gap-1 hover:underline cursor-pointer">
                     <ArrowLeft className="w-4 h-4" /> Cancel
                   </button>
                 )}
-                <h3 className="font-display font-medium text-base text-neutral-900 uppercase ml-2">
-                  {profile ? 'Edit Artist Biography & Spec' : 'Complete Artist Registry Profile'}
+                <h3 className="font-display font-medium text-base text-neutral-900 text-sentence ml-2">
+                  {profile ? 'Edit Your Profile' : 'Create Your Artist Profile'}
                 </h3>
               </div>
 
               <form onSubmit={profile ? handleUpdateProfile : handleCreateProfile} className="space-y-4 text-xs font-bold text-neutral-800">
-                
+
                 <div className="space-y-1.5">
-                  <label className="text-neutral-500 uppercase tracking-wider block">Performance Stage Name</label>
+                  <label className="text-neutral-500 text-sentence tracking-wider block">Stage Name</label>
                   <input 
                     type="text"
-                    className="w-full bg-neutral-50 border border-neutral-250 p-2.5 rounded-lg outline-none focus:border-indigo-600"
+                    className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
                     value={stageName}
                     onChange={(e) => setStageName(e.target.value)}
                     placeholder="e.g. DJ Sparkle or Maestro Symphony Orchestra"
@@ -237,10 +242,10 @@ export default function ArtistHub() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-neutral-500 uppercase tracking-wider block">Square Profile Image Link URL</label>
+                    <label className="text-neutral-500 text-sentence tracking-wider block">Profile Image URL</label>
                     <input 
                       type="text"
-                      className="w-full bg-neutral-50 border border-neutral-250 p-2.5 rounded-lg outline-none focus:border-indigo-600 font-mono"
+                      className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  font-mono"
                       value={profileImage}
                       onChange={(e) => setProfileImage(e.target.value)}
                       placeholder="e.g. https://images.unsplash.com/..."
@@ -248,10 +253,10 @@ export default function ArtistHub() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-neutral-500 uppercase tracking-wider block">Background Banner Cover Image URL</label>
+                    <label className="text-neutral-500 text-sentence tracking-wider block">Cover Image URL</label>
                     <input 
                       type="text"
-                      className="w-full bg-neutral-50 border border-neutral-250 p-2.5 rounded-lg outline-none focus:border-indigo-600 font-mono"
+                      className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  font-mono"
                       value={coverImage}
                       onChange={(e) => setCoverImage(e.target.value)}
                       placeholder="e.g. https://images.unsplash.com/..."
@@ -260,11 +265,11 @@ export default function ArtistHub() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-neutral-500 uppercase tracking-wider block">Musical genres &amp; Tags</label>
+                  <label className="text-neutral-500 text-sentence tracking-wider block">Genres</label>
                   <div className="flex gap-2">
                     <input 
                       type="text"
-                      className="flex-1 bg-neutral-50 border border-neutral-250 p-2.5 rounded-lg outline-none focus:border-indigo-600"
+                      className="flex-1 bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
                       value={genreInput}
                       onChange={(e) => setGenreInput(e.target.value)}
                       placeholder="e.g. Opera, Vocalist, Techno, Orchestral"
@@ -273,7 +278,7 @@ export default function ArtistHub() {
                     <button 
                       type="button"
                       onClick={handleAddGenre}
-                      className="py-2.5 px-5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg cursor-pointer font-bold uppercase transition-transform active:scale-97 text-[11px]"
+                      className="py-2.5 px-5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg cursor-pointer font-bold text-sentence transition-transform active:scale-97 text-[11px]"
                     >
                       Add genre
                     </button>
@@ -282,7 +287,7 @@ export default function ArtistHub() {
                   {genres.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 pt-2">
                       {genres.map((g) => (
-                        <span key={g} className="inline-flex items-center gap-1 px-3 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-black uppercase rounded-full">
+                        <span key={g} className="inline-flex items-center gap-1 px-3 py-1 bg-indigo-50   text-indigo-700 text-[10px] font-black text-sentence rounded-full">
                           <span>{g}</span>
                           <button type="button" onClick={() => handleRemoveGenre(g)} className="text-indigo-900 font-extrabold hover:text-red-650 shrink-0">×</button>
                         </span>
@@ -292,9 +297,9 @@ export default function ArtistHub() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-neutral-500 uppercase tracking-wider block">Biography</label>
+                  <label className="text-neutral-500 text-sentence tracking-wider block">Biography</label>
                   <textarea 
-                    className="w-full bg-neutral-50 border border-neutral-250 p-2.5 rounded-lg outline-none focus:border-indigo-600 h-24"
+                    className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  h-24"
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
                     placeholder="Short summary of background performance rosters, conservatory trainings, tour dates..."
@@ -303,23 +308,23 @@ export default function ArtistHub() {
 
                 {/* Social links block */}
                 <div className="space-y-3.5 pt-2">
-                  <h4 className="text-neutral-500 uppercase tracking-widest block text-[10px] border-b border-neutral-100 pb-1.5">Social Profiles Mappings</h4>
+                  <h4 className="text-neutral-500 text-sentence tracking-widest block text-[10px]   pb-1.5">Social Links</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-neutral-450 uppercase block text-[9px]">Official Webpage Web link</label>
+                      <label className="text-neutral-450 text-sentence block text-[9px]">Website</label>
                       <input 
                         type="text"
-                        className="w-full bg-neutral-50 border border-neutral-250 p-2 rounded-lg outline-none font-mono"
+                        className="w-full bg-neutral-50   p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 font-mono"
                         value={socialLinks.website}
                         onChange={(e) => setSocialLinks({ ...socialLinks, website: e.target.value })}
                         placeholder="e.g. musicartist.com"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-neutral-455 uppercase block text-[9px]">Instagram Handle</label>
+                      <label className="text-neutral-455 text-sentence block text-[9px]">Instagram Handle</label>
                       <input 
                         type="text"
-                        className="w-full bg-neutral-50 border border-neutral-250 p-2 rounded-lg outline-none font-mono"
+                        className="w-full bg-neutral-50   p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 font-mono"
                         value={socialLinks.instagram}
                         onChange={(e) => setSocialLinks({ ...socialLinks, instagram: e.target.value })}
                         placeholder="instagram.com/artist"
@@ -328,21 +333,21 @@ export default function ArtistHub() {
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-neutral-100 flex items-center justify-end gap-3">
+                <div className="pt-4   flex items-center justify-end gap-3">
                   {profile && (
                     <button 
                       type="button" 
                       onClick={() => setIsEditing(false)}
-                      className="py-2.5 px-4 bg-white border border-neutral-250 hover:bg-neutral-55 text-neutral-850 text-xs font-bold uppercase tracking-wider rounded-full transition-transform active:scale-97 cursor-pointer"
+                      className="py-2.5 px-4 bg-white   hover:bg-neutral-55 text-neutral-850 text-xs font-bold text-sentence tracking-wider rounded-full transition-transform active:scale-97 cursor-pointer"
                     >
                       Cancel Edit
                     </button>
                   )}
                   <button 
                     type="submit" 
-                    className="py-2.5 px-5 bg-neutral-900 border border-transparent hover:bg-neutral-800 text-white text-xs font-bold uppercase tracking-wider rounded-full transition-transform active:scale-97 cursor-pointer shadow-md"
+                    className="py-2.5 px-5 bg-neutral-900   hover:bg-neutral-800 text-white text-xs font-bold text-sentence tracking-wider rounded-full transition-transform active:scale-97 cursor-pointer shadow-md"
                   >
-                    Save Portfolio specifications
+                    Save Profile
                   </button>
                 </div>
 
@@ -355,7 +360,7 @@ export default function ArtistHub() {
             <div className="space-y-6">
               
               {/* Cover Banner card with overlay */}
-              <div className="relative bg-[#1a1a1a] h-56 rounded-2xl overflow-hidden border border-neutral-200 text-left">
+              <div className="relative bg-[#1a1a1a] h-56 rounded-2xl overflow-hidden   text-left">
                 {profile.coverImage && (
                   <img 
                     src={profile.coverImage} 
@@ -370,17 +375,21 @@ export default function ArtistHub() {
                   <img 
                     src={profile.profileImage || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=crop'} 
                     alt={profile.stageName}
-                    className="w-20 h-20 bg-neutral-950 rounded-2xl object-cover border-2 border-white shadow-md shrink-0"
+                    className="w-20 h-20 bg-neutral-950 rounded-2xl object-cover   shadow-md shrink-0"
                   />
                   <div>
-                    <h3 className="text-2xl sm:text-3xl font-display font-medium text-white uppercase leading-none">{profile.stageName}</h3>
+                    <h3 className="text-2xl sm:text-3xl font-display font-medium text-white text-sentence leading-none">{profile.stageName}</h3>
                     <div className="flex flex-wrap items-center gap-1.5 mt-2">
                       {genres.map((g) => (
-                        <span key={g} className="inline-block px-2.5 py-0.5 bg-indigo-650/45 text-white border border-white/20 text-[9px] font-black uppercase rounded-full">
+                        <span key={g} className="inline-block px-2.5 py-0.5 bg-indigo-650/45 text-white   text-[9px] font-black text-sentence rounded-full">
                           {g}
                         </span>
                       ))}
                     </div>
+                  </div>
+                  <div className="ml-auto text-right shrink-0">
+                    <span className="font-mono font-bold text-white text-lg block leading-none">{followerCount}</span>
+                    <span className="text-[9px] text-white/60 font-bold text-sentence tracking-wider block mt-1">Followers</span>
                   </div>
                 </div>
               </div>
@@ -389,14 +398,14 @@ export default function ArtistHub() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
                 
                 {/* Left col: bio & socials */}
-                <div className="md:col-span-2 bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-7 space-y-4">
-                  <h4 className="text-xs uppercase font-black text-indigo-700 tracking-wider border-b border-neutral-100 pb-1.5">Biography &amp; conservatory credentials</h4>
+                <div className="md:col-span-2 bg-white   rounded-2xl p-6 sm:p-7 space-y-4">
+                  <h4 className="text-xs text-sentence font-black text-indigo-700 tracking-wider   pb-1.5">Biography</h4>
                   <p className="text-xs text-neutral-510 leading-relaxed font-semibold whitespace-pre-wrap">
-                    {profile.bio || 'Your artist profile bio details is currently empty. Adjust specifications using the button above.'}
+                    {profile.bio || 'No bio added yet. Click Edit Profile to add one.'}
                   </p>
                   
                   {/* Social icons row */}
-                  <div className="pt-3 border-t border-neutral-100 flex flex-wrap items-center gap-3 text-neutral-550">
+                  <div className="pt-3   flex flex-wrap items-center gap-3 text-neutral-550">
                     {socialLinks.website && (
                       <a href={`https://${socialLinks.website}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs hover:text-[#E34718] font-bold">
                         <Globe className="w-4 h-4" />
@@ -419,25 +428,25 @@ export default function ArtistHub() {
                 </div>
 
                 {/* Right col: gigs linked status */}
-                <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-7 space-y-4">
-                  <h4 className="text-xs uppercase font-black text-indigo-700 tracking-wider border-b border-neutral-100 pb-1.5">Your Mapped Gigs / Lineups ({linkedEvents.length})</h4>
+                <div className="bg-white   rounded-2xl p-6 sm:p-7 space-y-4">
+                  <h4 className="text-xs text-sentence font-black text-indigo-700 tracking-wider   pb-1.5">Upcoming Events ({linkedEvents.length})</h4>
                   {linkedEvents.length === 0 ? (
                     <div className="text-center py-6 text-neutral-400">
                       <Music className="w-6 h-6 mx-auto mb-2 opacity-50" />
-                      <p className="text-[10px] font-bold uppercase tracking-wide">No concerts linked yet</p>
-                      <p className="text-[11px] leading-normal font-semibold mt-1">Ask the business organizers to map your profile to relevant events.</p>
+                      <p className="text-[10px] font-bold text-sentence tracking-wide">No events linked yet</p>
+                      <p className="text-[11px] leading-normal font-semibold mt-1">The event organizer will link your profile to upcoming shows.</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
                       {linkedEvents.map((evt) => (
-                        <div key={evt.id} className="p-3 bg-neutral-50/50 border border-neutral-200 rounded-xl flex items-center gap-2.5">
+                        <div key={evt.id} className="p-3 bg-neutral-50/50   rounded-xl flex items-center gap-2.5">
                           <img 
                             src={evt.bannerImage || evt.image} 
                             alt={evt.title}
-                            className="w-10 h-10 rounded-lg object-cover shrink-0 border border-neutral-205"
+                            className="w-10 h-10 rounded-lg object-cover shrink-0  "
                           />
                           <div className="min-w-0">
-                            <h5 className="font-bold text-xs text-neutral-900 truncate uppercase block leading-none">{evt.title}</h5>
+                            <h5 className="font-bold text-xs text-neutral-900 truncate text-sentence block leading-none">{evt.title}</h5>
                             <span className="text-[10px] text-neutral-450 font-semibold block mt-1">{evt.date} · {evt.venue}</span>
                           </div>
                         </div>

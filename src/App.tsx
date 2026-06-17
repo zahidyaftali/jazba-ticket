@@ -287,6 +287,7 @@ export default function App() {
             setSelectedEventForDetail(evt);
             window.scrollTo({ top: 0, behavior: 'instant' });
           }}
+          onRequireLogin={() => handleOpenAuth('login')}
         />
       ) : selectedArtistForDetail ? (
         <ArtistDetailPage
@@ -310,6 +311,7 @@ export default function App() {
           onBookEvent={(evt) => {
             setSelectedBookingEvent(evt);
           }}
+          onRequireLogin={() => handleOpenAuth('login')}
         />
       ) : currentView === 'dashboard' ? (
         <UserDashboardPage
@@ -379,6 +381,7 @@ export default function App() {
             setSelectedArtistForDetail(artist);
             window.scrollTo({ top: 0, behavior: 'instant' });
           }}
+          onRequireLogin={() => handleOpenAuth('login')}
         />
       ) : currentView === 'help' ? (
         <HelpPage 
@@ -434,7 +437,7 @@ export default function App() {
 
           {/* 6. TOP EVENTS SECTION */}
           <section 
-            className="max-w-7xl mx-auto px-4 py-16 sm:px-6 md:px-8 border-b border-neutral-200/50"
+            className="max-w-7xl mx-auto px-4 py-16 sm:px-6 md:px-8  "
             id="top-events"
           >
             <div className="flex items-center justify-between mb-8">
@@ -455,7 +458,7 @@ export default function App() {
 
             {/* Dynamic Warning if empty results */}
             {topEvents.length === 0 ? (
-              <div className="p-12 text-center bg-neutral-50 rounded-3xl border border-dashed border-neutral-200 max-w-lg mx-auto">
+              <div className="p-12 text-center bg-neutral-50 rounded-3xl    max-w-lg mx-auto">
                 <Info className="w-10 h-10 text-neutral-400 mx-auto mb-3" />
                 <h4 className="font-extrabold text-[#E34718] text-lg">No Matching Events Found</h4>
                 <p className="text-xs text-neutral-500 font-bold mt-1">Try relaxing your search terms or choosing "All Categories" from the discover grid above.</p>
@@ -483,7 +486,7 @@ export default function App() {
 
           {/* 8. EVENTS NEAR BY YOUR CITY */}
           <section 
-            className="max-w-7xl mx-auto px-4 py-16 sm:px-6 md:px-8 border-b border-neutral-200/50"
+            className="max-w-7xl mx-auto px-4 py-16 sm:px-6 md:px-8  "
             id="near-by"
           >
             <div className="flex items-center justify-between mb-8">
@@ -503,7 +506,7 @@ export default function App() {
             </div>
 
             {nearByEvents.length === 0 ? (
-              <div className="p-12 text-center bg-neutral-50 rounded-3xl border border-dashed border-neutral-200 max-w-lg mx-auto">
+              <div className="p-12 text-center bg-neutral-50 rounded-3xl    max-w-lg mx-auto">
                 <Info className="w-10 h-10 text-neutral-400 mx-auto mb-3" />
                 <h4 className="font-extrabold text-[#E34718] text-lg">No Local Shows Available</h4>
                 <p className="text-xs text-neutral-500 font-bold mt-1">There are no city events matching your filter variables currently.</p>
@@ -561,16 +564,16 @@ export default function App() {
       {/* 13. AUTH MODAL */}
       {authModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white border-2 border-neutral-200/90 rounded-[28px] p-6 w-full max-w-md shadow-xl relative">
+          <div className="bg-white   rounded-[28px] p-6 w-full max-w-md shadow-xl relative">
             <button 
               onClick={() => setAuthModal(null)}
-              className="absolute top-4 right-4 w-8 h-8 rounded-full border-2 border-neutral-200/50 flex items-center justify-center text-neutral-500 hover:text-black hover:bg-neutral-50"
+              className="absolute top-4 right-4 w-8 h-8 rounded-full   flex items-center justify-center text-neutral-500 hover:text-black hover:bg-neutral-50"
             >
               <X className="w-4 h-4" />
             </button>
 
             <div className="mb-6 flex flex-col items-center text-center">
-              <div className="w-12 h-12 bg-[#E34718] rounded-full flex items-center justify-center border-2 border-[#C23A12]/30 shadow-xs mb-3">
+              <div className="w-12 h-12 bg-[#E34718] rounded-full flex items-center justify-center   shadow-xs mb-3">
                 <LogIn className="w-5 h-5 text-white" />
               </div>
               <h3 className="font-display font-bold text-lg text-neutral-800">
@@ -586,45 +589,45 @@ export default function App() {
             <form onSubmit={handleAuthSubmit} className="space-y-4">
               {authModal === 'signup' && (
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1">Full Name</label>
+                  <label className="block text-xs font-semibold text-sentence tracking-wider text-neutral-400 mb-1">Full Name</label>
                   <input 
                     type="text" 
                     value={authFormName}
                     onChange={(e) => setAuthFormName(e.target.value)}
                     placeholder="Enter full name"
-                    className="w-full bg-white border-2 border-neutral-200/80 rounded-xl p-3 text-sm font-semibold focus:ring-1 focus:ring-[#E34718] focus:outline-none text-neutral-800 placeholder-neutral-300"
+                    className="w-full bg-white   rounded-xl p-3 text-sm font-semibold focus:ring-1 focus:ring-[#E34718] focus:outline-none text-neutral-800 placeholder-neutral-300"
                     required
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1">Email address</label>
+                <label className="block text-xs font-semibold text-sentence tracking-wider text-neutral-400 mb-1">Email address</label>
                 <input 
                   type="email" 
                   value={authFormEmail}
                   onChange={(e) => setAuthFormEmail(e.target.value)}
                   placeholder="name@company.com"
-                  className="w-full bg-white border-2 border-neutral-200/80 rounded-xl p-3 text-sm font-semibold focus:ring-1 focus:ring-[#E34718] focus:outline-none text-neutral-800 placeholder-neutral-300"
+                  className="w-full bg-white   rounded-xl p-3 text-sm font-semibold focus:ring-1 focus:ring-[#E34718] focus:outline-none text-neutral-800 placeholder-neutral-300"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1">Password</label>
+                <label className="block text-xs font-semibold text-sentence tracking-wider text-neutral-400 mb-1">Password</label>
                 <input 
                   type="password" 
                   value={authFormPassword}
                   onChange={(e) => setAuthFormPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-white border-2 border-neutral-200/80 rounded-xl p-3 text-sm font-semibold focus:ring-1 focus:ring-[#E34718] focus:outline-none text-neutral-800 placeholder-neutral-300"
+                  className="w-full bg-white   rounded-xl p-3 text-sm font-semibold focus:ring-1 focus:ring-[#E34718] focus:outline-none text-neutral-800 placeholder-neutral-300"
                   required
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-[#E34718] hover:bg-[#C23A12] text-white py-3 rounded-xl font-bold text-sm uppercase transition-all shadow-sm cursor-pointer"
+                className="w-full bg-[#E34718] hover:bg-[#C23A12] text-white py-3 rounded-xl font-bold text-sm text-sentence transition-all shadow-sm cursor-pointer"
               >
                 {authModal === 'signup' ? 'Register Account' : 'Sign In Now'}
               </button>

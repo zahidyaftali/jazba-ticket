@@ -40,7 +40,7 @@ export default function TermsOfUsePage({ onBackToHome }: TermsOfUsePageProps) {
         {/* Hero Content Wrapper */}
         <div className="max-w-7xl mx-auto w-full relative z-10 text-left space-y-4">
           {/* Subtle Path Breadcrumb */}
-          <div className="inline-flex items-center gap-2 text-[10px] font-black tracking-wider text-neutral-400 bg-neutral-950 border border-neutral-800 backdrop-blur-md px-3.5 py-1.5 rounded-full">
+          <div className="inline-flex items-center gap-2 text-[10px] font-black tracking-wider text-neutral-400 bg-neutral-950   backdrop-blur-md px-3.5 py-1.5 rounded-full">
             <button onClick={onBackToHome} className="hover:text-white hover:underline cursor-pointer transition-colors text-neutral-400">Home</button>
             <span>/</span>
             <span className="text-white">Terms of Use</span>
@@ -51,7 +51,7 @@ export default function TermsOfUsePage({ onBackToHome }: TermsOfUsePageProps) {
           </h1>
 
           <p className="text-neutral-300 font-medium text-xs sm:text-sm md:text-base max-w-2xl leading-relaxed">
-            Legal protocols and bind-on-purchase agreements governing digital transaction security, user booking access, system registration guidelines, and absolute platform compliance.
+            The rules that govern your use of Jazba Ticket, covering bookings, accounts, and ticket purchases.
           </p>
         </div>
       </section>
@@ -63,13 +63,13 @@ export default function TermsOfUsePage({ onBackToHome }: TermsOfUsePageProps) {
         <div className="flex items-center justify-between mb-8">
           <button 
             onClick={onBackToHome}
-            className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-neutral-600 hover:text-black hover:underline cursor-pointer transition-colors"
+            className="inline-flex items-center gap-2 text-xs font-black text-sentence tracking-wider text-neutral-600 hover:text-black hover:underline cursor-pointer transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Back to Home Page
           </button>
           
-          <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest bg-white border border-neutral-200 rounded-full px-4 py-1.5 shadow-3xs">
+          <span className="text-[10px] font-bold text-neutral-400 text-sentence tracking-widest bg-white   rounded-full px-4 py-1.5 shadow-3xs">
             Last updated: June 15, 2026
           </span>
         </div>
@@ -81,16 +81,15 @@ export default function TermsOfUsePage({ onBackToHome }: TermsOfUsePageProps) {
           <div className="lg:col-span-4 space-y-6">
             
             {/* Quick Summary Card */}
-            <div className="bg-white border-2 border-neutral-200/90 rounded-3xl p-6.5 shadow-xs">
-              <h3 className="font-display font-extrabold text-[#E34718] text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+            <div className="bg-white   rounded-3xl p-6.5 shadow-xs">
+              <h3 className="font-display font-extrabold text-[#E34718] text-sm text-sentence tracking-wider mb-4 flex items-center gap-2">
                 <Scale className="w-4 h-4 text-[#E34718]" />
-                Compliance Core
+                Quick Summary
               </h3>
               <p className="text-xs text-neutral-600 font-medium leading-relaxed mb-4">
-                Using Jazba Ticket implies unconditional acceptance of these conditions. We demand active compliance with purchase limits, ticket transfer regulations, and behavioral ethics during live attendance.
+                By using Jazba Ticket, you agree to these terms — including purchase limits, ticket transfer rules, and expected conduct at live events.
               </p>
               
-              <hr className="border-neutral-105 my-4" />
               
               <ul className="space-y-3">
                 <li className="flex items-start gap-2.5 text-xs font-bold text-neutral-700">
@@ -111,20 +110,16 @@ export default function TermsOfUsePage({ onBackToHome }: TermsOfUsePageProps) {
             {/* Platform Integrity Advisory */}
             <div className="bg-neutral-900 text-white rounded-3xl p-6.5 shadow-md relative overflow-hidden">
               <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#ffffff_1.5px,transparent_1.5px)] [background-size:12px_12px] pointer-events-none"></div>
-              <h4 className="font-display font-black text-white text-base mb-2">Platform Integrity Notice</h4>
-              <p className="text-neutral-400 text-xs font-medium leading-relaxed mb-4">
-                We monitor transaction queries rigorously. Accounts engaging in ticket scalping, fraudulent back-billing, or using programmatic bots to hoard bookings see instant lifetime suspensions.
+              <h4 className="font-display font-black text-white text-base mb-2">Fair Use Notice</h4>
+              <p className="text-neutral-400 text-xs font-medium leading-relaxed">
+                Accounts found scalping tickets, filing fraudulent chargebacks, or using bots to hoard bookings will be permanently suspended.
               </p>
-              <div className="bg-neutral-950 border border-neutral-850 rounded-xl p-3 text-[10px] font-mono text-neutral-400 leading-normal">
-                SYSTEM_PORT_IP_MONITORING: ON<br />
-                AUTHENTICATED_PASS_KEYS: RE-VALIDATING
-              </div>
             </div>
 
           </div>
 
           {/* RIGHT POLICIES CONTENT (8 cols) */}
-          <div className="lg:col-span-8 bg-white border-2 border-neutral-200/90 rounded-3xl p-6.5 sm:p-8 md:p-10 shadow-xs space-y-10">
+          <div className="lg:col-span-8 bg-white   rounded-3xl p-6.5 sm:p-8 md:p-10 shadow-xs space-y-10">
             
             {/* Sec 1 */}
             <section className="space-y-3.5" id="agreement">
@@ -132,14 +127,13 @@ export default function TermsOfUsePage({ onBackToHome }: TermsOfUsePageProps) {
                 <div className="w-8 h-8 rounded-lg bg-[#E34718]/10 text-[#E34718] flex items-center justify-center font-bold text-xs">
                   <BookOpen className="w-4 h-4" />
                 </div>
-                <h2 className="text-lg font-display font-extrabold text-neutral-900 uppercase tracking-tight">1. Core Agreement</h2>
+                <h2 className="text-lg font-display font-extrabold text-neutral-900 text-sentence tracking-tight">1. Core Agreement</h2>
               </div>
               <p className="text-xs text-neutral-600 font-medium leading-relaxed">
-                These generic Terms of Use govern your access as a user, ticket buyer, artist, or event organizer on the Jazba Ticket platform. By registering an account profile and finalizing ticket bookings, you bind yourself to comply with our overall community rules.
+                These Terms of Use govern your access as a user, ticket buyer, artist, or event organizer on Jazba Ticket. By creating an account and booking tickets, you agree to follow these rules.
               </p>
             </section>
 
-            <hr className="border-neutral-150" />
 
             {/* Sec 2 */}
             <section className="space-y-3.5" id="purchase-limits">
@@ -147,17 +141,16 @@ export default function TermsOfUsePage({ onBackToHome }: TermsOfUsePageProps) {
                 <div className="w-8 h-8 rounded-lg bg-[#E34718]/10 text-[#E34718] flex items-center justify-center font-bold text-xs">
                   <ShieldAlert className="w-4 h-4" />
                 </div>
-                <h2 className="text-lg font-display font-extrabold text-neutral-900 uppercase tracking-tight">2. Ticket Purchase and Scalping Limits</h2>
+                <h2 className="text-lg font-display font-extrabold text-neutral-900 text-sentence tracking-tight">2. Ticket Purchase and Scalping Limits</h2>
               </div>
               <p className="text-xs text-neutral-600 font-medium leading-relaxed">
-                To guarantee equal and fair ticket access for live events, users are limited to a maximum number of passes per single billing order (typically <strong>10 passes</strong> per customer, unless designated otherwise of gold classes).
+                To keep ticket access fair, orders are limited to a maximum of <strong>10 tickets</strong> per customer per event, unless otherwise stated for a specific ticket tier.
               </p>
               <p className="text-xs text-neutral-600 font-medium leading-relaxed">
-                Secondary reselling of ticket holdings for commercial inflation or utilizing automated script bots is formally prohibited. Tickets spotted in violation of premium markup trading rules are voided immediately without financial refund.
+                Reselling tickets at a markup or using bots to purchase tickets is not allowed. Tickets found in violation of this policy will be voided without a refund.
               </p>
             </section>
 
-            <hr className="border-neutral-150" />
 
             {/* Sec 3 */}
             <section className="space-y-3.5" id="conduct">
@@ -165,14 +158,13 @@ export default function TermsOfUsePage({ onBackToHome }: TermsOfUsePageProps) {
                 <div className="w-8 h-8 rounded-lg bg-[#E34718]/10 text-[#E34718] flex items-center justify-center font-bold text-xs">
                   <Terminal className="w-4 h-4" />
                 </div>
-                <h2 className="text-lg font-display font-extrabold text-neutral-900 uppercase tracking-tight">3. User Conduct and Content Policies</h2>
+                <h2 className="text-lg font-display font-extrabold text-neutral-900 text-sentence tracking-tight">3. User Conduct and Content Policies</h2>
               </div>
               <p className="text-xs text-neutral-600 font-medium leading-relaxed">
-                Any reviews, feedback posts, event descriptions, artist names, logos, or catalog assets uploaded onto our service must adhere to standard safety directives. You represent that you own necessary intellectual titles for images you supply.
+                Any reviews, event descriptions, artist profiles, or images you upload must be appropriate and accurate. You confirm that you own the rights to any images you submit.
               </p>
             </section>
 
-            <hr className="border-neutral-150" />
 
             {/* Sec 4 */}
             <section className="space-y-3.5" id="limitations">
@@ -180,10 +172,10 @@ export default function TermsOfUsePage({ onBackToHome }: TermsOfUsePageProps) {
                 <div className="w-8 h-8 rounded-lg bg-[#E34718]/10 text-[#E34718] flex items-center justify-center font-bold text-xs">
                   <Bell className="w-4 h-4" />
                 </div>
-                <h2 className="text-lg font-display font-extrabold text-neutral-900 uppercase tracking-tight">4. Limitations of General Liability</h2>
+                <h2 className="text-lg font-display font-extrabold text-neutral-900 text-sentence tracking-tight">4. Limitations of General Liability</h2>
               </div>
               <p className="text-xs text-neutral-600 font-medium leading-relaxed">
-                Jazba Ticket operates strictly as a transactional ticketing self-service platform connecting clients with artist shows and independent experience organizers. We hold zero liability for performance delays, staging defects, or venue safety issues. Any disputes regarding performance quality must be taken directly to the named Event Organizer.
+                Jazba Ticket is a ticketing platform connecting fans with shows and event organizers. We're not responsible for performance delays, venue issues, or the quality of the event itself — those concerns should be directed to the event organizer.
               </p>
             </section>
 

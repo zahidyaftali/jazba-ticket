@@ -121,8 +121,8 @@ function LiveStripeForm({
 
   return (
     <form onSubmit={handleLivePayment} className="space-y-4" id="live-stripe-form">
-      <div className="bg-[#FAFBFD] border-2 border-neutral-200 rounded-xl p-4.5 transition-all focus-within:border-[#E34718]">
-        <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-2 flex items-center justify-between">
+      <div className="bg-[#FAFBFD]   rounded-xl p-4.5 transition-all ">
+        <label className="block text-[10px] font-bold text-sentence tracking-wider text-neutral-400 mb-2 flex items-center justify-between">
           <span>Stripe Card Elements</span>
           <span className="text-[9px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md font-black">Live Vault</span>
         </label>
@@ -134,7 +134,7 @@ function LiveStripeForm({
       </div>
 
       {errorMessage && (
-        <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-semibold flex items-start gap-2 animate-fadeIn">
+        <div className="p-3 bg-red-50   text-red-700 rounded-xl text-xs font-semibold flex items-start gap-2 animate-fadeIn">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{errorMessage}</span>
         </div>
@@ -143,7 +143,7 @@ function LiveStripeForm({
       <button
         type="submit"
         disabled={!stripe || isProcessing}
-        className="w-full py-3.5 bg-[#E34718] hover:bg-[#C23A12] text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        className="w-full py-3.5 bg-[#E34718] hover:bg-[#C23A12] text-white rounded-xl text-xs font-black text-sentence tracking-widest transition-all shadow-md active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {isProcessing ? (
           <>
@@ -262,10 +262,10 @@ function DemoStripeForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" id="demo-stripe-form">
-      <div className="bg-amber-50/50 border border-amber-200/80 rounded-xl p-4 flex gap-3 text-left">
+      <div className="bg-amber-50/50   rounded-xl p-4 flex gap-3 text-left">
         <Sparkles className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
         <div className="text-xs font-semibold text-amber-800 leading-relaxed">
-          <p className="font-extrabold uppercase text-[10px] tracking-wide mb-1 flex items-center gap-1.5 text-amber-900">
+          <p className="font-extrabold text-sentence text-[10px] tracking-wide mb-1 flex items-center gap-1.5 text-amber-900">
             <Info className="w-3.5 h-3.5 text-amber-600" />
             Active Payment Sandbox Simulator Mode
           </p>
@@ -278,7 +278,7 @@ function DemoStripeForm({
       <div className="space-y-3.5 text-left">
         {/* Name Input */}
         <div>
-          <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5 text-left">
+          <label className="block text-[10px] font-bold text-sentence tracking-wider text-neutral-400 mb-1.5 text-left">
             Cardholder Name
           </label>
           <input 
@@ -287,13 +287,13 @@ function DemoStripeForm({
             onChange={(e) => setName(e.target.value)}
             placeholder="John Doe"
             required
-            className="w-full bg-white border-2 border-neutral-200 rounded-xl px-4 py-2.5 text-xs font-bold text-neutral-800 placeholder-neutral-300 focus:border-[#E34718] focus:outline-none focus:ring-0 transition-colors"
+            className="w-full bg-white   rounded-xl px-4 py-2.5 text-xs font-bold text-neutral-800 placeholder-neutral-300  focus:outline-none focus:ring-0 transition-colors"
           />
         </div>
 
         {/* Card Number Input with Dynamic Card Brand Icons */}
         <div>
-          <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5 text-left">
+          <label className="block text-[10px] font-bold text-sentence tracking-wider text-neutral-400 mb-1.5 text-left">
             Card Number
           </label>
           <div className="relative">
@@ -307,7 +307,7 @@ function DemoStripeForm({
               }}
               placeholder="4242 4242 4242 4242"
               required
-              className="w-full bg-white border-2 border-neutral-200 rounded-xl pl-11 pr-20 py-2.5 text-xs font-mono font-bold text-neutral-800 placeholder-neutral-300 focus:border-[#E34718] focus:outline-none focus:ring-0 transition-colors"
+              className="w-full bg-white   rounded-xl pl-11 pr-20 py-2.5 text-xs font-mono font-bold text-neutral-800 placeholder-neutral-300  focus:outline-none focus:ring-0 transition-colors"
             />
             {/* Left Card Icon */}
             <div className="absolute left-4 top-3 text-neutral-400">
@@ -315,7 +315,7 @@ function DemoStripeForm({
             </div>
 
             {/* Brand Logo right tag */}
-            <div className="absolute right-4 top-2 bg-neutral-100 border border-neutral-200 text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-md text-neutral-600">
+            <div className="absolute right-4 top-2 bg-neutral-100   text-[9px] font-black text-sentence tracking-wider px-2 py-1 rounded-md text-neutral-600">
               {cardBrand === 'visa' && <span className="text-blue-600 font-sans tracking-tight">★ VISA</span>}
               {cardBrand === 'mastercard' && <span className="text-red-500 font-sans">● MasterCard</span>}
               {cardBrand === 'amex' && <span className="text-emerald-600 font-sans">◆ AMEX</span>}
@@ -328,7 +328,7 @@ function DemoStripeForm({
         <div className="grid grid-cols-2 gap-3.5">
           {/* Expiration date */}
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">
+            <label className="block text-[10px] font-bold text-sentence tracking-wider text-neutral-400 mb-1.5">
               Expiration Date
             </label>
             <input 
@@ -344,13 +344,13 @@ function DemoStripeForm({
               }}
               placeholder="MM/YY"
               required
-              className="w-full bg-white border-2 border-neutral-200 rounded-xl px-4 py-2.5 text-xs font-mono font-bold text-neutral-800 text-center placeholder-neutral-300 focus:border-[#E34718] focus:outline-none focus:ring-0 transition-colors"
+              className="w-full bg-white   rounded-xl px-4 py-2.5 text-xs font-mono font-bold text-neutral-800 text-center placeholder-neutral-300  focus:outline-none focus:ring-0 transition-colors"
             />
           </div>
 
           {/* Secure CVC */}
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">
+            <label className="block text-[10px] font-bold text-sentence tracking-wider text-neutral-400 mb-1.5">
               Secure CVC
             </label>
             <input 
@@ -362,14 +362,14 @@ function DemoStripeForm({
               }}
               placeholder="CVV"
               required
-              className="w-full bg-white border-2 border-neutral-200 rounded-xl px-4 py-2.5 text-xs font-mono font-bold text-neutral-800 text-center placeholder-neutral-300 focus:border-[#E34718] focus:outline-none focus:ring-0 transition-colors"
+              className="w-full bg-white   rounded-xl px-4 py-2.5 text-xs font-mono font-bold text-neutral-800 text-center placeholder-neutral-300  focus:outline-none focus:ring-0 transition-colors"
             />
           </div>
         </div>
       </div>
 
       {validationError && (
-        <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-semibold flex items-start gap-2 animate-fadeIn text-left">
+        <div className="p-3 bg-red-50   text-red-700 rounded-xl text-xs font-semibold flex items-start gap-2 animate-fadeIn text-left">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{validationError}</span>
         </div>
@@ -379,17 +379,17 @@ function DemoStripeForm({
       <button
         type="submit"
         disabled={isProcessing}
-        className="w-full py-3.5 bg-[#E34718] hover:bg-[#C23A12] text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+        className="w-full py-3.5 bg-[#E34718] hover:bg-[#C23A12] text-white rounded-xl text-xs font-black text-sentence tracking-widest transition-all shadow-md active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
       >
         {isProcessing ? (
           <>
             <Loader2 className="w-4.5 h-4.5 animate-spin" />
-            <span>Connecting Stripe Gateway...</span>
+            <span>Processing payment...</span>
           </>
         ) : (
           <>
             <Lock className="w-3.5 h-3.5" />
-            <span>Process payment via stripe</span>
+            <span>Pay Now</span>
           </>
         )}
       </button>
@@ -404,19 +404,19 @@ export default function StripeCheckoutForm(props: StripeCheckoutFormProps) {
   const stripePromiseInstance = getStripePromise();
 
   return (
-    <div className="bg-white border-2 border-neutral-105 rounded-2xl p-5.5 sm:p-7 shadow-xs font-sans mt-2" id="stripe-checkout-gate">
+    <div className="bg-white   rounded-2xl p-5.5 sm:p-7 shadow-xs font-sans mt-2" id="stripe-checkout-gate">
       {/* Upper Brand Header */}
-      <div className="flex items-center justify-between gap-4 border-b border-neutral-100 pb-3.5 mb-5.5 text-left">
+      <div className="flex items-center justify-between gap-4   pb-3.5 mb-5.5 text-left">
         <div>
-          <h3 className="text-xs font-black text-neutral-900 uppercase tracking-widest flex items-center gap-1.5 leading-none">
+          <h3 className="text-xs font-black text-neutral-900 text-sentence tracking-widest flex items-center gap-1.5 leading-none">
             <span className="text-violet-600 font-extrabold text-sm lowercase tracking-tighter">stripe</span> Direct Checkout
           </h3>
-          <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider mt-1.5">
+          <p className="text-[10px] text-neutral-400 font-bold text-sentence tracking-wider mt-1.5">
             PCI-DSS COMPLIANT ENCRYPTION
           </p>
         </div>
-        <div className="bg-neutral-50 px-3 py-1.5 rounded-lg border border-neutral-200 text-right leading-none shrink-0">
-          <span className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider block">Total Payable:</span>
+        <div className="bg-neutral-50 px-3 py-1.5 rounded-lg   text-right leading-none shrink-0">
+          <span className="text-[9px] text-neutral-400 font-bold text-sentence tracking-wider block">Total Payable:</span>
           <span className="text-sm font-mono font-black text-neutral-800 tracking-tight block mt-1">
             {props.currency === 'PKR' && `Rs. ${Math.round(props.amount * 280).toLocaleString()}`}
             {props.currency === 'GBP' && `£${(props.amount * 0.78).toFixed(2)}`}
@@ -434,12 +434,12 @@ export default function StripeCheckoutForm(props: StripeCheckoutFormProps) {
       )}
 
       {/* Stripe compliance lock trust text */}
-      <div className="pt-4 border-t border-neutral-100 mt-4.5 flex flex-col sm:flex-row gap-2 items-center justify-between text-[9px] font-bold text-neutral-400 font-mono uppercase tracking-widest text-[9px]">
+      <div className="pt-4   mt-4.5 flex flex-col sm:flex-row gap-2 items-center justify-between text-[9px] font-bold text-neutral-400 font-mono text-sentence tracking-widest text-[9px]">
         <span className="flex items-center gap-1">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-          SSL 256-Bit Financial Encryption Vault
+          256-Bit SSL Encryption
         </span>
-        <span className="text-neutral-450">API VERSION 2026-06</span>
+        <span className="text-neutral-450">Powered by Stripe</span>
       </div>
     </div>
   );

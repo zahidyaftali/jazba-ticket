@@ -226,7 +226,7 @@ export default function EventsExplorerPage({
       
       {/* 1. GORGEOUS HERO SECTION - FULL WIDTH (60vh left-aligned, matching the Home Page style) */}
       <section 
-        className="relative bg-[#121212] min-h-[420px] h-[60vh] px-4 sm:px-6 md:px-8 border-b border-neutral-900 overflow-visible z-10 flex items-center"
+        className="relative bg-[#121212] min-h-[420px] h-[60vh] px-4 sm:px-6 md:px-8   overflow-visible z-10 flex items-center"
         id="explorer-hero"
       >
         {/* DARK MUSIC EVENT BACKGROUND PHOTO WITH GRADIENT OVERLAY */}
@@ -245,7 +245,7 @@ export default function EventsExplorerPage({
         {/* Hero Content Wrapper */}
         <div className="max-w-7xl mx-auto w-full relative z-10 text-left space-y-4">
           {/* Subtle Path Breadcrumb */}
-          <div className="inline-flex items-center gap-2 text-[10px] font-black tracking-wider text-neutral-400 bg-neutral-905 border border-neutral-800 backdrop-blur-md px-3.5 py-1.5 rounded-full">
+          <div className="inline-flex items-center gap-2 text-[10px] font-black tracking-wider text-neutral-400 bg-neutral-905   backdrop-blur-md px-3.5 py-1.5 rounded-full">
             <span onClick={onBackToHome} className="hover:text-white hover:underline cursor-pointer transition-colors text-neutral-400">Home</span>
             <span>/</span>
             <span className="text-white">All Events</span>
@@ -256,7 +256,7 @@ export default function EventsExplorerPage({
           </h1>
 
           <p className="text-neutral-300 font-medium text-xs sm:text-sm md:text-base max-w-2xl leading-relaxed">
-            Instantly browsable collection of stadium concerts, classical theatre sets, multi-city music festivals, and corporate speaking circles. Book certified authentic passes seamlessly.
+            Browse concerts, theatre, festivals, and more — and book your tickets in just a few clicks.
           </p>
         </div>
       </section>
@@ -265,11 +265,11 @@ export default function EventsExplorerPage({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 mt-10">
         
         {/* CONTROL AND SORT BAR SUMMARY OVERVIEW PANEL */}
-        <div className="bg-white border border-neutral-200 rounded-2xl p-4.5 mb-8 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        <div className="bg-white   rounded-2xl p-4.5 mb-8 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-grow">
             <div className="flex items-center gap-2 text-sm font-bold text-neutral-800 shrink-0">
               <span className="w-2.5 h-2.5 rounded-full bg-[#E34718] inline-block"></span>
-              <span>Query Filters Dashboard</span>
+              <span>Filter Events</span>
             </div>
 
             {/* Integrated Sleek Search Bar */}
@@ -283,7 +283,7 @@ export default function EventsExplorerPage({
                   setVisibleCount(8);
                 }}
                 placeholder="Search by title, venue, genre..."
-                className="w-full pl-9.5 pr-8 py-2 bg-neutral-50 hover:bg-neutral-100/50 border border-neutral-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#E34718] text-neutral-800 transition-all placeholder-neutral-400"
+                className="w-full pl-9.5 pr-8 py-2 bg-neutral-50 hover:bg-neutral-100/50   rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#E34718] text-neutral-800 transition-all placeholder-neutral-400"
               />
               {searchTerm && (
                 <button
@@ -299,13 +299,13 @@ export default function EventsExplorerPage({
           <div className="flex flex-wrap items-center gap-2.5 justify-end">
             <button
               onClick={onBackToHome}
-              className="bg-neutral-900 hover:bg-neutral-800 text-white text-[10px] font-black tracking-wider uppercase px-4 py-2.5 rounded-full transition-all active:scale-97 cursor-pointer"
+              className="bg-neutral-900 hover:bg-neutral-800 text-white text-[10px] font-black tracking-wider text-sentence px-4 py-2.5 rounded-full transition-all active:scale-97 cursor-pointer"
             >
               ← Back to Home
             </button>
             <button
               onClick={handleClearFilters}
-              className="bg-white hover:bg-neutral-50 border border-neutral-200 text-neutral-800 text-[10px] font-black tracking-wider uppercase px-4 py-2.5 rounded-full transition-all active:scale-97 cursor-pointer"
+              className="bg-white hover:bg-neutral-50   text-neutral-800 text-[10px] font-black tracking-wider text-sentence px-4 py-2.5 rounded-full transition-all active:scale-97 cursor-pointer"
             >
               Reset Filters
             </button>
@@ -318,7 +318,7 @@ export default function EventsExplorerPage({
           {/* SORT SELECT DROPDOWN */}
             <div className="relative group/sort">
               <label className="sr-only">Sort Events</label>
-              <div className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/90 rounded-2xl px-3.5 py-3 text-xs font-bold text-neutral-700 cursor-pointer">
+              <div className="flex items-center gap-2 bg-neutral-50 hover:bg-neutral-100   rounded-2xl px-3.5 py-3 text-xs font-bold text-neutral-700 cursor-pointer">
                 <ArrowUpDown className="w-3.5 h-3.5 text-neutral-500" />
                 <span>Sort: {
                   sortOption === 'sooner' ? 'Latest Added' :
@@ -329,7 +329,7 @@ export default function EventsExplorerPage({
               </div>
 
               {/* FLOATING DROPDOWN LIST */}
-              <div className="absolute right-0 top-full mt-1.5 w-52 bg-white border-2 border-neutral-100 rounded-2xl shadow-xl p-2 z-30 opacity-0 pointer-events-none group-hover/sort:opacity-100 group-hover/sort:pointer-events-auto transition-all duration-200">
+              <div className="absolute right-0 top-full mt-1.5 w-52 bg-white   rounded-2xl shadow-xl p-2 z-30 opacity-0 pointer-events-none group-hover/sort:opacity-100 group-hover/sort:pointer-events-auto transition-all duration-200">
                 <button
                   onClick={() => setSortOption('sooner')}
                   className={`w-full text-left px-3.5 py-2 text-xs font-bold rounded-xl transition-colors ${sortOption === 'sooner' ? 'bg-[#E34718]/10 text-[#C23A12]' : 'hover:bg-neutral-50 text-neutral-600'}`}
@@ -358,7 +358,7 @@ export default function EventsExplorerPage({
             </div>
 
             {/* TOGGLE VIEWMODE: GRID OR LIST */}
-            <div className="bg-neutral-50 border border-neutral-200/90 rounded-2xl p-1 flex items-center">
+            <div className="bg-neutral-50   rounded-2xl p-1 flex items-center">
               <button
                 onClick={() => setViewMode('grid')}
                 className={`p-2 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-white text-neutral-950 shadow-xs' : 'text-neutral-400 hover:text-neutral-600'}`}
@@ -378,7 +378,7 @@ export default function EventsExplorerPage({
             {/* MOBILE ONLY SIDEBAR OPENER */}
             <button
               onClick={() => setIsSidebarOpenMobile(true)}
-              className="lg:hidden bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 text-[#C5E85C] px-4.5 py-3 rounded-2xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+              className="lg:hidden bg-neutral-900   hover:bg-neutral-800 text-[#C5E85C] px-4.5 py-3 rounded-2xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
               <span>Filters</span>
@@ -392,8 +392,8 @@ export default function EventsExplorerPage({
           <aside className="hidden lg:block space-y-7 sticky top-24">
             
             {/* LIKED / WISHLIST MINI-SECTION PANEL */}
-            <div className="bg-white border border-neutral-200 rounded-2xl p-5 shadow-xs">
-              <h3 className="text-xs font-black uppercase tracking-widest text-[#C23A12] mb-4.5 flex items-center justify-between">
+            <div className="bg-white   rounded-2xl p-5 shadow-xs">
+              <h3 className="text-xs font-black text-sentence tracking-widest text-[#C23A12] mb-4.5 flex items-center justify-between">
                 <span>Personal Collection</span>
                 <span className="bg-[#E34718]/10 text-[#C23A12] px-2 py-0.5 rounded-full text-[10px] font-extrabold font-mono">
                   {likedEventIds.length} Saved
@@ -404,10 +404,10 @@ export default function EventsExplorerPage({
                   setShowOnlyLiked(!showOnlyLiked);
                   setVisibleCount(8);
                 }}
-                className={`w-full flex items-center justify-between p-3.5 rounded-2xl border-2 transition-all ${
+                className={`w-full flex items-center justify-between p-3.5 rounded-2xl  transition-all ${
                   showOnlyLiked 
-                    ? 'border-neutral-900 bg-red-50/40 text-neutral-900' 
-                    : 'border-neutral-200/70 hover:border-neutral-300 hover:bg-neutral-50 text-neutral-700'
+                    ? ' bg-red-50/40 text-neutral-900' 
+                    : '  hover:bg-neutral-50 text-neutral-700'
                 }`}
               >
                 <div className="flex items-center gap-2.5">
@@ -419,8 +419,8 @@ export default function EventsExplorerPage({
             </div>
 
             {/* SECTOR 1: CATEGORIES FILTER PILLS */}
-            <div className="bg-white border border-neutral-200 rounded-2xl p-5 shadow-xs">
-              <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-4 flex items-center gap-1.5">
+            <div className="bg-white   rounded-2xl p-5 shadow-xs">
+              <h3 className="text-xs font-black text-sentence tracking-widest text-neutral-400 mb-4 flex items-center gap-1.5">
                 <Layers className="w-3.5 h-3.5" />
                 <span>Categories</span>
               </h3>
@@ -457,8 +457,8 @@ export default function EventsExplorerPage({
             </div>
 
             {/* SECTOR 2: CITIES / VENUES REGION */}
-            <div className="bg-white border border-neutral-200 rounded-2xl p-5 shadow-xs">
-              <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-4 flex items-center gap-1.5">
+            <div className="bg-white   rounded-2xl p-5 shadow-xs">
+              <h3 className="text-xs font-black text-sentence tracking-widest text-neutral-400 mb-4 flex items-center gap-1.5">
                 <Map className="w-3.5 h-3.5" />
                 <span>Cities &amp; Venues</span>
               </h3>
@@ -473,7 +473,7 @@ export default function EventsExplorerPage({
                         setSelectedCity(city);
                         setVisibleCount(8);
                       }}
-                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all uppercase tracking-wide text-left ${
+                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-sentence tracking-wide text-left ${
                         isActive 
                           ? 'bg-neutral-900 text-white shadow-xs' 
                           : 'hover:bg-neutral-50 text-neutral-700 hover:text-black'
@@ -488,8 +488,8 @@ export default function EventsExplorerPage({
             </div>
 
             {/* SECTOR 3: PRICE TIERS */}
-            <div className="bg-white border border-neutral-200 rounded-2xl p-5 shadow-xs">
-              <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-4 flex items-center gap-1.5">
+            <div className="bg-white   rounded-2xl p-5 shadow-xs">
+              <h3 className="text-xs font-black text-sentence tracking-widest text-neutral-400 mb-4 flex items-center gap-1.5">
                 <DollarSign className="w-3.5 h-3.5" />
                 <span>Price Tiers</span>
               </h3>
@@ -497,40 +497,40 @@ export default function EventsExplorerPage({
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => { setPriceTier('all'); setVisibleCount(8); }}
-                  className={`py-2 rounded-xl text-xs font-bold uppercase transition-all border-2 text-center select-none ${
+                  className={`py-2 rounded-xl text-xs font-bold text-sentence transition-all  text-center select-none ${
                     priceTier === 'all' 
-                      ? 'border-neutral-950 bg-neutral-950 text-white' 
-                      : 'border-neutral-200/80 hover:border-neutral-300 text-neutral-700 bg-white'
+                      ? ' bg-neutral-950 text-white' 
+                      : '  text-neutral-700 bg-white'
                   }`}
                 >
                   All
                 </button>
                 <button
                   onClick={() => { setPriceTier('under-50'); setVisibleCount(8); }}
-                  className={`py-2 rounded-xl text-xs font-bold uppercase transition-all border-2 text-center select-none ${
+                  className={`py-2 rounded-xl text-xs font-bold text-sentence transition-all  text-center select-none ${
                     priceTier === 'under-50' 
-                      ? 'border-neutral-950 bg-neutral-950 text-white' 
-                      : 'border-neutral-200/80 hover:border-neutral-300 text-neutral-700 bg-white'
+                      ? ' bg-neutral-950 text-white' 
+                      : '  text-neutral-700 bg-white'
                   }`}
                 >
                   &lt; $50
                 </button>
                 <button
                   onClick={() => { setPriceTier('50-100'); setVisibleCount(8); }}
-                  className={`py-2 rounded-xl text-xs font-bold uppercase transition-all border-2 text-center select-none ${
+                  className={`py-2 rounded-xl text-xs font-bold text-sentence transition-all  text-center select-none ${
                     priceTier === '50-100' 
-                      ? 'border-neutral-950 bg-neutral-950 text-white' 
-                      : 'border-neutral-200/80 hover:border-neutral-300 text-neutral-700 bg-white'
+                      ? ' bg-neutral-950 text-white' 
+                      : '  text-neutral-700 bg-white'
                   }`}
                 >
                   $50 - $100
                 </button>
                 <button
                   onClick={() => { setPriceTier('over-100'); setVisibleCount(8); }}
-                  className={`py-2 rounded-xl text-xs font-bold uppercase transition-all border-2 text-center select-none ${
+                  className={`py-2 rounded-xl text-xs font-bold text-sentence transition-all  text-center select-none ${
                     priceTier === 'over-100' 
-                      ? 'border-neutral-950 bg-neutral-950 text-white' 
-                      : 'border-neutral-200/80 hover:border-neutral-300 text-neutral-700 bg-white'
+                      ? ' bg-neutral-950 text-white' 
+                      : '  text-neutral-700 bg-white'
                   }`}
                 >
                   &gt; $100
@@ -539,8 +539,8 @@ export default function EventsExplorerPage({
             </div>
 
             {/* SECTOR 4: SPECIAL OPTIONS */}
-            <div className="bg-white border border-neutral-200 rounded-2xl p-5 shadow-xs">
-              <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3.5 flex items-center gap-1.5">
+            <div className="bg-white   rounded-2xl p-5 shadow-xs">
+              <h3 className="text-xs font-black text-sentence tracking-widest text-neutral-400 mb-3.5 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>Availability Filters</span>
               </h3>
@@ -553,7 +553,7 @@ export default function EventsExplorerPage({
                     setShowOnlyFeatured(e.target.checked);
                     setVisibleCount(8);
                   }}
-                  className="rounded border-neutral-300 text-[#E34718] focus:ring-[#E34718] w-4 h-4 cursor-pointer"
+                  className="rounded  text-[#E34718] focus:ring-[#E34718] w-4 h-4 cursor-pointer"
                 />
                 <span className="text-xs font-bold text-neutral-700 group-hover:text-black transition-colors">
                   Only Featured / Top Shows
@@ -580,16 +580,16 @@ export default function EventsExplorerPage({
               <motion.div 
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white border-2 border-dashed border-neutral-300 rounded-[32px] p-12 text-center max-w-xl mx-auto my-6 shadow-xs"
+                className="bg-white    rounded-[32px] p-12 text-center max-w-xl mx-auto my-6 shadow-xs"
               >
                 <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4 text-neutral-400">
                   <Info className="w-8 h-8" />
                 </div>
                 <h4 className="font-display font-bold text-xl text-neutral-800 tracking-tight">
-                  No Matching Matches Located
+                  No Events Found
                 </h4>
                 <p className="text-xs text-neutral-500 font-medium max-w-sm mx-auto mt-2 leading-relaxed">
-                  We currently don't have events registered under these parameters. Try clearing some keyword variables or disabling specific city limits.
+                  We couldn't find any events matching your search. Try adjusting your filters or clearing your search term.
                 </p>
                 <button
                   onClick={handleClearFilters}
@@ -615,7 +615,7 @@ export default function EventsExplorerPage({
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ duration: 0.25 }}
                         onClick={() => onViewDetail(evt)}
-                        className="group bg-white border border-neutral-200 hover:border-neutral-300 rounded-2xl overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between cursor-pointer"
+                        className="group bg-white    rounded-2xl overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between cursor-pointer"
                       >
                         {/* Image area */}
                         <div className="relative aspect-4/3 overflow-hidden bg-neutral-50">
@@ -635,7 +635,7 @@ export default function EventsExplorerPage({
                           </button>
 
                           {/* Top Left Badge Category */}
-                          <span className="absolute top-3 left-3 bg-neutral-900/90 text-white px-3 py-1 text-[10px] font-extrabold uppercase tracking-widest rounded-full shadow-sm">
+                          <span className="absolute top-3 left-3 bg-neutral-900/90 text-white px-3 py-1 text-[10px] font-extrabold text-sentence tracking-widest rounded-full shadow-sm">
                             {evt.category}
                           </span>
                         </div>
@@ -643,7 +643,7 @@ export default function EventsExplorerPage({
                         {/* Title details description content */}
                         <div className="p-5.5 flex-1 flex flex-col justify-between">
                           <div>
-                            <div className="flex items-center gap-1.5 text-neutral-400 text-[10px] font-black uppercase tracking-wider">
+                            <div className="flex items-center gap-1.5 text-neutral-400 text-[10px] font-black text-sentence tracking-wider">
                               <Calendar className="w-3 h-3 text-[#E34718]" />
                               <span>{evt.fullDate || evt.date}</span>
                             </div>
@@ -665,9 +665,9 @@ export default function EventsExplorerPage({
                           </div>
 
                           {/* CARD PRICE AND PRIMARY ACTION BUTTON */}
-                          <div className="mt-6 pt-4 border-t border-neutral-100 flex items-center justify-between gap-2">
+                          <div className="mt-6 pt-4   flex items-center justify-between gap-2">
                             <div>
-                              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block leading-none">Standard Pass</span>
+                              <span className="text-[10px] font-bold text-neutral-400 text-sentence tracking-wider block leading-none">Standard Pass</span>
                               <span className="font-display font-black text-neutral-900 text-lg mt-0.5 block">${evt.price}</span>
                             </div>
 
@@ -705,7 +705,7 @@ export default function EventsExplorerPage({
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ duration: 0.2 }}
                         onClick={() => onViewDetail(evt)}
-                        className="bg-white border border-neutral-200 hover:border-neutral-300 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row gap-5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 cursor-pointer justify-between group"
+                        className="bg-white    rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row gap-5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 cursor-pointer justify-between group"
                       >
                         {/* List view image segment */}
                         <div className="w-full sm:w-44 h-32 bg-neutral-100 rounded-2xl overflow-hidden shrink-0 relative">
@@ -715,7 +715,7 @@ export default function EventsExplorerPage({
                             className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500"
                             referrerPolicy="no-referrer"
                           />
-                          <span className="absolute top-2.5 left-2.5 bg-neutral-900/95 text-white px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest rounded-full">
+                          <span className="absolute top-2.5 left-2.5 bg-neutral-900/95 text-white px-2.5 py-0.5 text-[9px] font-black text-sentence tracking-widest rounded-full">
                             {evt.category}
                           </span>
                         </div>
@@ -723,7 +723,7 @@ export default function EventsExplorerPage({
                         {/* Middle detailed segment */}
                         <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
                           <div>
-                            <div className="flex items-center gap-2.5 text-neutral-400 text-[10px] font-extrabold uppercase tracking-wide">
+                            <div className="flex items-center gap-2.5 text-neutral-400 text-[10px] font-extrabold text-sentence tracking-wide">
                               <span className="flex items-center gap-1 text-[#E34718]">
                                 <Calendar className="w-3.5 h-3.5" />
                                 <span>{evt.fullDate || evt.date}</span>
@@ -743,26 +743,26 @@ export default function EventsExplorerPage({
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2 mt-4">
-                            <span className="text-[10px] uppercase font-black px-2.5 py-1 bg-neutral-100 text-neutral-600 rounded-md">
+                            <span className="text-[10px] text-sentence font-black px-2.5 py-1 bg-neutral-100 text-neutral-600 rounded-md">
                               Guaranteed Admission
                             </span>
-                            <span className="text-[10px] uppercase font-black px-2.5 py-1 bg-orange-50 text-[#C23A12] rounded-md">
+                            <span className="text-[10px] text-sentence font-black px-2.5 py-1 bg-orange-50 text-[#C23A12] rounded-md">
                               Instant Receipt
                             </span>
                           </div>
                         </div>
 
                         {/* Right side pricing checkout segment */}
-                        <div className="sm:border-l sm:border-neutral-100 sm:pl-6 flex sm:flex-col justify-between sm:justify-center items-center sm:items-end gap-3 shrink-0 py-1">
+                        <div className="  sm:pl-6 flex sm:flex-col justify-between sm:justify-center items-center sm:items-end gap-3 shrink-0 py-1">
                           <div className="text-left sm:text-right">
-                            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block leading-none">Pass Price</span>
+                            <span className="text-[10px] font-bold text-neutral-400 text-sentence tracking-wider block leading-none">Pass Price</span>
                             <span className="font-display font-black text-2xl text-neutral-900 mt-1 block">${evt.price}</span>
                           </div>
 
                           <div className="flex items-center gap-2">
                             <button
                               onClick={(e) => handleToggleLike(evt.id, e)}
-                              className="w-9 h-9 border border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50 rounded-full flex items-center justify-center text-neutral-500 hover:text-red-500 cursor-pointer active:scale-95"
+                              className="w-9 h-9    hover:bg-neutral-50 rounded-full flex items-center justify-center text-neutral-500 hover:text-red-500 cursor-pointer active:scale-95"
                             >
                               <Heart className={`w-4 h-4 ${isLiked ? 'text-red-500 fill-red-500' : 'text-neutral-500'}`} />
                             </button>
@@ -771,7 +771,7 @@ export default function EventsExplorerPage({
                                 e.stopPropagation();
                                 onBook(evt);
                               }}
-                              className="bg-neutral-900 hover:bg-neutral-800 text-white hover:text-[#C5E85C] px-5 py-2.5 rounded-full text-xs font-black tracking-wide uppercase transition-all shadow-sm active:scale-95 cursor-pointer"
+                              className="bg-neutral-900 hover:bg-neutral-800 text-white hover:text-[#C5E85C] px-5 py-2.5 rounded-full text-xs font-black tracking-wide text-sentence transition-all shadow-sm active:scale-95 cursor-pointer"
                             >
                               Get Ticket
                             </button>
@@ -790,7 +790,7 @@ export default function EventsExplorerPage({
               <div className="text-center mt-10">
                 <button
                   onClick={() => setVisibleCount(prev => prev + 6)}
-                  className="bg-white hover:bg-neutral-50 border-2 border-black/15 text-neutral-900 text-xs font-black uppercase tracking-wider px-7 py-3.5 rounded-full shadow-xs hover:shadow-sm active:scale-95 cursor-pointer transition-all inline-flex items-center gap-2"
+                  className="bg-white hover:bg-neutral-50   text-neutral-900 text-xs font-black text-sentence tracking-wider px-7 py-3.5 rounded-full shadow-xs hover:shadow-sm active:scale-95 cursor-pointer transition-all inline-flex items-center gap-2"
                 >
                   <span>Load More Events</span>
                   <span>↓</span>
@@ -825,14 +825,14 @@ export default function EventsExplorerPage({
               className="relative w-full max-w-sm bg-white h-full shadow-2xl overflow-y-auto p-6 flex flex-col justify-between"
             >
               <div>
-                <div className="flex items-center justify-between pb-4 border-b border-neutral-100 mb-6 font-display font-bold">
-                  <h2 className="font-display font-extrabold text-[#C23A12] flex items-center gap-1.5 uppercase text-sm tracking-widest">
+                <div className="flex items-center justify-between pb-4   mb-6 font-display font-bold">
+                  <h2 className="font-display font-extrabold text-[#C23A12] flex items-center gap-1.5 text-sentence text-sm tracking-widest">
                     <SlidersHorizontal className="w-4 h-4" />
                     Filters &amp; Tags
                   </h2>
                   <button
                     onClick={() => setIsSidebarOpenMobile(false)}
-                    className="w-8 h-8 rounded-full border border-neutral-200 flex items-center justify-center hover:bg-neutral-50 text-neutral-500"
+                    className="w-8 h-8 rounded-full   flex items-center justify-center hover:bg-neutral-50 text-neutral-500"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -842,16 +842,16 @@ export default function EventsExplorerPage({
 
                   {/* LIKED TOGGLE */}
                   <div className="space-y-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-[#C23A12] block">Saved Collection</span>
+                    <span className="text-[10px] font-black text-sentence tracking-widest text-[#C23A12] block">Saved Collection</span>
                     <button
                       onClick={() => {
                         setShowOnlyLiked(!showOnlyLiked);
                         setVisibleCount(8);
                       }}
-                      className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all ${
+                      className={`w-full flex items-center justify-between p-3 rounded-xl  transition-all ${
                         showOnlyLiked 
-                          ? 'border-neutral-900 bg-red-50/40 text-neutral-900' 
-                          : 'border-neutral-200 text-neutral-700 bg-white'
+                          ? ' bg-red-50/40 text-neutral-900' 
+                          : ' text-neutral-700 bg-white'
                       }`}
                     >
                       <div className="flex items-center gap-2">
@@ -863,7 +863,7 @@ export default function EventsExplorerPage({
 
                   {/* CATEGORIES */}
                   <div className="space-y-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-[#111c2d] block">Categories</span>
+                    <span className="text-[10px] font-black text-sentence tracking-widest text-[#111c2d] block">Categories</span>
                     <div className="flex flex-wrap gap-1.5">
                       {categories.map((cat) => {
                         const isActive = selectedCategory === cat.id;
@@ -889,7 +889,7 @@ export default function EventsExplorerPage({
 
                   {/* CITIES */}
                   <div className="space-y-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400 block">Cities</span>
+                    <span className="text-[10px] font-black text-sentence tracking-widest text-neutral-400 block">Cities</span>
                     <div className="flex flex-wrap gap-1.5">
                       {availableCities.map((city) => {
                         const isActive = selectedCity === city;
@@ -900,7 +900,7 @@ export default function EventsExplorerPage({
                               setSelectedCity(city);
                               setVisibleCount(8);
                             }}
-                            className={`px-3.5 py-1.5 rounded-full text-xs font-bold uppercase transition-all ${
+                            className={`px-3.5 py-1.5 rounded-full text-xs font-bold text-sentence transition-all ${
                               isActive 
                                 ? 'bg-neutral-900 text-white' 
                                 : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
@@ -915,36 +915,36 @@ export default function EventsExplorerPage({
 
                   {/* PRICE TIER */}
                   <div className="space-y-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400 block">Price Filters</span>
+                    <span className="text-[10px] font-black text-sentence tracking-widest text-neutral-400 block">Price Filters</span>
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         onClick={() => { setPriceTier('all'); setVisibleCount(8); }}
-                        className={`py-2 rounded-xl text-xs font-bold uppercase border ${
-                          priceTier === 'all' ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 text-neutral-600 bg-white'
+                        className={`py-2 rounded-xl text-xs font-bold text-sentence  ${
+                          priceTier === 'all' ? ' bg-neutral-950 text-white' : ' text-neutral-600 bg-white'
                         }`}
                       >
                         All
                       </button>
                       <button
                         onClick={() => { setPriceTier('under-50'); setVisibleCount(8); }}
-                        className={`py-2 rounded-xl text-xs font-bold uppercase border ${
-                          priceTier === 'under-50' ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 text-neutral-600 bg-white'
+                        className={`py-2 rounded-xl text-xs font-bold text-sentence  ${
+                          priceTier === 'under-50' ? ' bg-neutral-950 text-white' : ' text-neutral-600 bg-white'
                         }`}
                       >
                         &lt; $50
                       </button>
                       <button
                         onClick={() => { setPriceTier('50-100'); setVisibleCount(8); }}
-                        className={`py-2 rounded-xl text-xs font-bold uppercase border ${
-                          priceTier === '50-100' ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 text-neutral-600 bg-white'
+                        className={`py-2 rounded-xl text-xs font-bold text-sentence  ${
+                          priceTier === '50-100' ? ' bg-neutral-950 text-white' : ' text-neutral-600 bg-white'
                         }`}
                       >
                         $50 - $100
                       </button>
                       <button
                         onClick={() => { setPriceTier('over-100'); setVisibleCount(8); }}
-                        className={`py-2 rounded-xl text-xs font-bold uppercase border ${
-                          priceTier === 'over-100' ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 text-neutral-600 bg-white'
+                        className={`py-2 rounded-xl text-xs font-bold text-sentence  ${
+                          priceTier === 'over-100' ? ' bg-neutral-950 text-white' : ' text-neutral-600 bg-white'
                         }`}
                       >
                         &gt; $100
@@ -954,7 +954,7 @@ export default function EventsExplorerPage({
 
                   {/* AVAILABILITY */}
                   <div className="space-y-2 pt-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-[#111c2d] block">Availability</span>
+                    <span className="text-[10px] font-black text-sentence tracking-widest text-[#111c2d] block">Availability</span>
                     <label className="flex items-center gap-2.5 cursor-pointer">
                       <input 
                         type="checkbox" 
@@ -963,7 +963,7 @@ export default function EventsExplorerPage({
                           setShowOnlyFeatured(e.target.checked);
                           setVisibleCount(8);
                         }}
-                        className="rounded border-neutral-300 text-[#E34718] focus:ring-[#E34718]"
+                        className="rounded  text-[#E34718] focus:ring-[#E34718]"
                       />
                       <span className="text-xs font-bold text-neutral-700">
                         Top Featured Shows Only
@@ -975,10 +975,10 @@ export default function EventsExplorerPage({
               </div>
 
               {/* DRAWERS FOOTER */}
-              <div className="pt-6 border-t border-neutral-100 space-y-2">
+              <div className="pt-6   space-y-2">
                 <button
                   onClick={() => setIsSidebarOpenMobile(false)}
-                  className="w-full bg-[#E34718] hover:bg-[#C23A12] text-white font-black text-xs py-3 rounded-full uppercase transition-all shadow-xs"
+                  className="w-full bg-[#E34718] hover:bg-[#C23A12] text-white font-black text-xs py-3 rounded-full text-sentence transition-all shadow-xs"
                 >
                   Apply Filters
                 </button>
@@ -987,7 +987,7 @@ export default function EventsExplorerPage({
                     handleClearFilters();
                     setIsSidebarOpenMobile(false);
                   }}
-                  className="w-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold text-xs py-2.5 rounded-full uppercase transition-all"
+                  className="w-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold text-xs py-2.5 rounded-full text-sentence transition-all"
                 >
                   Clear All
                 </button>

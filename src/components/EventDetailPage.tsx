@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { EventItem } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import { auth } from '../firebase';
+import { getOrganizerProfile, followTarget, unfollowTarget, isFollowingTarget, getFollowerCount, OrganizerProfile } from '../services/backendService';
 
 interface EventDetailPageProps {
   event: EventItem;
@@ -12,6 +14,7 @@ interface EventDetailPageProps {
   onBack: () => void;
   onBook: (event: EventItem, quantity: number, tier: 'general' | 'vip' | 'elite') => void;
   onSelectRelatedEvent: (event: EventItem) => void;
+  onRequireLogin: () => void;
 }
 
 export default function EventDetailPage({
@@ -19,7 +22,8 @@ export default function EventDetailPage({
   allEvents,
   onBack,
   onBook,
-  onSelectRelatedEvent
+  onSelectRelatedEvent,
+  onRequireLogin
 }: EventDetailPageProps) {
   // --- States ---
   const [isLiked, setIsLiked] = useState(false);
@@ -34,10 +38,73 @@ export default function EventDetailPage({
   // Agenda interactive state
   const [selectedAgendaId, setSelectedAgendaId] = useState<number | null>(0);
   
-  // Organizer state
+  // Organizer state - real profile, follow status, and follower count loaded from Firestore
+  const [organizerProfile, setOrganizerProfile] = useState<OrganizerProfile | null>(null);
   const [isFollowingOrganizer, setIsFollowingOrganizer] = useState(false);
   const [organizerRating] = useState(4.9);
-  const [organizerFollowers, setOrganizerFollowers] = useState(12840);
+  const [organizerFollowers, setOrganizerFollowers] = useState(0);
+  const [organizerFollowBusy, setOrganizerFollowBusy] = useState(false);
+
+  const organizerUserId = (event as any).organizerId as string | undefined;
+  const organizerTargetId = organizerProfile?.id || organizerUserId || '';
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!organizerUserId) {
+      setOrganizerProfile(null);
+      return;
+    }
+    getOrganizerProfile(organizerUserId).then((profile) => {
+      if (!cancelled) setOrganizerProfile(profile);
+    });
+    return () => { cancelled = true; };
+  }, [organizerUserId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!organizerTargetId) {
+      setOrganizerFollowers(0);
+      setIsFollowingOrganizer(false);
+      return;
+    }
+    getFollowerCount('organizer', organizerTargetId).then((count) => {
+      if (!cancelled) setOrganizerFollowers(count);
+    });
+    const user = auth.currentUser;
+    if (user) {
+      isFollowingTarget(user.uid, 'organizer', organizerTargetId).then((following) => {
+        if (!cancelled) setIsFollowingOrganizer(following);
+      });
+    } else {
+      setIsFollowingOrganizer(false);
+    }
+    return () => { cancelled = true; };
+  }, [organizerTargetId]);
+
+  const handleToggleFollowOrganizer = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      onRequireLogin();
+      return;
+    }
+    if (!organizerTargetId || organizerFollowBusy) return;
+    setOrganizerFollowBusy(true);
+    try {
+      if (isFollowingOrganizer) {
+        await unfollowTarget(user.uid, 'organizer', organizerTargetId);
+        setIsFollowingOrganizer(false);
+        setOrganizerFollowers(prev => Math.max(0, prev - 1));
+      } else {
+        await followTarget(user.uid, 'organizer', organizerTargetId);
+        setIsFollowingOrganizer(true);
+        setOrganizerFollowers(prev => prev + 1);
+      }
+    } catch (err) {
+      console.error('Error updating organizer follow state', err);
+    } finally {
+      setOrganizerFollowBusy(false);
+    }
+  };
   
   // Gallery zoom state
   const [zoomImage, setZoomImage] = useState<string | null>(null);
@@ -149,9 +216,9 @@ export default function EventDetailPage({
   ];
 
   const organizerDetails = {
-    name: 'Jazba Premiere Productions',
-    bio: 'Pioneers of high-production theatrical experiences, live music tours, and monumental concerts across the United Kingdom and Canada since 2012.',
-    imageUrl: 'https://images.unsplash.com/photo-1519751138087-5bf79df62d5b?w=100&auto=format&fit=crop&q=80'
+    name: organizerProfile?.companyName || 'Jazba Premiere Productions',
+    bio: organizerProfile?.description || 'Pioneers of high-production theatrical experiences, live music tours, and monumental concerts across the United Kingdom and Canada since 2012.',
+    imageUrl: organizerProfile?.logoUrl || 'https://images.unsplash.com/photo-1519751138087-5bf79df62d5b?w=100&auto=format&fit=crop&q=80'
   };
 
   const galleryImages = [
@@ -226,7 +293,7 @@ export default function EventDetailPage({
         <div className="mb-8 flex items-center justify-between">
           <button 
             onClick={onBack}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-full text-xs font-bold uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer group"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-full text-xs font-bold text-sentence tracking-wider transition-all shadow-md active:scale-95 cursor-pointer group"
           >
             <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
             <span>Back to Shows</span>
@@ -240,7 +307,7 @@ export default function EventDetailPage({
           <div className="lg:col-span-8 space-y-6">
             
             {/* 1. HERO BANNER COVER & QUICK METADATA */}
-            <div className="relative rounded-2xl overflow-hidden border border-neutral-200 bg-black shadow-xs">
+            <div className="relative rounded-2xl overflow-hidden   bg-black shadow-xs">
               <div className="h-[280px] sm:h-[420px] w-full overflow-hidden relative">
                 <img 
                   src={event.image} 
@@ -256,7 +323,7 @@ export default function EventDetailPage({
               <div className="absolute top-4 right-4 flex items-center gap-2.5 z-10">
                 <button 
                   onClick={() => setIsLiked(!isLiked)}
-                  className="w-10 h-10 rounded-full bg-white/95 hover:bg-white flex items-center justify-center border border-neutral-200/60 shadow-md transition-all active:scale-95 cursor-pointer"
+                  className="w-10 h-10 rounded-full bg-white/95 hover:bg-white flex items-center justify-center   shadow-md transition-all active:scale-95 cursor-pointer"
                   title="Save Event"
                 >
                   <Heart className={`w-4.5 h-4.5 transition-colors ${isLiked ? 'fill-red-500 text-red-500' : 'text-neutral-700'}`} />
@@ -266,7 +333,7 @@ export default function EventDetailPage({
                     navigator.clipboard.writeText(window.location.href);
                     alert('Event page link copied to clipboard!');
                   }}
-                  className="w-10 h-10 rounded-full bg-white/95 hover:bg-white flex items-center justify-center border border-neutral-200/60 shadow-md transition-all active:scale-95 cursor-pointer"
+                  className="w-10 h-10 rounded-full bg-white/95 hover:bg-white flex items-center justify-center   shadow-md transition-all active:scale-95 cursor-pointer"
                   title="Share Event"
                 >
                   <Share2 className="w-4.5 h-4.5 text-neutral-700" />
@@ -276,10 +343,10 @@ export default function EventDetailPage({
               {/* OVERLAY DETAILS */}
               <div className="absolute bottom-0 text-white p-6 sm:p-10 w-full text-left">
                 <div className="flex flex-wrap items-center gap-2 mb-4">
-                  <span className="bg-neutral-950/80 text-[#E34718] text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded-full border border-neutral-800">
+                  <span className="bg-neutral-950/80 text-[#E34718] text-[10px] text-sentence font-black tracking-widest px-3 py-1.5 rounded-full  ">
                     {event.category.toUpperCase()}
                   </span>
-                  <span className="bg-white/10 text-white backdrop-blur-md text-[10px] font-bold px-3 py-1.5 rounded-full border border-white/10">
+                  <span className="bg-white/10 text-white backdrop-blur-md text-[10px] font-bold px-3 py-1.5 rounded-full  ">
                     ★ Premium Verified
                   </span>
                 </div>
@@ -295,19 +362,19 @@ export default function EventDetailPage({
             </div>
 
             {/* 2. EVENT INFORMATION SECTION (MINIMAL GRID) */}
-            <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-8 shadow-2xs">
-              <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest border-b border-neutral-100 pb-3 mb-6 text-left">
+            <div className="bg-white   rounded-2xl p-6 sm:p-8 shadow-2xs">
+              <h3 className="text-[10px] font-black text-neutral-400 text-sentence tracking-widest   pb-3 mb-6 text-left">
                 Essential Spotlights
               </h3>
               
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-left">
                 {/* DATE DETAILS */}
                 <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 bg-[#E34718]/10 rounded-xl text-neutral-800 flex items-center justify-center shrink-0 border border-[#E34718]/20">
+                  <div className="w-11 h-11 bg-[#E34718]/10 rounded-xl text-neutral-800 flex items-center justify-center shrink-0  ">
                     <Calendar className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
-                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block leading-none">Date</span>
+                    <span className="text-[10px] font-bold text-neutral-400 text-sentence tracking-widest block leading-none">Date</span>
                     <span className="text-sm font-bold text-neutral-950 mt-1.5 block truncate whitespace-nowrap">
                       {event.fullDate || `${event.date}, ${event.year || '2026'}`}
                     </span>
@@ -316,11 +383,11 @@ export default function EventDetailPage({
 
                 {/* TIMING DETAILS */}
                 <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 bg-[#E34718]/10 rounded-xl text-neutral-800 flex items-center justify-center shrink-0 border border-[#E34718]/20">
+                  <div className="w-11 h-11 bg-[#E34718]/10 rounded-xl text-neutral-800 flex items-center justify-center shrink-0  ">
                     <Clock className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
-                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block leading-none">Time</span>
+                    <span className="text-[10px] font-bold text-neutral-400 text-sentence tracking-widest block leading-none">Time</span>
                     <span className="text-sm font-bold text-neutral-950 mt-1.5 block font-mono truncate whitespace-nowrap">
                       {event.time}
                     </span>
@@ -329,11 +396,11 @@ export default function EventDetailPage({
 
                 {/* LOCATION ROOM VENUE */}
                 <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 bg-neutral-100 rounded-xl text-neutral-800 flex items-center justify-center shrink-0 border border-neutral-200">
+                  <div className="w-11 h-11 bg-neutral-100 rounded-xl text-neutral-800 flex items-center justify-center shrink-0  ">
                     <MapPin className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
-                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block leading-none">Location</span>
+                    <span className="text-[10px] font-bold text-neutral-400 text-sentence tracking-widest block leading-none">Location</span>
                     <span className="text-sm font-bold text-neutral-950 mt-1.5 block truncate whitespace-nowrap">
                       {event.location}
                     </span>
@@ -343,22 +410,22 @@ export default function EventDetailPage({
             </div>
 
             {/* 3. EVENT DESCRIPTION */}
-            <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-8 shadow-2xs text-left">
-              <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest border-b border-neutral-100 pb-3 mb-6">
+            <div className="bg-white   rounded-2xl p-6 sm:p-8 shadow-2xs text-left">
+              <h3 className="text-[10px] font-black text-neutral-400 text-sentence tracking-widest   pb-3 mb-6">
                 Event Description
               </h3>
               
               <div className="prose prose-neutral text-sm sm:text-base text-neutral-600 leading-relaxed font-normal space-y-4">
                 <p>
-                  Experience the pinnacle of live performance art at <strong className="text-neutral-900 font-bold">{event.title}</strong>. This unique showcase weaves masterful scenography, breathtaking performances, and rich acoustics into an unforgettable narrative that captures the hearts of audience members globally.
+                  Join us for an unforgettable night at <strong className="text-neutral-900 font-bold">{event.title}</strong>. Expect outstanding performances, immersive staging, and great sound in a venue built to bring the show to life.
                 </p>
                 <p>
-                  Acclaimed globally as one of the most compelling releases in modern entertainment, each specific set has been carefully tuned to harmonize with the theater's physical layout and natural acoustics structure. Whether you are a lifelong patron of high-concept arts or a first-time musical show attendee, you are bound to uncover deep emotional resonance and premium satisfaction.
+                  Whether you're a longtime fan of live entertainment or attending your first show, you're in for a night to remember.
                 </p>
                 
                 {/* PERFORMANCE HIGHLIGHT BULLETS */}
-                <div className="pt-6 border-t border-neutral-100 mt-6">
-                  <h4 className="text-neutral-850 font-bold text-xs uppercase tracking-widest mb-4">Performance Highlights</h4>
+                <div className="pt-6   mt-6">
+                  <h4 className="text-neutral-850 font-bold text-xs text-sentence tracking-widest mb-4">Performance Highlights</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs sm:text-sm text-neutral-600 font-medium">
                     <div className="flex items-center gap-3">
                       <div className="w-5 h-5 rounded-full bg-[#E34718]/10 flex items-center justify-center shrink-0">
@@ -382,7 +449,7 @@ export default function EventDetailPage({
                       <div className="w-5 h-5 rounded-full bg-[#E34718]/10 flex items-center justify-center shrink-0">
                         <Check className="w-3.5 h-3.5 text-[#E34718]" />
                       </div>
-                      <span>Verified VIP bar and snack corridors</span>
+                      <span>VIP bar and snack access</span>
                     </div>
                   </div>
                 </div>
@@ -390,12 +457,12 @@ export default function EventDetailPage({
             </div>
 
             {/* 4. EVENT AGENDA / Schedule (CLEAN MINIMAL CARD EXPANSION) */}
-            <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-8 shadow-2xs text-left">
-              <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 pb-3">
-                <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">
+            <div className="bg-white   rounded-2xl p-6 sm:p-8 shadow-2xs text-left">
+              <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3   pb-3">
+                <h3 className="text-[10px] font-black text-neutral-400 text-sentence tracking-widest">
                   Event Agenda / Schedule
                 </h3>
-                <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider bg-neutral-100 px-2.5 py-1 rounded-full">
+                <span className="text-[10px] text-neutral-400 font-bold text-sentence tracking-wider bg-neutral-100 px-2.5 py-1 rounded-full">
                   Local Stage Time (BST)
                 </span>
               </div>
@@ -408,10 +475,10 @@ export default function EventDetailPage({
                     <div 
                       key={item.id}
                       onClick={() => setSelectedAgendaId(isSelected ? null : item.id)}
-                      className={`group p-4 rounded-xl border transition-all duration-200 cursor-pointer ${
+                      className={`group p-4 rounded-xl  transition-all duration-200 cursor-pointer ${
                         isSelected 
-                          ? 'bg-[#E34718]/5 border-[#E34718]' 
-                          : 'bg-white border-neutral-200 hover:border-neutral-350'
+                          ? 'bg-[#E34718]/5 ' 
+                          : 'bg-white  '
                       }`}
                     >
                       <div className="flex items-start justify-between gap-4">
@@ -447,7 +514,7 @@ export default function EventDetailPage({
                             transition={{ duration: 0.2 }}
                             className="overflow-hidden"
                           >
-                            <p className="text-xs text-neutral-500 mt-3.5 pt-3.5 border-t border-neutral-100 leading-relaxed">
+                            <p className="text-xs text-neutral-500 mt-3.5 pt-3.5   leading-relaxed">
                               {item.desc}
                             </p>
                           </motion.div>
@@ -460,8 +527,8 @@ export default function EventDetailPage({
             </div>
 
             {/* 5. FEATURED LIVE PERFORMERS */}
-            <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-8 shadow-2xs text-left">
-              <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest border-b border-neutral-100 pb-3 mb-6">
+            <div className="bg-white   rounded-2xl p-6 sm:p-8 shadow-2xs text-left">
+              <h3 className="text-[10px] font-black text-neutral-400 text-sentence tracking-widest   pb-3 mb-6">
                 Featured Live Performers
               </h3>
 
@@ -469,9 +536,9 @@ export default function EventDetailPage({
                 {artistsList.map((artist, idx) => (
                   <div 
                     key={idx}
-                    className="flex flex-col items-center text-center p-5 rounded-xl border border-neutral-200 bg-neutral-50/20"
+                    className="flex flex-col items-center text-center p-5 rounded-xl   bg-neutral-50/20"
                   >
-                    <div className="w-16 h-16 rounded-full overflow-hidden border border-neutral-200 shadow-inner relative mb-3">
+                    <div className="w-16 h-16 rounded-full overflow-hidden   shadow-inner relative mb-3">
                       <img 
                         src={artist.avatar} 
                         alt={artist.name} 
@@ -483,11 +550,11 @@ export default function EventDetailPage({
                     <h4 className="font-bold text-xs sm:text-sm text-neutral-900 leading-snug font-display">
                       {artist.name}
                     </h4>
-                    <span className="text-[9px] text-neutral-400 font-extrabold uppercase tracking-widest block mt-1">
+                    <span className="text-[9px] text-neutral-400 font-extrabold text-sentence tracking-widest block mt-1">
                       {artist.role}
                     </span>
                     
-                    <p className="text-[11px] text-neutral-500 font-medium leading-relaxed mt-3.5 pt-3.5 border-t border-neutral-200">
+                    <p className="text-[11px] text-neutral-500 font-medium leading-relaxed mt-3.5 pt-3.5  ">
                       {artist.bio}
                     </p>
                   </div>
@@ -496,14 +563,14 @@ export default function EventDetailPage({
             </div>
 
             {/* 6. VENUE & DIRECTIONS */}
-            <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-8 shadow-2xs text-left">
-              <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest border-b border-neutral-100 pb-3 mb-6">
+            <div className="bg-white   rounded-2xl p-6 sm:p-8 shadow-2xs text-left">
+              <h3 className="text-[10px] font-black text-neutral-400 text-sentence tracking-widest   pb-3 mb-6">
                 Venue &amp; Logistics Guides
               </h3>
 
               <div className="space-y-6">
                 {/* MAP SIMULATOR VISUAL CONTAINER */}
-                <div className="relative h-60 rounded-xl overflow-hidden border border-neutral-200 bg-neutral-100 shadow-inner">
+                <div className="relative h-60 rounded-xl overflow-hidden   bg-neutral-100 shadow-inner">
                   <div className="absolute inset-0 bg-[#E2E8F0] overflow-hidden flex flex-col justify-end p-4">
                     {/* Modern stylized roads map back-draw */}
                     <div className="absolute inset-0 opacity-[0.25] pointer-events-none">
@@ -511,21 +578,21 @@ export default function EventDetailPage({
                       <div className="absolute w-full h-[6px] bg-white top-2/3 left-0 shadow-xs"></div>
                       <div className="absolute w-[6px] h-full bg-white left-1/4 top-0 shadow-xs"></div>
                       <div className="absolute w-[6px] h-full bg-white left-3/4 top-0 shadow-xs"></div>
-                      <div className="absolute w-24 h-24 rounded-full border-4 border-white left-[20%] top-[35%] opacity-50"></div>
+                      <div className="absolute w-24 h-24 rounded-full   left-[20%] top-[35%] opacity-50"></div>
                     </div>
 
                     {/* SEATING POSITION / PIN MARKER */}
                     <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-                      <div className="bg-neutral-900 text-white rounded-lg px-4 py-2 text-xs font-bold shadow-xl border border-neutral-800 flex items-center gap-2 z-10 whitespace-nowrap">
+                      <div className="bg-neutral-900 text-white rounded-lg px-4 py-2 text-xs font-bold shadow-xl   flex items-center gap-2 z-10 whitespace-nowrap">
                         <MapPin className="w-3.5 h-3.5 text-[#E34718]" />
                         <span>{event.location}</span>
                       </div>
-                      <div className="w-6 h-6 bg-[#E34718]/30 rounded-full border border-[#E34718] mt-1 flex items-center justify-center">
+                      <div className="w-6 h-6 bg-[#E34718]/30 rounded-full   mt-1 flex items-center justify-center">
                         <div className="w-2 h-2 bg-[#E34718] rounded-full"></div>
                       </div>
                     </div>
 
-                    <div className="z-10 bg-white/95 backdrop-blur-md p-3.5 rounded-xl border border-neutral-200 max-w-xs text-left shadow-lg">
+                    <div className="z-10 bg-white/95 backdrop-blur-md p-3.5 rounded-xl   max-w-xs text-left shadow-lg">
                       <h4 className="font-bold text-xs text-neutral-950 leading-tight">London Symphonic Center Arch</h4>
                       <p className="text-[10px] text-neutral-500 leading-snug mt-1">382 Festival Row Corridor, Westminster, EC2N</p>
                     </div>
@@ -534,16 +601,16 @@ export default function EventDetailPage({
 
                 {/* DIRECTIONS & STAGE PLOTS */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="p-4 bg-neutral-50/50 border border-neutral-200 rounded-xl">
-                    <h4 className="font-bold text-xs text-neutral-800 uppercase tracking-widest mb-2 border-b border-neutral-100 pb-1.5">Transport Guides</h4>
+                  <div className="p-4 bg-neutral-50/50   rounded-xl">
+                    <h4 className="font-bold text-xs text-neutral-800 text-sentence tracking-widest mb-2   pb-1.5">Transport Guides</h4>
                     <p className="text-[11px] text-neutral-500 leading-relaxed font-semibold space-y-1.5">
                       <span className="block">• <strong>Underground:</strong> Westminster Station (Jubilee / District lines) - 4 min walk</span>
                       <span className="block">• <strong>Bus Depot:</strong> Platform 9 lines 24 &amp; 88 stop directly at the theater gates</span>
                       <span className="block">• <strong>Parking:</strong> Structural Deck G slots can be booked seamlessly in booking checkout</span>
                     </p>
                   </div>
-                  <div className="p-4 bg-neutral-50/50 border border-neutral-200 rounded-xl">
-                    <h4 className="font-bold text-xs text-neutral-800 uppercase tracking-widest mb-2 border-b border-neutral-100 pb-1.5">Stage Layout Specs</h4>
+                  <div className="p-4 bg-neutral-50/50   rounded-xl">
+                    <h4 className="font-bold text-xs text-neutral-800 text-sentence tracking-widest mb-2   pb-1.5">Stage Layout Specs</h4>
                     <p className="text-[11px] text-neutral-500 leading-relaxed font-semibold space-y-1.5">
                       <span className="block">• Center Core Ring acoustics optimize vocal output near central aisles</span>
                       <span className="block">• Projections require distance: Rows D+ represent prime viewing fields</span>
@@ -555,13 +622,13 @@ export default function EventDetailPage({
             </div>
 
             {/* 7. ORGANIZER PROFILE */}
-            <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-8 shadow-2xs text-left">
-              <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest border-b border-neutral-100 pb-3 mb-6">
+            <div className="bg-white   rounded-2xl p-6 sm:p-8 shadow-2xs text-left">
+              <h3 className="text-[10px] font-black text-neutral-400 text-sentence tracking-widest   pb-3 mb-6">
                 Organizer Profile
               </h3>
 
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-                <div className="w-14 h-14 rounded-xl overflow-hidden border border-neutral-200 shrink-0">
+                <div className="w-14 h-14 rounded-xl overflow-hidden   shrink-0">
                   <img 
                     src={organizerDetails.imageUrl} 
                     alt={organizerDetails.name} 
@@ -579,23 +646,17 @@ export default function EventDetailPage({
                           <Check className="w-3.5 h-3.5" />
                         </span>
                       </h4>
-                      <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider mt-1">
+                      <p className="text-[10px] text-neutral-400 font-bold text-sentence tracking-wider mt-1">
                         Active member since 2012 • London Region
                       </p>
                     </div>
 
-                    <button 
-                      onClick={() => {
-                        if (isFollowingOrganizer) {
-                          setOrganizerFollowers(prev => prev - 1);
-                        } else {
-                          setOrganizerFollowers(prev => prev + 1);
-                        }
-                        setIsFollowingOrganizer(!isFollowingOrganizer);
-                      }}
-                      className={`px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                        isFollowingOrganizer 
-                          ? 'bg-neutral-100 border border-neutral-200 text-neutral-600 hover:bg-neutral-250 animate-fadeIn'
+                    <button
+                      onClick={handleToggleFollowOrganizer}
+                      disabled={organizerFollowBusy}
+                      className={`px-5 py-2 rounded-full text-xs font-bold text-sentence tracking-wider transition-all cursor-pointer disabled:opacity-60 ${
+                        isFollowingOrganizer
+                          ? 'bg-neutral-100   text-neutral-600 hover:bg-neutral-250 animate-fadeIn'
                           : 'bg-neutral-950 text-white hover:bg-neutral-800'
                       }`}
                     >
@@ -604,12 +665,12 @@ export default function EventDetailPage({
                   </div>
 
                   {/* STATS STRIP */}
-                  <div className="flex items-center justify-center sm:justify-start gap-6 mt-4 pt-4 border-t border-neutral-100">
+                  <div className="flex items-center justify-center sm:justify-start gap-6 mt-4 pt-4  ">
                     <div>
                       <span className="font-mono font-bold text-neutral-800 text-sm block leading-none">
                         {organizerFollowers.toLocaleString()}
                       </span>
-                      <span className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider block mt-1 leading-none">
+                      <span className="text-[9px] text-neutral-400 font-bold text-sentence tracking-wider block mt-1 leading-none">
                         Followers
                       </span>
                     </div>
@@ -618,7 +679,7 @@ export default function EventDetailPage({
                         <Star className="w-3.5 h-3.5 fill-[#E34718] text-[#E34718]" />
                         {organizerRating}
                       </span>
-                      <span className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider block mt-1 leading-none">
+                      <span className="text-[9px] text-neutral-400 font-bold text-sentence tracking-wider block mt-1 leading-none">
                         Aggregate Rating
                       </span>
                     </div>
@@ -632,9 +693,9 @@ export default function EventDetailPage({
             </div>
 
             {/* 8. GALLERY PICTURES (ZOOM EXPANSIONS) */}
-            <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-8 shadow-2xs text-left">
-              <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest border-b border-neutral-100 pb-3 mb-6">
-                Stage Showcase Gallery
+            <div className="bg-white   rounded-2xl p-6 sm:p-8 shadow-2xs text-left">
+              <h3 className="text-[10px] font-black text-neutral-400 text-sentence tracking-widest   pb-3 mb-6">
+                Photo Gallery
               </h3>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -642,7 +703,7 @@ export default function EventDetailPage({
                   <div 
                     key={idx}
                     onClick={() => setZoomImage(img)}
-                    className="group relative h-24 sm:h-32 rounded-xl overflow-hidden cursor-zoom-in border border-neutral-200 bg-neutral-100"
+                    className="group relative h-24 sm:h-32 rounded-xl overflow-hidden cursor-zoom-in   bg-neutral-100"
                   >
                     <img 
                       src={img} 
@@ -659,16 +720,16 @@ export default function EventDetailPage({
             </div>
 
             {/* 9. FAQs */}
-            <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-8 shadow-2xs text-left">
-              <div className="mb-6 border-b border-neutral-100 pb-3">
-                <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">
+            <div className="bg-white   rounded-2xl p-6 sm:p-8 shadow-2xs text-left">
+              <div className="mb-6   pb-3">
+                <h3 className="text-[10px] font-black text-neutral-400 text-sentence tracking-widest">
                   Frequently Asked Questions
                 </h3>
                 <p className="text-xs text-neutral-500 font-medium mt-1">Immediate stage concerns and gate instructions answered.</p>
               </div>
 
               {/* ZERO BOX-SHADOWS ACCORDION WRAPPER (DIVIDE LINES ONLY) */}
-              <div className="divide-y divide-neutral-200 border-t border-b border-neutral-200">
+              <div className="    ">
                 {faqList.map((item) => {
                   const isOpen = openFaqId === item.id;
                   
@@ -683,7 +744,7 @@ export default function EventDetailPage({
                         className="w-full flex items-center justify-between py-4 px-1 bg-white text-left font-bold text-xs sm:text-sm text-neutral-800 hover:text-black focus:outline-none transition-colors cursor-pointer"
                       >
                         <span className="pr-4 leading-tight font-display font-medium text-neutral-950">{item.question}</span>
-                        <div className="shrink-0 w-7 h-7 rounded-full border border-neutral-200 flex items-center justify-center bg-neutral-50 text-neutral-660">
+                        <div className="shrink-0 w-7 h-7 rounded-full   flex items-center justify-center bg-neutral-50 text-neutral-660">
                           {isOpen ? <Minus className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
                         </div>
                       </button>
@@ -709,21 +770,21 @@ export default function EventDetailPage({
             </div>
 
             {/* 10. REVIEWS & TESTIMONIALS */}
-            <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-8 shadow-2xs text-left">
-              <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest border-b border-neutral-100 pb-3 mb-6">
+            <div className="bg-white   rounded-2xl p-6 sm:p-8 shadow-2xs text-left">
+              <h3 className="text-[10px] font-black text-neutral-400 text-sentence tracking-widest   pb-3 mb-6">
                 Reviews &amp; Testimonials
               </h3>
 
               {/* STARS OVERALL RATING CHALET */}
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-center border-b border-neutral-200 pb-6 mb-6">
-                <div className="sm:col-span-4 text-center pb-4 sm:pb-0 sm:border-r border-neutral-100">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-center   pb-6 mb-6">
+                <div className="sm:col-span-4 text-center pb-4 sm:pb-0  ">
                   <span className="text-3xl sm:text-4xl font-display font-medium text-neutral-900 leading-none">4.8</span>
                   <div className="flex items-center justify-center gap-1 mt-2.5">
                     {[1, 2, 3, 4, 5].map((s) => (
                       <Star key={s} className="w-4 h-4 fill-[#E34718] text-[#E34718]" />
                     ))}
                   </div>
-                  <span className="text-[9px] text-neutral-400 font-bold block mt-2 uppercase tracking-wide">
+                  <span className="text-[9px] text-neutral-400 font-bold block mt-2 text-sentence tracking-wide">
                     Based on 148 global reviews
                   </span>
                 </div>
@@ -750,8 +811,8 @@ export default function EventDetailPage({
               {/* TESTIMONIAL BUBBLES */}
               <div className="space-y-4">
                 {eventReviews.map((rev) => (
-                  <div key={rev.id} className="p-5 bg-neutral-50/20 border border-neutral-200 rounded-xl flex flex-col sm:flex-row gap-4">
-                    <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 border border-neutral-200 relative mb-2 sm:mb-0">
+                  <div key={rev.id} className="p-5 bg-neutral-50/20   rounded-xl flex flex-col sm:flex-row gap-4">
+                    <div className="w-10 h-10 rounded-full overflow-hidden shrink-0   relative mb-2 sm:mb-0">
                       <img src={rev.avatar} alt={rev.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -759,8 +820,8 @@ export default function EventDetailPage({
                         <div>
                           <h4 className="font-bold text-xs sm:text-sm text-neutral-850 flex items-center gap-1.5 leading-tight">
                             {rev.name}
-                            <span className="bg-orange-50 text-[9px] text-[#C23A12] px-2 py-0.5 border border-orange-200/50 rounded-full font-bold uppercase tracking-wider shrink-0">
-                              Verified Stay
+                            <span className="bg-orange-50 text-[9px] text-[#C23A12] px-2 py-0.5   rounded-full font-bold text-sentence tracking-wider shrink-0">
+                              Verified Booking
                             </span>
                           </h4>
                           <span className="text-[10px] text-neutral-400 font-bold block mt-1">{rev.date}</span>
@@ -778,8 +839,8 @@ export default function EventDetailPage({
                         "{rev.text}"
                       </p>
 
-                      <div className="flex items-center gap-3 mt-4 text-[10px] text-neutral-400 font-black tracking-widest uppercase">
-                        <button className="flex items-center gap-1 hover:text-neutral-600 bg-white border border-neutral-200 px-3 py-1 rounded-md transition-colors cursor-pointer">
+                      <div className="flex items-center gap-3 mt-4 text-[10px] text-neutral-400 font-black tracking-widest text-sentence">
+                        <button className="flex items-center gap-1 hover:text-neutral-600 bg-white   px-3 py-1 rounded-md transition-colors cursor-pointer">
                           <ThumbsUp className="w-3 h-3 text-[#C23A12]" /> <span>Helpful • 8</span>
                         </button>
                         <span>|</span>
@@ -797,22 +858,22 @@ export default function EventDetailPage({
           <div className="lg:col-span-4 lg:sticky lg:top-24 lg:self-start h-fit space-y-6 z-10 text-left">
             
             {/* TICKET RES BLOCK WITH ITEM RECEIPTS */}
-            <div className="bg-white border border-neutral-200/85 rounded-2xl p-6 shadow-xs relative overflow-hidden">
+            <div className="bg-white   rounded-2xl p-6 shadow-xs relative overflow-hidden">
               <div className="absolute top-0 inset-x-0 h-1 bg-[#E34718]"></div>
               
 
 
               {/* TIER CHANGER */}
               <div className="space-y-2.5 mb-6">
-                <span className="block text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1.5 leading-none">Choose Ticket Tier</span>
+                <span className="block text-[10px] font-bold text-neutral-400 text-sentence tracking-widest mb-1.5 leading-none">Choose Ticket Tier</span>
                 
                 {/* General Seating */}
                 <button 
                   onClick={() => setTicketTier('general')}
-                  className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                  className={`w-full text-left p-4 rounded-xl  transition-all flex items-center justify-between cursor-pointer ${
                     ticketTier === 'general' 
-                      ? 'border-[#E34718] bg-[#E34718]/5 ring-1 ring-[#E34718]/50' 
-                      : 'border-neutral-200 bg-white hover:border-neutral-300'
+                      ? ' bg-[#E34718]/5 ring-1 ring-[#E34718]/50' 
+                      : ' bg-white '
                   }`}
                 >
                   <div className="min-w-0 pr-2">
@@ -821,57 +882,57 @@ export default function EventDetailPage({
                   </div>
                   <div className="shrink-0 text-right">
                     <span className="font-mono font-bold text-sm sm:text-base text-neutral-900 block">${tierPricing.general}</span>
-                    <span className="text-[9px] text-[#C23A12] font-bold block mt-0.5 uppercase tracking-wider">Avail.</span>
+                    <span className="text-[9px] text-[#C23A12] font-bold block mt-0.5 text-sentence tracking-wider">Avail.</span>
                   </div>
                 </button>
 
                 {/* VIP Seating */}
                 <button 
                   onClick={() => setTicketTier('vip')}
-                  className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                  className={`w-full text-left p-4 rounded-xl  transition-all flex items-center justify-between cursor-pointer ${
                     ticketTier === 'vip' 
-                      ? 'border-[#E34718] bg-[#E34718]/5 ring-1 ring-[#E34718]/50' 
-                      : 'border-neutral-200 bg-white hover:border-neutral-300'
+                      ? ' bg-[#E34718]/5 ring-1 ring-[#E34718]/50' 
+                      : ' bg-white '
                   }`}
                 >
                   <div className="min-w-0 pr-2">
                     <span className="font-bold text-xs sm:text-sm text-neutral-850 flex items-center gap-1.5">
                       VIP Premium
-                      <span className="bg-[#E34718]/10 text-[#C23A12] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider shrink-0">Club</span>
+                      <span className="bg-[#E34718]/10 text-[#C23A12] px-1.5 py-0.5 rounded-md font-bold text-sentence tracking-wider shrink-0">Club</span>
                     </span>
                     <p className="text-[10px] text-neutral-405 font-medium mt-0.5 leading-tight">Fast track lane, custom bar perks.</p>
                   </div>
                   <div className="shrink-0 text-right">
                     <span className="font-mono font-bold text-sm sm:text-base text-neutral-900 block">${tierPricing.vip}</span>
-                    <span className="text-[9px] text-[#C23A12] font-bold block mt-0.5 uppercase tracking-wider">Popular</span>
+                    <span className="text-[9px] text-[#C23A12] font-bold block mt-0.5 text-sentence tracking-wider">Popular</span>
                   </div>
                 </button>
 
                 {/* Elite Pass */}
                 <button 
                   onClick={() => setTicketTier('elite')}
-                  className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                  className={`w-full text-left p-4 rounded-xl  transition-all flex items-center justify-between cursor-pointer ${
                     ticketTier === 'elite' 
-                      ? 'border-[#E34718] bg-[#E34718]/5 ring-1 ring-[#E34718]/50' 
-                      : 'border-neutral-200 bg-white hover:border-neutral-300'
+                      ? ' bg-[#E34718]/5 ring-1 ring-[#E34718]/50' 
+                      : ' bg-white '
                   }`}
                 >
                   <div className="min-w-0 pr-2">
                     <span className="font-bold text-xs sm:text-sm text-neutral-850 flex items-center gap-1.5">
                       Elite Backstage
-                      <span className="bg-sky-100 text-[8px] text-sky-800 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider shrink-0">Max</span>
+                      <span className="bg-sky-100 text-[8px] text-sky-800 px-1.5 py-0.5 rounded-md font-bold text-sentence tracking-wider shrink-0">Max</span>
                     </span>
                     <p className="text-[10px] text-neutral-400 font-medium mt-0.5 leading-tight">Meet-n-greet, VIP lounge, front row sights.</p>
                   </div>
                   <div className="shrink-0 text-right">
                     <span className="font-mono font-bold text-sm sm:text-base text-neutral-900 block">${tierPricing.elite}</span>
-                    <span className="text-[9px] text-red-500 font-bold block mt-0.5 uppercase tracking-wider">5 Left</span>
+                    <span className="text-[9px] text-red-500 font-bold block mt-0.5 text-sentence tracking-wider">5 Left</span>
                   </div>
                 </button>
               </div>
 
               {/* QUANTITY CONTROLLER */}
-              <div className="flex items-center justify-between mb-5 bg-neutral-50 p-4 rounded-xl border border-neutral-200">
+              <div className="flex items-center justify-between mb-5 bg-neutral-50 p-4 rounded-xl  ">
                 <div>
                   <span className="font-bold text-xs sm:text-sm text-neutral-800 block">Total Attendees</span>
                   <p className="text-[10px] text-neutral-450 font-medium mt-0.5">Maximum 10 reservations</p>
@@ -881,7 +942,7 @@ export default function EventDetailPage({
                   <button 
                     disabled={quantity <= 1}
                     onClick={() => setQuantity(prev => prev - 1)}
-                    className="w-10 h-10 border border-neutral-300 rounded-lg flex items-center justify-center bg-white hover:bg-neutral-50 disabled:opacity-30 transition-all cursor-pointer text-neutral-800 font-bold"
+                    className="w-10 h-10   rounded-lg flex items-center justify-center bg-white hover:bg-neutral-50 disabled:opacity-30 transition-all cursor-pointer text-neutral-800 font-bold"
                   >
                     <Minus className="w-3.5 h-3.5" />
                   </button>
@@ -889,7 +950,7 @@ export default function EventDetailPage({
                   <button 
                     disabled={quantity >= 10}
                     onClick={() => setQuantity(prev => prev + 1)}
-                    className="w-10 h-10 border border-neutral-300 rounded-lg flex items-center justify-center bg-white hover:bg-neutral-50 disabled:opacity-30 transition-all cursor-pointer text-neutral-800 font-bold"
+                    className="w-10 h-10   rounded-lg flex items-center justify-center bg-white hover:bg-neutral-50 disabled:opacity-30 transition-all cursor-pointer text-neutral-800 font-bold"
                   >
                     <Plus className="w-3.5 h-3.5" />
                   </button>
@@ -898,7 +959,7 @@ export default function EventDetailPage({
 
               {/* COUPON DISPATCH code inputs */}
               <form onSubmit={handleApplyPromo} className="mb-5">
-                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1.5 leading-none">Coupon Apply</label>
+                <label className="block text-[10px] font-bold text-neutral-400 text-sentence tracking-widest mb-1.5 leading-none">Coupon Apply</label>
                 <div className="flex gap-2">
                   <input 
                     type="text"
@@ -906,7 +967,7 @@ export default function EventDetailPage({
                     onChange={(e) => setPromoCode(e.target.value)}
                     disabled={promoApplied}
                     placeholder="Enter Coupon (e.g. JAZBA18)"
-                    className="uppercase flex-1 bg-white border border-neutral-200 rounded-xl px-3 text-xs font-bold focus:outline-none focus:border-neutral-900 text-neutral-800 placeholder-neutral-300 disabled:bg-neutral-50 disabled:text-neutral-400 min-h-[44px]"
+                    className="text-sentence flex-1 bg-white   rounded-xl px-3 text-xs font-bold focus:outline-none  text-neutral-800 placeholder-neutral-300 disabled:bg-neutral-50 disabled:text-neutral-400 min-h-[44px]"
                   />
                   <button
                     type="submit"
@@ -929,7 +990,7 @@ export default function EventDetailPage({
               </form>
 
               {/* ITEMIZED REVIEWS AND RECEIPT TOTALS */}
-              <div className="space-y-2 border-t border-neutral-100 pt-4 mb-5 text-[11px] text-neutral-500 font-bold">
+              <div className="space-y-2   pt-4 mb-5 text-[11px] text-neutral-500 font-bold">
                 <div className="flex justify-between items-center">
                   <span>Subtotal ({quantity} x {ticketTier.toUpperCase()})</span>
                   <span className="font-mono text-neutral-800">${getSubtotal()}</span>
@@ -947,7 +1008,7 @@ export default function EventDetailPage({
                   <span className="font-mono text-neutral-800">${getBookingServiceFee()}</span>
                 </div>
 
-                <div className="flex justify-between items-center pt-3 border-t border-solid border-neutral-100 text-xs sm:text-sm font-black text-neutral-800">
+                <div className="flex justify-between items-center pt-3    text-xs sm:text-sm font-black text-neutral-800">
                   <span className="text-neutral-900 leading-none">Aggregate Total Price</span>
                   <span className="font-mono text-neutral-950 text-sm sm:text-base leading-none">${getTotalPrice()}</span>
                 </div>
@@ -956,7 +1017,7 @@ export default function EventDetailPage({
               {/* REDIRECT RESERVATION TARGETS */}
               <button 
                 onClick={() => onBook(event, quantity, ticketTier)}
-                className="w-full text-center bg-[#E34718] hover:bg-[#C23A12] text-white py-3.5 rounded-xl font-bold uppercase tracking-wider text-xs active:scale-97 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full text-center bg-[#E34718] hover:bg-[#C23A12] text-white py-3.5 rounded-xl font-bold text-sentence tracking-wider text-xs active:scale-97 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer"
                 id="btn-confirm-reserve"
               >
                 <Ticket className="w-4 h-4 text-white" />
@@ -969,8 +1030,8 @@ export default function EventDetailPage({
             </div>
 
             {/* TRUST BLOCK WITH CHECKBOX AND DETAILS */}
-            <div className="bg-neutral-950 text-white rounded-2xl p-5 border border-neutral-900 text-xs font-bold leading-relaxed space-y-3 shadow-xs">
-              <span className="text-[#E34718] uppercase tracking-widest text-[9px] font-black block border-b border-white/10 pb-1 mt-0.5">
+            <div className="bg-neutral-950 text-white rounded-2xl p-5   text-xs font-bold leading-relaxed space-y-3 shadow-xs">
+              <span className="text-[#E34718] text-sentence tracking-widest text-[9px] font-black block   pb-1 mt-0.5">
                 🛡️ Guaranteed Security
               </span>
               <p className="text-neutral-300 font-semibold leading-relaxed">
@@ -986,7 +1047,7 @@ export default function EventDetailPage({
         </div>
 
         {/* 12. RELATED EVENTS */}
-        <div className="mt-16 border-t border-neutral-200 pt-16 text-left">
+        <div className="mt-16   pt-16 text-left">
           <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
             <div>
               <h3 className="text-xl sm:text-2xl font-display font-semibold text-neutral-900 tracking-tight">
@@ -997,7 +1058,7 @@ export default function EventDetailPage({
             
             <button 
               onClick={onBack}
-              className="text-[#C23A12] font-black tracking-widest text-xs hover:underline uppercase self-start sm:self-auto shrink-0 cursor-pointer"
+              className="text-[#C23A12] font-black tracking-widest text-xs hover:underline text-sentence self-start sm:self-auto shrink-0 cursor-pointer"
             >
               Browse Broad Catalog →
             </button>
@@ -1010,7 +1071,7 @@ export default function EventDetailPage({
                 <div 
                   key={evt.id}
                   onClick={() => onSelectRelatedEvent(evt)}
-                  className="group bg-white border border-neutral-200 hover:border-neutral-300 rounded-2xl overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between"
+                  className="group bg-white    rounded-2xl overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between"
                 >
                   <div className="relative">
                     <div className="h-44 overflow-hidden relative">
@@ -1023,15 +1084,15 @@ export default function EventDetailPage({
                       <div className="absolute inset-0 bg-gradient-to-t from-black/15 to-transparent"></div>
                     </div>
 
-                    <div className="absolute top-3.5 left-3.5 bg-[#E34718] text-white w-10.5 h-11.5 rounded-xl flex flex-col items-center justify-center font-black leading-none shrink-0 text-center border border-white/10">
+                    <div className="absolute top-3.5 left-3.5 bg-[#E34718] text-white w-10.5 h-11.5 rounded-xl flex flex-col items-center justify-center font-black leading-none shrink-0 text-center  ">
                       <span className="text-[14px] font-black">{day || '18'}</span>
-                      <span className="text-[8px] uppercase font-semibold tracking-wide mt-0.5">{month || 'Feb'}</span>
+                      <span className="text-[8px] text-sentence font-semibold tracking-wide mt-0.5">{month || 'Feb'}</span>
                     </div>
                   </div>
 
                   <div className="p-5 flex-1 flex flex-col justify-between gap-3.5">
                     <div>
-                      <span className="text-[9px] bg-neutral-100 text-[#C23A12] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider mb-2.5 inline-block">
+                      <span className="text-[9px] bg-neutral-100 text-[#C23A12] font-bold px-2.5 py-1 rounded-full text-sentence tracking-wider mb-2.5 inline-block">
                         {evt.category}
                       </span>
                       <h4 className="font-display font-bold text-xs sm:text-sm text-neutral-850 tracking-tight leading-snug group-hover:text-[#E34718] transition-colors line-clamp-1">
@@ -1046,9 +1107,9 @@ export default function EventDetailPage({
                       </div>
                     </div>
 
-                    <div className="pt-3.5 border-t border-neutral-100/80 flex items-center justify-between">
+                    <div className="pt-3.5   flex items-center justify-between">
                       <span className="font-mono text-xs sm:text-sm font-bold text-neutral-900">${evt.price}</span>
-                      <span className="text-[10px] text-[#C23A12] font-bold tracking-widest uppercase flex items-center gap-1">
+                      <span className="text-[10px] text-[#C23A12] font-bold tracking-widest text-sentence flex items-center gap-1">
                         Reserve Space ↗
                       </span>
                     </div>
@@ -1074,9 +1135,9 @@ export default function EventDetailPage({
             <div className="max-w-4xl max-h-[85vh] relative text-center">
               <img 
                 src={zoomImage} 
-                alt="Zoomed Stage Showcase" 
+                alt="Event photo"
                 referrerPolicy="no-referrer"
-                className="max-w-full max-h-[80vh] rounded-2xl border border-white/10 object-contain shadow-2xl mx-auto"
+                className="max-w-full max-h-[80vh] rounded-2xl   object-contain shadow-2xl mx-auto"
               />
               <span className="text-xs text-neutral-400 mt-3.5 font-bold tracking-wide block">
                 Click anywhere outside the picture boundaries to exit close-up preview

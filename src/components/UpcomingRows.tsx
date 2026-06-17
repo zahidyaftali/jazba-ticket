@@ -15,7 +15,7 @@ export default function UpcomingRows({ events, onBook, onViewAll, onViewDetail }
 
   return (
     <section 
-      className="bg-[#F8F6F0] border-b border-black/5 py-18 px-4 sm:px-6 md:px-8"
+      className="bg-[#F8F6F0]   py-18 px-4 sm:px-6 md:px-8"
       id="upcoming"
     >
       <div className="max-w-7xl mx-auto">
@@ -48,16 +48,16 @@ export default function UpcomingRows({ events, onBook, onViewAll, onViewDetail }
               <div 
                 key={item.id}
                 onClick={() => onViewDetail?.(item)}
-                className="bg-white border-2 border-neutral-200/60 hover:border-neutral-300/80 rounded-2xl p-4.5 sm:p-5.5 md:p-6 shadow-xs hover:shadow-sm hover:-translate-y-0.5 transition-all duration-300 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 cursor-pointer group/row"
+                className="bg-white    rounded-2xl p-4.5 sm:p-5.5 md:p-6 shadow-xs hover:shadow-sm hover:-translate-y-0.5 transition-all duration-300 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 cursor-pointer group/row"
                 id={`upcoming-row-${item.id}`}
               >
                 {/* DATE SEGMENT (LEFT) */}
-                <div className="flex items-center gap-4.5 border-b md:border-b-0 md:border-r border-neutral-100 pb-3 md:pb-0 md:pr-8 shrink-0 min-w-[140px]">
+                <div className="flex items-center gap-4.5     pb-3 md:pb-0 md:pr-8 shrink-0 min-w-[140px]">
                   <span className="text-3xl sm:text-4xl font-display font-black text-[#E34718] tracking-tight">
                     {item.date}
                   </span>
                   <div className="leading-tight">
-                    <span className="block text-[10px] uppercase font-black tracking-widest text-neutral-400">February</span>
+                    <span className="block text-[10px] text-sentence font-black tracking-widest text-neutral-400">February</span>
                     <span className="text-xs sm:text-sm font-bold text-neutral-500">{item.year || '2025'}</span>
                   </div>
                 </div>
@@ -82,18 +82,18 @@ export default function UpcomingRows({ events, onBook, onViewAll, onViewDetail }
                 </div>
 
                 {/* ACTION BUTTON SEGMENT (RIGHT) */}
-                <div className="shrink-0 flex items-center justify-between md:justify-end gap-5 pt-2.5 md:pt-0 border-t md:border-t-0 border-neutral-50">
+                <div className="shrink-0 flex items-center justify-between md:justify-end gap-5 pt-2.5 md:pt-0   ">
                   <div className="md:hidden">
-                    <span className="text-[9px] text-neutral-400 font-semibold uppercase block">Ticket Price</span>
+                    <span className="text-[9px] text-neutral-400 font-semibold text-sentence block">Ticket Price</span>
                     <span className="font-display font-black text-neutral-900 text-base">${item.price}</span>
                   </div>
 
                   <button
                     onClick={(e) => { e.stopPropagation(); onBook(item); }}
-                    className={`px-5.5 py-2.5 rounded-full font-bold text-xs uppercase tracking-wider transition-all duration-200 active:scale-95 cursor-pointer flex items-center gap-1.5 ${
+                    className={`px-5.5 py-2.5 rounded-full font-bold text-xs text-sentence tracking-wider transition-all duration-200 active:scale-95 cursor-pointer flex items-center gap-1.5 ${
                       isFirst
                         ? 'bg-neutral-900 hover:bg-neutral-800 text-[#E34718] shadow-sm'
-                        : 'bg-white hover:bg-neutral-50 text-neutral-800 border border-neutral-200 shadow-sm'
+                        : 'bg-white hover:bg-neutral-50 text-neutral-800   shadow-sm'
                     }`}
                   >
                     Buy Tickets

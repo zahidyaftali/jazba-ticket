@@ -38,7 +38,7 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
     setErrorMessage('');
 
     if (!name.trim()) {
-      setErrorMessage('Please type your name for your personalized admissions ticket.');
+      setErrorMessage('Please enter your name.');
       return;
     }
 
@@ -48,7 +48,7 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
     }
 
     if (!validateEmail(email)) {
-      setErrorMessage('Invalid email format for booking receipts.');
+      setErrorMessage('Please enter a valid email address.');
       return;
     }
 
@@ -96,7 +96,7 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
       setLoading(false);
       let friendlyMessage = 'Failed to create account. Email may already be in use.';
       if (err.code === 'auth/email-already-in-use') {
-        friendlyMessage = 'This email address is already registered. Please check in instead.';
+        friendlyMessage = 'This email address is already registered. Please sign in instead.';
       } else if (err.message) {
         friendlyMessage = err.message;
       }
@@ -160,38 +160,38 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
         <div className="w-full mb-6 flex justify-start">
           <button 
             onClick={onBack}
-            className="flex items-center gap-2 text-neutral-550 hover:text-[#E34718] font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer group bg-white border border-neutral-200 hover:bg-neutral-50 px-4 py-2 rounded-full shadow-xs"
+            className="flex items-center gap-2 text-neutral-550 hover:text-[#E34718] font-bold text-xs text-sentence tracking-wider transition-colors cursor-pointer group bg-white   hover:bg-neutral-50 px-4 py-2 rounded-full shadow-xs"
             id="signup-breadcrumb-return"
           >
             <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5 text-neutral-500 group-hover:text-[#E34718]" />
-            <span>Cancel registration</span>
+            <span>Back to Home</span>
           </button>
         </div>
 
         {/* Polished Card */}
-        <div className="w-full bg-white border border-neutral-200/80 rounded-[2rem] p-8 sm:p-10 shadow-xs space-y-6 relative overflow-hidden transition-all duration-300">
+        <div className="w-full bg-white   rounded-[2rem] p-8 sm:p-10 shadow-xs space-y-6 relative overflow-hidden transition-all duration-300">
           
           {/* Header */}
           <div className="space-y-2 text-center">
             <h1 className="text-3xl sm:text-4xl font-display font-bold tracking-tight text-neutral-900" id="signup-heading-custom">
-              Claim backstage pass
+              Create Your Account
             </h1>
             <p className="text-xs text-neutral-500 font-medium max-w-sm mx-auto leading-normal">
-              Register now to access secure ticket stubs, artist interactions, and priority lounge admissions.
+              Sign up to book tickets, follow your favorite artists, and manage your bookings in one place.
             </p>
           </div>
 
           {/* Validation Warnings */}
           {errorMessage && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
-              className="p-3.5 bg-red-50 border border-red-200 text-red-800 rounded-2xl flex items-start gap-2.5 text-xs text-left leading-normal"
+              className="p-3.5 bg-red-50   text-red-800 rounded-2xl flex items-start gap-2.5 text-xs text-left leading-normal"
               id="signup-error-alert"
             >
               <AlertCircle className="w-4 h-4 text-red-650 shrink-0 mt-0.5" />
               <div>
-                <span className="font-extrabold uppercase tracking-widest text-[9px] text-red-600 block font-mono">Enrollment error</span>
+                <span className="font-extrabold text-sentence tracking-widest text-[9px] text-red-600 block font-mono">Sign-up error</span>
                 <p className="font-medium mt-0.5">{errorMessage}</p>
               </div>
             </motion.div>
@@ -202,7 +202,7 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
             
             {/* Full Name */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-neutral-450 uppercase tracking-widest block pl-1 font-sans">
+              <label className="text-[10px] font-bold text-neutral-450 text-sentence tracking-widest block pl-1 font-sans">
                 Your Full Name
               </label>
               <div className="relative">
@@ -215,14 +215,14 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Liam Hall"
-                  className="w-full bg-neutral-50 hover:bg-neutral-100/60 border border-neutral-200 focus:bg-white rounded-2xl pl-11 pr-4 py-3.5 text-xs font-semibold focus:outline-none focus:border-[#E34718] focus:ring-1 focus:ring-[#E34718]/40 placeholder-neutral-405 text-neutral-800 tracking-wide transition-all min-h-[44px]"
+                  className="w-full bg-neutral-50 hover:bg-neutral-100/60   focus:bg-white rounded-2xl pl-11 pr-4 py-3.5 text-xs font-semibold focus:outline-none  focus:ring-1 focus:ring-[#E34718]/40 placeholder-neutral-405 text-neutral-800 tracking-wide transition-all min-h-[44px]"
                 />
               </div>
             </div>
 
             {/* Email Address */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-neutral-450 uppercase tracking-widest block pl-1 font-sans">
+              <label className="text-[10px] font-bold text-neutral-450 text-sentence tracking-widest block pl-1 font-sans">
                 Email Address
               </label>
               <div className="relative">
@@ -234,16 +234,16 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@gmail.com"
-                  className="w-full bg-neutral-50 hover:bg-neutral-100/60 border border-neutral-200 focus:bg-white rounded-2xl pl-11 pr-4 py-3.5 text-xs font-semibold focus:outline-none focus:border-[#E34718] focus:ring-1 focus:ring-[#E34718]/40 placeholder-neutral-405 text-neutral-800 tracking-wide transition-all min-h-[44px]"
+                  placeholder="you@example.com"
+                  className="w-full bg-neutral-50 hover:bg-neutral-100/60   focus:bg-white rounded-2xl pl-11 pr-4 py-3.5 text-xs font-semibold focus:outline-none  focus:ring-1 focus:ring-[#E34718]/40 placeholder-neutral-405 text-neutral-800 tracking-wide transition-all min-h-[44px]"
                 />
               </div>
             </div>
 
             {/* Password input */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-neutral-450 uppercase tracking-widest block pl-1 font-sans">
-                Create Account Passcode
+              <label className="text-[10px] font-bold text-neutral-450 text-sentence tracking-widest block pl-1 font-sans">
+                Password
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -255,7 +255,7 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Minimum 6 characters"
-                  className="w-full bg-neutral-50 hover:bg-neutral-100/60 border border-neutral-200 focus:bg-white rounded-2xl pl-11 pr-11 py-3.5 text-xs font-semibold focus:outline-none focus:border-[#E34718] focus:ring-1 focus:ring-[#E34718]/40 placeholder-neutral-405 text-neutral-800 tracking-wide transition-all min-h-[44px]"
+                  className="w-full bg-neutral-50 hover:bg-neutral-100/60   focus:bg-white rounded-2xl pl-11 pr-11 py-3.5 text-xs font-semibold focus:outline-none  focus:ring-1 focus:ring-[#E34718]/40 placeholder-neutral-405 text-neutral-800 tracking-wide transition-all min-h-[44px]"
                 />
                 <button
                   type="button"
@@ -272,10 +272,10 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#E34718] hover:bg-[#C23A12] disabled:bg-[#E34718]/50 text-white font-extrabold text-xs uppercase py-4 px-6 rounded-full tracking-widest transition-all shadow-md hover:shadow-lg hover:shadow-[#E34718]/10 active:scale-98 cursor-pointer flex items-center justify-center gap-2 mt-6 min-h-[44px]"
+              className="w-full bg-[#E34718] hover:bg-[#C23A12] disabled:bg-[#E34718]/50 text-white font-extrabold text-xs text-sentence py-4 px-6 rounded-full tracking-widest transition-all shadow-md hover:shadow-lg hover:shadow-[#E34718]/10 active:scale-98 cursor-pointer flex items-center justify-center gap-2 mt-6 min-h-[44px]"
               id="submit-signup-primary"
             >
-              <span>{loading ? 'Minting Passcode...' : 'Register VIP Holder Account'}</span>
+              <span>{loading ? 'Creating Account...' : 'Sign Up'}</span>
               <ArrowRight className="w-4 h-4 stroke-[2.5]" />
             </button>
           </form>
@@ -284,9 +284,9 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
           <div className="space-y-4 pt-2">
             <div className="relative flex items-center justify-center">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-neutral-200"></div>
+                <div className="w-full  "></div>
               </div>
-              <div className="relative bg-white px-3 text-[9px] uppercase font-bold text-neutral-400 tracking-widest font-sans">
+              <div className="relative bg-white px-3 text-[9px] text-sentence font-bold text-neutral-400 tracking-widest font-sans">
                 Or Continue With Google
               </div>
             </div>
@@ -294,7 +294,7 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
             <button
               type="button"
               onClick={handleGoogleSignIn}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50 bg-white rounded-2xl transition-all cursor-pointer shadow-xs font-semibold text-xs text-neutral-750"
+              className="w-full flex items-center justify-center gap-2 py-3 px-4    hover:bg-neutral-50 bg-white rounded-2xl transition-all cursor-pointer shadow-xs font-semibold text-xs text-neutral-750"
               title="Continue with Google"
             >
               <svg className="w-4.5 h-4.5 shrink-0" viewBox="0 0 24 24">
@@ -307,13 +307,13 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
           {/* Switch View Trigger */}
           <div className="pt-2 text-center text-xs font-bold text-neutral-400 font-sans">
             <span>
-              Already have a backstage pass?{' '}
-              <button 
+              Already have an account?{' '}
+              <button
                 onClick={onSwitchToLogin}
                 className="text-[#E34718] hover:underline font-extrabold cursor-pointer transition-colors"
                 id="signup-switch-login-trigger"
               >
-                Check-in here
+                Sign in here
               </button>
             </span>
           </div>
@@ -321,8 +321,8 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
         </div>
 
         {/* Footer Brand Statement */}
-        <div className="mt-6 text-neutral-400 text-[10px] font-sans font-bold uppercase tracking-widest text-center select-none">
-          Jazba Classical &middot; Secure Decentralized Admissions v4.0.2
+        <div className="mt-6 text-neutral-400 text-[10px] font-sans font-bold text-sentence tracking-widest text-center select-none">
+          Jazbaticket &middot; Secure Ticketing
         </div>
 
       </div>

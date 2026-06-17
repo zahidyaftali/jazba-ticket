@@ -83,6 +83,28 @@
   }
 }
 
+/* Sentence case: only the first letter is capitalized, replacing uppercase styling */
+.text-sentence {
+  text-transform: lowercase;
+}
+.text-sentence::first-letter {
+  text-transform: uppercase;
+}
+
+/* Default body copy font family, except numeric/mono data displays */
+body,
+p:not(.font-mono),
+span:not(.font-mono),
+li:not(.font-mono),
+td:not(.font-mono),
+th:not(.font-mono),
+label:not(.font-mono),
+a:not(.font-mono),
+button:not(.font-mono),
+div:not(.font-mono) {
+  font-family: var(--font-sans);
+}
+
 @utility headline-xl {
   font-family: "Hanken Grotesk", sans-serif;
   font-size: 64px;

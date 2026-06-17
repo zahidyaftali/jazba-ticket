@@ -45,7 +45,7 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
   const [chatOpen, setChatOpen] = useState<boolean>(false);
   const [chatMessage, setChatMessage] = useState<string>('');
   const [chatLog, setChatLog] = useState<Array<{ sender: 'user' | 'agent'; text: string; time: string }>>([
-    { sender: 'agent', text: "Hello! Welcome to Jazba support. How can we secure your admission experience today?", time: "Just now" }
+    { sender: 'agent', text: "Hi there! Welcome to Jazba Ticket support. How can I help you today?", time: "Just now" }
   ]);
   const [isTyping, setIsTyping] = useState<boolean>(false);
 
@@ -60,24 +60,24 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
 
   const knowledgebaseArticles = {
     safety: [
-      { id: 1, title: "How do I verify if my ticket is genuine?", desc: "All original Jazba tickets contain cryptographic verification keys readable instantly by gate scanners. If you bought through our official interface, your entry pass is fully authenticated." },
-      { id: 2, title: "Can I resell my entry passes on third-party sites?", desc: "To completely stamp out fraudulent markup schemes, Jazba supports direct wallet transfers but strictly halts unauthorized reselling pools by binding code maps to user IDs." },
-      { id: 3, title: "What is the Zero-Spoof Gate protection protocol?", desc: "A decentralized localized verification token map operates in all partnered amphitheaters, rejecting unauthorized duplicates instantly without requiring external internet networks." }
+      { id: 1, title: "How do I verify if my ticket is genuine?", desc: "Every ticket booked through Jazba Ticket has a unique QR code that's checked at the gate. As long as you booked through our site, your ticket is guaranteed genuine." },
+      { id: 2, title: "Can I resell my tickets on third-party sites?", desc: "We don't support reselling on third-party sites, since that's how most ticket fraud happens. If you can no longer attend, contact our support team and we'll help you transfer or refund your ticket." },
+      { id: 3, title: "How does ticket scanning work at the venue?", desc: "Each ticket has a unique QR code checked against our system at the door, so duplicate or copied tickets are rejected automatically." }
     ],
     refunds: [
-      { id: 4, title: "What is your refund policy for classical orchestral shows?", desc: "Cancellations made 48 hours prior to local venue time are automatically guaranteed a 100% flat refund directly back to the original checkout payment card." },
-      { id: 5, title: "My booking success screen says 'Wait List'?", desc: "When high demand orchestral arenas reach complete ticket saturation, our fair capping protocols place pending orders on a secure holding loop, reserving seats first come first served." },
-      { id: 6, title: "Are fees refundable in the event of venue cancellations?", desc: "Yes. Unlike generic platforms that retain administration fees, Jazba processes full, clean returns including all direct ticketing levies under cancellation scenarios." }
+      { id: 4, title: "What is your refund policy?", desc: "Cancel at least 48 hours before the show and you'll get a full refund to your original payment method, automatically." },
+      { id: 5, title: "My booking shows 'Wait List' — what does that mean?", desc: "When a show sells out, you can join the wait list. If a spot opens up, we'll email you and hold it for a short window before offering it to the next person in line." },
+      { id: 6, title: "Are fees refunded if an event is cancelled?", desc: "Yes. If an event is cancelled by the venue or organizer, you'll get a full refund including any service fees — no charges deducted." }
     ],
     tech: [
-      { id: 7, title: "Resetting dashboard transaction passwords", desc: "Access the profile controls inside your personalized User Dashboard or submit an official temporary recovery token path above for immediate authentication links." },
-      { id: 8, title: "Troubleshooting offline QR code loading", desc: "Our ticket-issued passes are automatically cryptographically cached offline. You can download safe PDF coordinate documents prepackaged for low cellular data stadiums." },
-      { id: 9, title: "Configuring multi-factor device authorization", desc: "Keep transaction vaults protected by activating verification pathways directly bound to trusted phone coordinates in your user settings panel." }
+      { id: 7, title: "How do I reset my password?", desc: "Use the 'Forgot password' link on the login page, or update your password anytime from your Dashboard's Settings tab." },
+      { id: 8, title: "My ticket QR code won't load", desc: "Your tickets are saved for offline access automatically. You can also download a PDF copy from your Dashboard in case you have no signal at the venue." },
+      { id: 9, title: "Can I add extra security to my account?", desc: "We're working on two-factor authentication. For now, using a strong, unique password keeps your account secure." }
     ],
     booking: [
-      { id: 10, title: "Booking multiple ticket tiers for orchestra cycles", desc: "You can combine Standard Passes, Premium VIP passes, and Elite Box slots in a single checkout loop under our streamlined direct-venue cart settings." },
-      { id: 11, title: "When will my physical ticket map arrive?", desc: "We are proudly paperless. Your entry keys are generated in instant high definition digital formats directly on your dashboard immediately following payment verification panels." },
-      { id: 12, title: "Do ticket reservations require name matches at the gate?", desc: "Yes, for elite safety protocols, gate scans verify identity matching the registered name. You can reassign tickets safely via the dashboard prior to show start." }
+      { id: 10, title: "Can I book different ticket tiers together?", desc: "Yes — mix General, VIP, and Elite tickets for the same event in a single checkout." },
+      { id: 11, title: "Do I get a physical ticket?", desc: "No, we're fully digital. Your ticket with its QR code appears in your Dashboard immediately after payment." },
+      { id: 12, title: "Do ticket names need to match at the gate?", desc: "Yes, the name on the ticket is checked at the door. You can reassign a ticket to someone else from your Dashboard before the event." }
     ]
   };
 
@@ -89,13 +89,13 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
     setTimeout(() => {
       setDiagnosticLoading(false);
       if (topic === 'spoof') {
-        setDiagnosticResult("Gate Verification Diagnostic: All active keys for London, Westminster, Tokyo, and Hamilton are fully validated. Your current device token is active.");
+        setDiagnosticResult("All ticket scanners at our partner venues are online and working normally.");
       } else if (topic === 'login') {
-        setDiagnosticResult("Access Portal Diagnostic: Verified system routes are operating normally. Clear browser cache and log back in, or request a passcode reset form below.");
+        setDiagnosticResult("Login systems are running normally. Try clearing your browser cache and signing in again, or reset your password below.");
       } else if (topic === 'refund') {
-        setDiagnosticResult("Transaction Refund Pathway: Automatic returns are ready. For showsCancelled within 48h, access your dashboard and click 'Initiate Vault Return'.");
+        setDiagnosticResult("Refunds are processing normally. If your event was cancelled or you're within the 48-hour window, go to your Dashboard and click 'Request Refund'.");
       } else {
-        setDiagnosticResult("General Network Health: High speed. 0.2ms ticket checks are fully live. Connection secure.");
+        setDiagnosticResult("All systems are running normally.");
       }
     }, 1200);
   };
@@ -114,13 +114,13 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
     // Dynamic response from Jazba Assistant
     setTimeout(() => {
       setIsTyping(false);
-      let reply = "I understand. Let me check our direct database ledger templates. All tickets purchased through Jazba are cryptographically cached on our secure Westminister servers.";
+      let reply = "Thanks for reaching out! Our support team will get back to you shortly. In the meantime, you can check your tickets anytime from your Dashboard.";
       if (userMsg.toLowerCase().includes('refund') || userMsg.toLowerCase().includes('cancel')) {
-        reply = "Under our Curation Safeguard terms, full returns are supported up to 48 hours prior to show starts. I can forward you to our refunds manager.";
+        reply = "We offer full refunds up to 48 hours before the show. I'll pass this along to our refunds team for you.";
       } else if (userMsg.toLowerCase().includes('hello') || userMsg.toLowerCase().includes('hi')) {
-        reply = "Hello there! I am the automated Jazba Guard. How can we support your artistic seat coordinates today?";
+        reply = "Hi there! How can I help you today?";
       } else if (userMsg.toLowerCase().includes('ticket') || userMsg.toLowerCase().includes('code') || userMsg.toLowerCase().includes('qr')) {
-        reply = "Your offline verification passes are fully secure under the 'My Tickets' dashboard. Simply show the live screen code at the venue entryway.";
+        reply = "You can find your tickets anytime under 'My Tickets' in your Dashboard — just show the QR code at the venue entrance.";
       }
       setChatLog(prev => [...prev, { sender: 'agent', text: reply, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
     }, 1600);
@@ -168,9 +168,9 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
         <motion.div 
           animate={{ y: [0, -8, 0], rotate: [-8, -5, -8] }}
           transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-          className="hidden lg:absolute left-12 bottom-12 w-52 h-24 backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl shadow-2xl flex items-center justify-center p-3 select-none z-10"
+          className="hidden lg:absolute left-12 bottom-12 w-52 h-24 backdrop-blur-md bg-white/5   rounded-2xl shadow-2xl flex items-center justify-center p-3 select-none z-10"
         >
-          <div className="border border-dashed border-white/15 w-full h-full rounded-xl flex items-center justify-center relative bg-white/5 gap-2">
+          <div className="   w-full h-full rounded-xl flex items-center justify-center relative bg-white/5 gap-2">
             <ShieldCheck className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
             <span className="font-display font-black text-[10px] tracking-widest text-[#E34718]">SSL 256 PROTECTION</span>
           </div>
@@ -180,7 +180,7 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
         <motion.div 
           animate={{ y: [0, 6, 0] }}
           transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-          className="hidden md:absolute left-24 top-24 bg-neutral-950/90 border border-neutral-800 backdrop-blur-md px-4 py-2 rounded-full shadow-lg rotate-[-6deg] flex items-center gap-2 z-10"
+          className="hidden md:absolute left-24 top-24 bg-neutral-950/90   backdrop-blur-md px-4 py-2 rounded-full shadow-lg rotate-[-6deg] flex items-center gap-2 z-10"
         >
           <span className="text-[#E34718] text-[10px] font-black tracking-widest bg-[#E34718]/10 px-2 py-0.5 rounded-full">ACTIVE ACTIONS</span>
           <span className="font-semibold text-xs text-neutral-200">24/7 Response Desk</span>
@@ -192,7 +192,7 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
           transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
           className="hidden lg:absolute right-12 bottom-12 w-48 h-48 flex flex-col items-center justify-end z-10"
         >
-          <div className="relative w-full h-36 backdrop-blur-md bg-[#E34718]/10 border border-[#E34718]/30 rounded-2xl shadow-xl p-4 flex flex-col justify-between">
+          <div className="relative w-full h-36 backdrop-blur-md bg-[#E34718]/10   rounded-2xl shadow-xl p-4 flex flex-col justify-between">
             <div className="flex justify-between items-start">
               <HelpCircle className="w-7 h-7 text-[#E34718]" />
               <span className="text-[10px] font-mono text-[#E34718] bg-black/45 px-1.5 py-0.5 rounded font-black">AUTHENTIC</span>
@@ -202,7 +202,7 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
               <div className="w-24 h-1.5 bg-neutral-700/60 rounded-full"></div>
             </div>
           </div>
-          <div className="absolute -bottom-2 right-4 bg-neutral-900 border border-neutral-800 text-neutral-100 rounded-full px-3.5 py-1.5 font-bold text-[11px] shadow-lg">
+          <div className="absolute -bottom-2 right-4 bg-neutral-900   text-neutral-100 rounded-full px-3.5 py-1.5 font-bold text-[11px] shadow-lg">
             Support Secure ✔
           </div>
         </motion.div>
@@ -213,21 +213,21 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
           {/* LEFT COLUMN: LEFT-ALIGNED HERO TEXT && BUTTONS */}
           <div className="lg:col-span-7 text-left space-y-6 flex flex-col items-start px-4 sm:px-0">
             {/* BREADCRUMB */}
-            <div className="inline-flex items-center gap-1.5 bg-neutral-900/90 border border-neutral-800 px-3.5 py-1.5 rounded-full text-xs font-semibold text-neutral-400">
+            <div className="inline-flex items-center gap-1.5 bg-neutral-900/90   px-3.5 py-1.5 rounded-full text-xs font-semibold text-neutral-400">
               <span onClick={onBackToHome} className="hover:text-white cursor-pointer transition-colors">Home</span>
               <span className="text-neutral-600">/</span>
               <span className="text-[#E34718] font-bold">Help & Contact Center</span>
             </div>
 
             <div className="space-y-3">
-              <span className="inline-block text-xs font-black tracking-widest text-[#E34718] uppercase">COGNITIVE SUPPORT INTERFACE</span>
+              <span className="inline-block text-xs font-black tracking-widest text-[#E34718] text-sentence">Support Center</span>
               <h1 className="text-4xl sm:text-5xl md:text-6xl font-display font-black tracking-tight leading-[1.1] text-white">
-                How can we <span className="text-[#E34718] drop-shadow-[0_2px_10px_rgba(227,71,24,0.15)]">assist your entry</span> credentials?
+                How can we <span className="text-[#E34718] drop-shadow-[0_2px_10px_rgba(227,71,24,0.15)]">help you</span> today?
               </h1>
             </div>
 
             <p className="text-neutral-300/90 font-medium text-sm sm:text-base md:text-lg max-w-xl leading-relaxed">
-              Verify payment paths, check token validity diagnostics, initiate refundable flat cancellations, or message our global response curators directly.
+              Check your ticket status, manage refunds, or get in touch with our support team directly.
             </p>
 
             {/* TWO CTAs/BUTTONS */}
@@ -237,14 +237,14 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
                   const el = document.getElementById('support-directory-section');
                   el?.scrollIntoView({ behavior: 'smooth' });
                 }}
-                className="bg-[#E34718] hover:bg-[#C23A12] text-white font-semibold text-sm px-6 py-3.5 rounded-full transition-all active:scale-95 shadow-lg shadow-[#E34718]/15 flex items-center gap-2 cursor-pointer border border-[#E34718]/10 animate-pulse"
+                className="bg-[#E34718] hover:bg-[#C23A12] text-white font-semibold text-sm px-6 py-3.5 rounded-full transition-all active:scale-95 shadow-lg shadow-[#E34718]/15 flex items-center gap-2 cursor-pointer   animate-pulse"
               >
                 <span>Explore Support channels</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
               <button 
                 onClick={onExploreEvents}
-                className="bg-neutral-900/80 hover:bg-neutral-900 text-white border border-neutral-800 backdrop-blur-sm font-semibold text-sm px-6 py-3.5 rounded-full transition-all active:scale-95 shadow-lg cursor-pointer"
+                className="bg-neutral-900/80 hover:bg-neutral-900 text-white   backdrop-blur-sm font-semibold text-sm px-6 py-3.5 rounded-full transition-all active:scale-95 shadow-lg cursor-pointer"
               >
                 Back to Live Shows
               </button>
@@ -253,7 +253,7 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
 
           {/* RIGHT COLUMN: TRANSPARENT GLASS SUPPORT COMMAND LOOKUP */}
           <div className="lg:col-span-5 w-full max-w-sm mx-auto lg:ml-auto px-4 sm:px-0">
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl space-y-4 relative text-left">
+            <div className="bg-white/5 backdrop-blur-xl   rounded-2xl p-6 shadow-2xl space-y-4 relative text-left">
               <div className="absolute top-0 right-0 w-24 h-24 bg-[#E34718]/10 rounded-full blur-2xl pointer-events-none" />
               <div className="absolute bottom-0 left-0 w-24 h-24 bg-[#E34718]/10 rounded-full blur-2xl pointer-events-none" />
               
@@ -271,15 +271,15 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Ticket authenticity, refunds, credentials..."
-                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 py-3 text-sm text-white font-medium placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#E34718]/50 transition-all font-sans"
+                    placeholder="Search help articles..."
+                    className="w-full bg-white/5   rounded-xl pl-4 pr-10 py-3 text-sm text-white font-medium placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#E34718]/50 transition-all font-sans"
                   />
                   <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                 </div>
 
                 {/* Troubleshooting Quick Selectors */}
-                <div className="border border-white/5 bg-white/5 rounded-xl p-3 space-y-2">
-                  <span className="block text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Quick actions:</span>
+                <div className="  bg-white/5 rounded-xl p-3 space-y-2">
+                  <span className="block text-[10px] font-bold text-neutral-400 text-sentence tracking-widest">Quick actions:</span>
                   <div className="grid grid-cols-2 gap-2 text-[11px] font-bold">
                     <button
                       onClick={() => { setActiveTab('safety'); setSearchQuery(''); }}
@@ -312,15 +312,15 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
                 <button
                   type="button"
                   onClick={() => setChatOpen(true)}
-                  className="w-full mt-2 bg-[#E34718] hover:bg-[#C23A12] text-white font-extrabold text-xs uppercase tracking-wider py-3.5 rounded-xl transition-all active:scale-97 cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-[#E34718]/10 outline-none select-none"
+                  className="w-full mt-2 bg-[#E34718] hover:bg-[#C23A12] text-white font-extrabold text-xs text-sentence tracking-wider py-3.5 rounded-xl transition-all active:scale-97 cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-[#E34718]/10 outline-none select-none"
                 >
                   <div className="w-2 h-2 bg-white rounded-full animate-ping shrink-0" />
-                  <span>Launch Live Assistant</span>
+                  <span>Start Live Chat</span>
                 </button>
               </div>
 
               {/* Quick help info text */}
-              <div className="pt-3 border-t border-white/5 flex justify-between items-center text-[10px] text-neutral-400 font-mono">
+              <div className="pt-3   flex justify-between items-center text-[10px] text-neutral-400 font-mono">
                 <span className="flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5 text-[#E34718]" />
                   Response time: &lt;1m
@@ -339,31 +339,31 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
       </section>
 
       {/* 2. THREE CORE HELP CARDS - SEPARATED INSIDE A DISTINCT CONTAINER SECTION */}
-      <section className="bg-white py-16 border-b border-neutral-100" id="support-directory-section">
+      <section className="bg-white py-16  " id="support-directory-section">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
           
           <div className="text-center mb-10 max-w-xl mx-auto space-y-2">
-            <span className="inline-block text-[10px] font-black tracking-widest text-[#E34718] bg-orange-50 px-3 py-1 rounded-full uppercase">
+            <span className="inline-block text-[10px] font-black tracking-widest text-[#E34718] bg-orange-50 px-3 py-1 rounded-full text-sentence">
               Support Directory
             </span>
             <h2 className="text-3xl font-display font-black text-neutral-900 tracking-tight leading-none">
-              Explore Our Response Desks
+              How Can We Help?
             </h2>
             <p className="text-neutral-500 text-xs sm:text-sm font-semibold leading-relaxed">
-              Launch self-guided system scans, initiate automatic refunds, or contact our Westminister support desk specialists.
+              Browse help articles, manage your refunds, or get in touch with our support team.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             
-            <div className="bg-[#FAFBFD] rounded-3xl p-6 border border-neutral-200/50 hover:border-orange-300 hover:shadow-lg transition-all duration-300 text-left flex flex-col justify-between">
+            <div className="bg-[#FAFBFD] rounded-3xl p-6    hover:shadow-lg transition-all duration-300 text-left flex flex-col justify-between">
               <div>
-                <div className="w-10 h-10 rounded-xl bg-orange-50 text-[#C23A12] flex items-center justify-center mb-4 border border-orange-200/50">
+                <div className="w-10 h-10 rounded-xl bg-orange-50 text-[#C23A12] flex items-center justify-center mb-4  ">
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <h3 className="font-display font-bold text-base text-neutral-900">Ticket Authenticity</h3>
                 <p className="text-xs text-neutral-500 font-semibold leading-relaxed mt-1.5">
-                  Every booking processes offline secure token codes natively preventing double sold duplicate risks completely.
+                  Every ticket has a unique code that prevents duplicates or double-selling.
                 </p>
               </div>
               <button 
@@ -371,21 +371,21 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
                   setSearchQuery("genuine"); 
                   document.getElementById('help-knowledge-base')?.scrollIntoView({ behavior: 'smooth' }); 
                 }}
-                className="mt-6 flex items-center gap-1.5 text-xs text-[#C23A12] hover:underline font-black cursor-pointer text-left uppercase tracking-wider"
+                className="mt-6 flex items-center gap-1.5 text-xs text-[#C23A12] hover:underline font-black cursor-pointer text-left text-sentence tracking-wider"
               >
                 <span>Verify credentials</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="bg-[#FAFBFD] rounded-3xl p-6 border border-neutral-200/50 hover:border-orange-300 hover:shadow-lg transition-all duration-300 text-left flex flex-col justify-between">
+            <div className="bg-[#FAFBFD] rounded-3xl p-6    hover:shadow-lg transition-all duration-300 text-left flex flex-col justify-between">
               <div>
-                <div className="w-10 h-10 rounded-xl bg-orange-50/80 text-[#C23A12] flex items-center justify-center mb-4 border border-orange-200/50">
+                <div className="w-10 h-10 rounded-xl bg-orange-50/80 text-[#C23A12] flex items-center justify-center mb-4  ">
                   <Undo2 className="w-5 h-5" />
                 </div>
-                <h3 className="font-display font-bold text-base text-neutral-900">Refunding Pathway</h3>
+                <h3 className="font-display font-bold text-base text-neutral-900">Refunds</h3>
                 <p className="text-xs text-neutral-500 font-semibold leading-relaxed mt-1.5">
-                  Processed refund returns are completed back to original cards within 2-4 business cycles automatically.
+                  Refunds are sent back to your original payment method within 2-4 business days.
                 </p>
               </div>
               <button 
@@ -393,26 +393,26 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
                   setSearchQuery("policy"); 
                   document.getElementById('help-knowledge-base')?.scrollIntoView({ behavior: 'smooth' }); 
                 }}
-                className="mt-6 flex items-center gap-1.5 text-[#C23A12] hover:underline font-black cursor-pointer text-left uppercase tracking-wider text-xs"
+                className="mt-6 flex items-center gap-1.5 text-[#C23A12] hover:underline font-black cursor-pointer text-left text-sentence tracking-wider text-xs"
               >
                 <span>Refund policies</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="bg-[#FAFBFD] rounded-3xl p-6 border border-neutral-200/50 hover:border-[#E34718] hover:shadow-lg transition-all duration-300 text-left flex flex-col justify-between">
+            <div className="bg-[#FAFBFD] rounded-3xl p-6    hover:shadow-lg transition-all duration-300 text-left flex flex-col justify-between">
               <div>
-                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-4 border border-purple-100">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-4  ">
                   <MessageSquare className="w-5 h-5" />
                 </div>
-                <h3 className="font-display font-bold text-base text-neutral-900">Automated Direct Desk</h3>
+                <h3 className="font-display font-bold text-base text-neutral-900">Live Chat</h3>
                 <p className="text-xs text-neutral-500 font-semibold leading-relaxed mt-1.5">
-                  Initiate a live diagnostic session instantly or connect to specialized support agents inside London HQ.
+                  Chat with our support team instantly, based out of our London office.
                 </p>
               </div>
               <button 
                 onClick={() => setChatOpen(true)}
-                className="mt-6 flex items-center gap-1.5 text-purple-600 hover:underline font-black cursor-pointer text-left uppercase tracking-wider text-xs"
+                className="mt-6 flex items-center gap-1.5 text-purple-600 hover:underline font-black cursor-pointer text-left text-sentence tracking-wider text-xs"
               >
                 <span>Launch chat session</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -428,49 +428,49 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           
           <div className="lg:col-span-6 space-y-6 text-left">
-            <div className="inline-flex items-center gap-1.5 bg-[#E34718]/10 border border-[#E34718]/20 px-3.5 py-1 rounded-full">
+            <div className="inline-flex items-center gap-1.5 bg-[#E34718]/10   px-3.5 py-1 rounded-full">
               <Cpu className="w-3.5 h-3.5 text-[#C23A12]" />
-              <span className="text-[10px] font-bold text-[#C23A12] tracking-widest uppercase">DIAGNOSTIC SYSTEM FLOW</span>
+              <span className="text-[10px] font-bold text-[#C23A12] tracking-widest text-sentence">Quick Checks</span>
             </div>
-            
+
             <h2 className="text-3xl sm:text-4xl font-display font-black tracking-tight text-neutral-900 leading-tight">
-              Self-service <span className="text-[#E34718]">Gateway Integrity</span> checker.
+              Run a <span className="text-[#E34718]">Quick System Check</span>
             </h2>
-            
+
             <p className="text-neutral-500 text-sm font-semibold leading-relaxed">
-              Before submitting ticket trouble forms, you can execute a localized routing check to authenticate database connections and retrieve offline cache structures.
+              Before contacting support, try one of these quick checks — most issues resolve in seconds.
             </p>
 
             <div className="space-y-3 pt-2">
-              <h4 className="text-xs font-black uppercase tracking-widest text-[#C23A12] mb-2">Select Diagnostic Track</h4>
+              <h4 className="text-xs font-black text-sentence tracking-widest text-[#C23A12] mb-2">Choose a Topic</h4>
               
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <button
                   onClick={() => handleTroubleshoot('spoof')}
-                  className={`p-3.5 rounded-xl border text-xs font-bold text-center select-none transition-all cursor-pointer ${
+                  className={`p-3.5 rounded-xl  text-xs font-bold text-center select-none transition-all cursor-pointer ${
                     troubleTopic === 'spoof' 
-                      ? 'bg-orange-50 text-[#C23A12] border-orange-200' 
-                      : 'bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+                      ? 'bg-orange-50 text-[#C23A12] ' 
+                      : 'bg-white  text-neutral-700 hover:bg-neutral-50'
                   }`}
                 >
                   Authenticity Scans
                 </button>
                 <button
                   onClick={() => handleTroubleshoot('login')}
-                  className={`p-3.5 rounded-xl border text-xs font-bold text-center select-none transition-all cursor-pointer ${
+                  className={`p-3.5 rounded-xl  text-xs font-bold text-center select-none transition-all cursor-pointer ${
                     troubleTopic === 'login' 
-                      ? 'bg-orange-50 text-[#C23A12] border-orange-200' 
-                      : 'bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+                      ? 'bg-orange-50 text-[#C23A12] ' 
+                      : 'bg-white  text-neutral-700 hover:bg-neutral-50'
                   }`}
                 >
                   Login Access
                 </button>
                 <button
                   onClick={() => handleTroubleshoot('refund')}
-                  className={`p-3.5 rounded-xl border text-xs font-bold text-center select-none transition-all cursor-pointer ${
+                  className={`p-3.5 rounded-xl  text-xs font-bold text-center select-none transition-all cursor-pointer ${
                     troubleTopic === 'refund' 
-                      ? 'bg-orange-50 text-[#C23A12] border-orange-200' 
-                      : 'bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+                      ? 'bg-orange-50 text-[#C23A12] ' 
+                      : 'bg-white  text-neutral-700 hover:bg-neutral-50'
                   }`}
                 >
                   Refund Operations
@@ -485,11 +485,11 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
                    initial={{ opacity: 0, y: 5 }}
                    animate={{ opacity: 1, y: 0 }}
                    exit={{ opacity: 0 }}
-                   className="bg-neutral-900 text-neutral-400 p-4 rounded-2xl border border-neutral-800 text-xs font-mono"
+                   className="bg-neutral-900 text-neutral-400 p-4 rounded-2xl   text-xs font-mono"
                 >
                   <span className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#E34718] animate-pulse"></span>
-                    <span>Querying LondonHQ cryptology node, please hold...</span>
+                    <span>Checking systems, please wait...</span>
                   </span>
                 </motion.div>
               )}
@@ -498,14 +498,14 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
                 <motion.div 
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 text-left relative overflow-hidden"
+                  className="bg-neutral-900   rounded-2xl p-4 text-left relative overflow-hidden"
                 >
                   <div className="flex items-start gap-3">
                     <div className="w-5 h-5 rounded-full bg-[#E34718]/10 flex items-center justify-center shrink-0 mt-0.5">
                       <CheckCircle className="w-3.5 h-3.5 text-[#E34718]" />
                     </div>
                     <div>
-                      <h4 className="text-white text-xs font-black font-mono tracking-wide uppercase">DIAGNOSTIC COMPLETE</h4>
+                      <h4 className="text-white text-xs font-black font-mono tracking-wide text-sentence">Check Complete</h4>
                       <p className="text-neutral-400 text-xs font-mono mt-1.5 leading-relaxed">
                         {diagnosticResult}
                       </p>
@@ -518,17 +518,17 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
           </div>
 
           {/* Graphical Support Visual elements */}
-          <div className="lg:col-span-6 bg-[#0d0d0e] rounded-3xl p-6 sm:p-8 text-white text-left relative overflow-hidden border border-neutral-800 shadow-xl">
+          <div className="lg:col-span-6 bg-[#0d0d0e] rounded-3xl p-6 sm:p-8 text-white text-left relative overflow-hidden   shadow-xl">
             <div className="absolute top-0 right-0 w-32 h-32 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-[#E34718]/10 via-transparent to-transparent opacity-85 pointer-events-none" />
 
-            <div className="flex items-center gap-2 border-b border-neutral-800 pb-4 mb-6">
+            <div className="flex items-center gap-2   pb-4 mb-6">
               <LifeBuoy className="w-4.5 h-4.5 text-[#E34718]" />
-              <span className="text-[10px] font-mono uppercase font-black tracking-widest text-[#E34718]">GLOBAL HOTLINE CORRIDORS</span>
+              <span className="text-[10px] font-mono text-sentence font-black tracking-widest text-[#E34718]">Contact Us</span>
             </div>
 
             <div className="space-y-4">
               
-              <div className="p-4 bg-neutral-900/90 border border-neutral-800 rounded-2xl flex items-center justify-between gap-4">
+              <div className="p-4 bg-neutral-900/90   rounded-2xl flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-[#E34718]/10 flex items-center justify-center text-[#C23A12] shrink-0">
                     <Mail className="w-4.5 h-4.5" />
@@ -543,7 +543,7 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
                 </a>
               </div>
 
-              <div className="p-4 bg-neutral-900/90 border border-neutral-800 rounded-2xl flex items-center justify-between gap-4">
+              <div className="p-4 bg-neutral-900/90   rounded-2xl flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 shrink-0">
                     <PhoneCall className="w-4.5 h-4.5" />
@@ -558,14 +558,14 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
                 </span>
               </div>
 
-              <div className="p-4 bg-neutral-900/90 border border-neutral-800 rounded-2xl flex items-center justify-between gap-4 block sm:flex">
+              <div className="p-4 bg-neutral-900/90   rounded-2xl flex items-center justify-between gap-4 block sm:flex">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-[#E34718]/10 flex items-center justify-center text-[#E34718] shrink-0">
                     <Clock className="w-4.5 h-4.5" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-white leading-none">Active Shift Coordinates</h4>
-                    <span className="text-[10px] text-neutral-400 mt-1 block">Westminster & Hamilton response desks.</span>
+                    <h4 className="text-xs font-bold text-white leading-none">Support Hours</h4>
+                    <span className="text-[10px] text-neutral-400 mt-1 block">London & Hamilton support desks.</span>
                   </div>
                 </div>
                 <span className="text-xs text-neutral-300 font-semibold shrink-0 mt-2 sm:mt-0 block">
@@ -575,8 +575,8 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
 
             </div>
 
-            <div className="mt-6 pt-5 border-t border-neutral-800 flex items-center justify-between text-[11px] text-neutral-500">
-              <span>Security monitoring is active 24/7/365.</span>
+            <div className="mt-6 pt-5   flex items-center justify-between text-[11px] text-neutral-500">
+              <span>We typically respond within 2 hours.</span>
               <button 
                 onClick={onExploreEvents}
                 className="text-[#E34718] font-bold hover:underline flex items-center gap-1 cursor-pointer"
@@ -592,51 +592,51 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
       </section>
 
       {/* 4. KNOWLEDGE BASE ACCORDION MODULE */}
-      <section className="bg-orange-50 rounded-[3rem] border border-neutral-200/50 max-w-7xl mx-auto px-6 sm:px-10 py-16 mb-20 relative overflow-hidden text-left" id="help-knowledge-base">
+      <section className="bg-orange-50 rounded-[3rem]   max-w-7xl mx-auto px-6 sm:px-10 py-16 mb-20 relative overflow-hidden text-left" id="help-knowledge-base">
         <div className="absolute inset-0 opacity-[0.025] bg-[radial-gradient(#000000_1px,transparent_1px)] [background-size:16px_16px]" />
         
         <div className="max-w-3xl mx-auto mb-12 text-center relative z-10">
-          <div className="inline-flex items-center gap-1.5 bg-white border border-neutral-200 px-3.5 py-1 rounded-full mb-3 shadow-3xs">
+          <div className="inline-flex items-center gap-1.5 bg-white   px-3.5 py-1 rounded-full mb-3 shadow-3xs">
             <HelpCircle className="w-3.5 h-3.5 text-[#C23A12]" />
-            <span className="text-[10px] font-black text-[#C23A12] tracking-widest uppercase">Self-Guided Help Database</span>
+            <span className="text-[10px] font-black text-[#C23A12] tracking-widest text-sentence">Self-Guided Help Database</span>
           </div>
           <h2 className="text-3xl font-display font-black text-neutral-900 tracking-tight">
-            Browse the safe credentials base
+            Browse Help Topics
           </h2>
           <p className="text-neutral-500 font-semibold text-xs sm:text-sm mt-3 leading-relaxed max-w-xl mx-auto">
-            Choose a quick filter category below to investigate ticket validation maps, cancellation timelines, or multi-device dashboards.
+            Pick a category below to find answers about tickets, refunds, your account, and bookings.
           </p>
 
           {/* Tabs switchers */}
           <div className="flex flex-wrap items-center justify-center gap-2 mt-6">
             <button
               onClick={() => { setActiveTab('safety'); setSearchQuery(''); }}
-              className={`px-4 py-2 rounded-full text-xs font-bold transition-all uppercase cursor-pointer ${
-                activeTab === 'safety' ? 'bg-[#E34718] text-white shadow-3xs' : 'bg-white text-neutral-600 hover:text-black border border-neutral-200/60'
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all text-sentence cursor-pointer ${
+                activeTab === 'safety' ? 'bg-[#E34718] text-white shadow-3xs' : 'bg-white text-neutral-600 hover:text-black  '
               }`}
             >
               Ticket Safety
             </button>
             <button
               onClick={() => { setActiveTab('refunds'); setSearchQuery(''); }}
-              className={`px-4 py-2 rounded-full text-xs font-bold transition-all uppercase cursor-pointer ${
-                activeTab === 'refunds' ? 'bg-[#E34718] text-white shadow-3xs' : 'bg-white text-neutral-600 hover:text-black border border-neutral-200/60'
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all text-sentence cursor-pointer ${
+                activeTab === 'refunds' ? 'bg-[#E34718] text-white shadow-3xs' : 'bg-white text-neutral-600 hover:text-black  '
               }`}
             >
-              Refunds & Levies
+              Refunds & Fees
             </button>
             <button
               onClick={() => { setActiveTab('tech'); setSearchQuery(''); }}
-              className={`px-4 py-2 rounded-full text-xs font-bold transition-all uppercase cursor-pointer ${
-                activeTab === 'tech' ? 'bg-[#E34718] text-white shadow-3xs' : 'bg-white text-neutral-600 hover:text-black border border-neutral-200/60'
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all text-sentence cursor-pointer ${
+                activeTab === 'tech' ? 'bg-[#E34718] text-white shadow-3xs' : 'bg-white text-neutral-600 hover:text-black  '
               }`}
             >
               Dashboard & Tech
             </button>
             <button
               onClick={() => { setActiveTab('booking'); setSearchQuery(''); }}
-              className={`px-4 py-2 rounded-full text-xs font-bold transition-all uppercase cursor-pointer ${
-                activeTab === 'booking' ? 'bg-[#E34718] text-white shadow-3xs' : 'bg-white text-neutral-600 hover:text-black border border-neutral-200/60'
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all text-sentence cursor-pointer ${
+                activeTab === 'booking' ? 'bg-[#E34718] text-white shadow-3xs' : 'bg-white text-neutral-600 hover:text-black  '
               }`}
             >
               Seat Reservations
@@ -647,8 +647,8 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
         {/* Dynamic filter results display */}
         <div className="max-w-4xl mx-auto relative z-10 space-y-4">
           {searchQuery ? (
-            <div className="bg-white border border-neutral-200/70 rounded-3xl p-6 shadow-3xs">
-              <span className="text-neutral-400 text-[10px] font-bold uppercase tracking-widest block mb-4">
+            <div className="bg-white   rounded-3xl p-6 shadow-3xs">
+              <span className="text-neutral-400 text-[10px] font-bold text-sentence tracking-widest block mb-4">
                 SEARCH RESULTS ({filteredArticles.length})
               </span>
               
@@ -663,7 +663,7 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
                   </button>
                 </div>
               ) : (
-                <div className="space-y-6 divide-y divide-neutral-100">
+                <div className="space-y-6  ">
                   {filteredArticles.map((art) => (
                     <div key={art.id} className="pt-4 first:pt-0 space-y-2">
                       <h4 className="font-display font-bold text-sm text-neutral-900 flex items-center gap-2">
@@ -683,7 +683,7 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
               {knowledgebaseArticles[activeTab].map((art) => (
                 <div 
                   key={art.id}
-                  className="bg-white hover:bg-neutral-50/75 border border-neutral-200/50 rounded-2xl p-6 transition-all shadow-3xs"
+                  className="bg-white hover:bg-neutral-50/75   rounded-2xl p-6 transition-all shadow-3xs"
                 >
                   <h4 className="font-display font-bold text-xs sm:text-sm text-neutral-900 tracking-tight leading-snug flex items-start gap-2">
                     <FileText className="w-4.5 h-4.5 text-[#E34718] shrink-0 mt-0.5" />
@@ -706,10 +706,10 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
           {/* Info vertical grid columns */}
           <div className="lg:col-span-4 space-y-6">
             <h2 className="text-3xl font-display font-black tracking-tight text-neutral-900">
-              Submit a service credential challenge
+              Still Need Help?
             </h2>
             <p className="text-neutral-500 text-xs sm:text-sm font-semibold leading-relaxed">
-              If your offline seat pass coordinate keys require manual verification alignment, fill in the support dispatch matrix here.
+              Send us a message and our support team will get back to you.
             </p>
 
             <div className="space-y-4 pt-2">
@@ -718,8 +718,8 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
                   <CheckCircle className="w-3 h-3 text-[#E34718]" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-neutral-800">Decentralized Tickets</h4>
-                  <p className="text-xs text-neutral-400 font-semibold mt-1">We handle security via local cryptographic verification.</p>
+                  <h4 className="text-xs font-bold text-neutral-800">Secure Tickets</h4>
+                  <p className="text-xs text-neutral-400 font-semibold mt-1">Every ticket is protected with a unique, scan-verified code.</p>
                 </div>
               </div>
 
@@ -728,8 +728,8 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
                   <CheckCircle className="w-3 h-3 text-[#E34718]" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-neutral-800">Secure Vault Protection</h4>
-                  <p className="text-xs text-neutral-400 font-semibold mt-1 font-sans">Payment databases utilize single session client authorization hashes.</p>
+                  <h4 className="text-xs font-bold text-neutral-800">Secure Payments</h4>
+                  <p className="text-xs text-neutral-400 font-semibold mt-1 font-sans">Your payment details are never stored on our servers.</p>
                 </div>
               </div>
             </div>
@@ -737,9 +737,9 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
 
           {/* Service Submission Form Card */}
           <div className="lg:col-span-8">
-            <div className="bg-white border border-neutral-200/80 rounded-[32px] p-6 sm:p-8 shadow-sm">
-              <span className="text-neutral-400 text-[10px] font-bold uppercase tracking-widest block mb-4">
-                OFFICIAL SERVICE INTAKE FORM
+            <div className="bg-white   rounded-[32px] p-6 sm:p-8 shadow-sm">
+              <span className="text-neutral-400 text-[10px] font-bold text-sentence tracking-widest block mb-4">
+                Contact Form
               </span>
 
               {formSubmitted ? (
@@ -747,13 +747,13 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
                   <div className="w-12 h-12 rounded-full bg-[#E34718]/10 flex items-center justify-center mx-auto text-[#E34718]">
                     <CheckCircle className="w-6 h-6" />
                   </div>
-                  <h3 className="font-display font-bold text-lg text-neutral-900">Ticket intake received successfully</h3>
+                  <h3 className="font-display font-bold text-lg text-neutral-900">Message Sent!</h3>
                   <p className="text-xs text-neutral-500 font-semibold max-w-sm mx-auto">
-                    Your credential query has been lodged directly into our Westminster cryptography system. Response coordinates will arrive shortly.
+                    Thanks for reaching out — our support team will get back to you within 2 hours.
                   </p>
                   <button 
                     onClick={() => setFormSubmitted(false)}
-                    className="text-xs font-bold text-[#C23A12] hover:underline uppercase pt-4 cursor-pointer"
+                    className="text-xs font-bold text-[#C23A12] hover:underline text-sentence pt-4 cursor-pointer"
                   >
                     Submit another query
                   </button>
@@ -762,61 +762,61 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
                 <form onSubmit={handleContactSubmit} className="space-y-5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5 pl-0.5">Your Name</label>
+                      <label className="block text-[10px] font-bold text-sentence tracking-wider text-neutral-400 mb-1.5 pl-0.5">Your Name</label>
                       <input 
                         type="text"
                         required
                         value={contactForm.name}
                         onChange={(e) => setContactForm({...contactForm, name: e.target.value})}
                         placeholder="e.g. Adrian Vance"
-                        className="w-full bg-neutral-50 border border-neutral-200 focus:outline-none focus:ring-1 focus:ring-[#E34718] rounded-xl p-3 text-xs sm:text-sm font-semibold text-neutral-800"
+                        className="w-full bg-neutral-50   focus:outline-none focus:ring-1 focus:ring-[#E34718] rounded-xl p-3 text-xs sm:text-sm font-semibold text-neutral-800"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5 pl-0.5">Contact Email Address</label>
+                      <label className="block text-[10px] font-bold text-sentence tracking-wider text-neutral-400 mb-1.5 pl-0.5">Contact Email Address</label>
                       <input 
                         type="email"
                         required
                         value={contactForm.email}
                         onChange={(e) => setContactForm({...contactForm, email: e.target.value})}
-                        placeholder="adrian@culturepatrons.org"
-                        className="w-full bg-neutral-50 border border-neutral-200 focus:outline-none focus:ring-1 focus:ring-[#E34718] rounded-xl p-3 text-xs sm:text-sm font-semibold text-neutral-800"
+                        placeholder="you@example.com"
+                        className="w-full bg-neutral-50   focus:outline-none focus:ring-1 focus:ring-[#E34718] rounded-xl p-3 text-xs sm:text-sm font-semibold text-neutral-800"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5 pl-0.5">Diagnostic Challenge Type</label>
+                    <label className="block text-[10px] font-bold text-sentence tracking-wider text-neutral-400 mb-1.5 pl-0.5">What's this about?</label>
                     <select
                       value={contactForm.subject}
                       onChange={(e) => setContactForm({...contactForm, subject: e.target.value})}
-                      className="w-full bg-[#FAFBFD] border border-neutral-200 focus:outline-none focus:ring-1 focus:ring-[#E34718] rounded-xl p-3 text-xs font-bold text-neutral-700"
+                      className="w-full bg-[#FAFBFD]   focus:outline-none focus:ring-1 focus:ring-[#E34718] rounded-xl p-3 text-xs font-bold text-neutral-700"
                     >
-                      <option value="Verification Issue">Ticketing verification error at gate entrance</option>
-                      <option value="Billing Discrepancy">Double sold backup claim or card adjustments</option>
-                      <option value="General Information">Inquiring about global venue license integrations</option>
-                      <option value="API Access">Developer support coordinates & keys authorization</option>
+                      <option value="Verification Issue">Issue at venue entry</option>
+                      <option value="Billing Discrepancy">Billing or payment issue</option>
+                      <option value="General Information">General question</option>
+                      <option value="API Access">Other</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5 pl-0.5">Detailed description of ticket challenge</label>
-                    <textarea 
+                    <label className="block text-[10px] font-bold text-sentence tracking-wider text-neutral-400 mb-1.5 pl-0.5">Tell us what's going on</label>
+                    <textarea
                       required
                       rows={4}
                       value={contactForm.message}
                       onChange={(e) => setContactForm({...contactForm, message: e.target.value})}
-                      placeholder="Please explicitly outline show details, booked seat ranges, and your transaction credentials..."
-                      className="w-full bg-neutral-50 border border-neutral-200 focus:outline-none focus:ring-1 focus:ring-[#E34718] rounded-xl p-3 text-xs sm:text-sm font-semibold text-neutral-800 placeholder-neutral-400"
+                      placeholder="Include the event name and your order number if you have it..."
+                      className="w-full bg-neutral-50   focus:outline-none focus:ring-1 focus:ring-[#E34718] rounded-xl p-3 text-xs sm:text-sm font-semibold text-neutral-800 placeholder-neutral-400"
                     />
                   </div>
 
                   <div className="flex justify-end">
                     <button
                       type="submit"
-                      className="bg-[#E34718] hover:bg-[#C23A12] text-white text-xs font-bold uppercase tracking-wider px-6 py-3.5 rounded-full transition-all active:scale-95 shadow-sm hover:shadow-md cursor-pointer inline-flex items-center gap-2"
+                      className="bg-[#E34718] hover:bg-[#C23A12] text-white text-xs font-bold text-sentence tracking-wider px-6 py-3.5 rounded-full transition-all active:scale-95 shadow-sm hover:shadow-md cursor-pointer inline-flex items-center gap-2"
                     >
-                      <span>File official support inquiry</span>
+                      <span>Send Message</span>
                       <Send className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -837,15 +837,15 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
               initial={{ opacity: 0, scale: 0.9, y: 30 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 30 }}
-              className="bg-white border border-neutral-200/90 rounded-[30px] shadow-2xl w-80 sm:w-96 overflow-hidden flex flex-col h-[450px]"
+              className="bg-white   rounded-[30px] shadow-2xl w-80 sm:w-96 overflow-hidden flex flex-col h-[450px]"
             >
               {/* Chat Header */}
               <div className="bg-[#0d0d0e] p-4 text-white flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="w-2.5 h-2.5 bg-[#E34718] rounded-full animate-ping"></div>
                   <div>
-                    <h4 className="text-xs font-black font-mono tracking-widest text-[#E34718] leading-none">JAZBA SECURE GATE</h4>
-                    <span className="text-[9px] text-neutral-500 font-bold">Automated Support (Shift Live)</span>
+                    <h4 className="text-xs font-black font-mono tracking-widest text-[#E34718] leading-none">Jazba Support</h4>
+                    <span className="text-[9px] text-neutral-500 font-bold">Typically replies in a few minutes</span>
                   </div>
                 </div>
                 <button 
@@ -863,7 +863,7 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
                     <div className={`max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed ${
                       log.sender === 'user' 
                         ? 'bg-[#E34718] text-white font-bold rounded-tr-xs' 
-                        : 'bg-white border border-neutral-100 text-neutral-800 font-semibold shadow-4xs rounded-tl-xs'
+                        : 'bg-white   text-neutral-800 font-semibold shadow-4xs rounded-tl-xs'
                     }`}>
                       <p>{log.text}</p>
                       <span className="block text-[8px] text-neutral-100/80 text-right mt-1 font-semibold">
@@ -875,21 +875,21 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
 
                 {isTyping && (
                   <div className="flex justify-start">
-                    <div className="bg-white border border-neutral-100 p-2.5 rounded-2xl rounded-tl-xs shadow-4xs text-neutral-400 text-[10px] font-mono tracking-wide">
-                      Assistant scanning cryptography logs...
+                    <div className="bg-white   p-2.5 rounded-2xl rounded-tl-xs shadow-4xs text-neutral-400 text-[10px] font-mono tracking-wide">
+                      Typing...
                     </div>
                   </div>
                 )}
               </div>
 
               {/* Chat formulation form input */}
-              <form onSubmit={handleSendMessage} className="p-2 border-t border-neutral-100 bg-white flex items-center gap-2">
+              <form onSubmit={handleSendMessage} className="p-2   bg-white flex items-center gap-2">
                 <input
                   type="text"
-                  placeholder="Type admission question..."
+                  placeholder="Type your message..."
                   value={chatMessage}
                   onChange={(e) => setChatMessage(e.target.value)}
-                  className="bg-neutral-50 px-3 py-2 rounded-full text-xs flex-1 focus:outline-none border border-neutral-200 focus:ring-1 focus:ring-[#E34718] font-semibold text-neutral-800"
+                  className="bg-neutral-50 px-3 py-2 rounded-full text-xs flex-1 focus:outline-none   focus:ring-1 focus:ring-[#E34718] font-semibold text-neutral-800"
                 />
                 <button 
                   type="submit"
@@ -905,10 +905,10 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setChatOpen(true)}
-              className="bg-[#0d0d0e] hover:bg-neutral-900 text-white rounded-full px-5 py-3.5 shadow-xl flex items-center gap-2.5 border border-neutral-800 cursor-pointer"
+              className="bg-[#0d0d0e] hover:bg-neutral-900 text-white rounded-full px-5 py-3.5 shadow-xl flex items-center gap-2.5   cursor-pointer"
             >
               <div className="w-2.5 h-2.5 bg-[#E34718] rounded-full animate-pulse shrink-0"></div>
-              <span className="text-xs font-black uppercase tracking-wider text-white">Launch Secure Chat</span>
+              <span className="text-xs font-black text-sentence tracking-wider text-white">Chat with us</span>
               <MessageSquare className="w-4 h-4 text-white" />
             </motion.button>
           )}

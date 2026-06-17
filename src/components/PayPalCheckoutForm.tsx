@@ -89,20 +89,20 @@ export default function PayPalCheckoutForm({
   };
 
   return (
-    <div className="bg-white border-2 border-neutral-100 rounded-2xl p-5 sm:p-7 shadow-xs font-sans mt-2" id="paypal-checkout-gate">
+    <div className="bg-white   rounded-2xl p-5 sm:p-7 shadow-xs font-sans mt-2" id="paypal-checkout-gate">
       {/* Header element */}
-      <div className="flex items-center justify-between gap-4 border-b border-neutral-100 pb-3.5 mb-5 text-left">
+      <div className="flex items-center justify-between gap-4   pb-3.5 mb-5 text-left">
         <div className="flex items-center gap-2">
           {/* Custom Styled PayPal Logo */}
           <span className="italic font-serif font-black tracking-tighter text-[#003087] text-xl">
             Pay<span className="text-[#0079c1]">Pal</span>
           </span>
-          <span className="text-[9px] bg-[#0079c1]/10 text-[#003087] font-black uppercase tracking-widest px-2 py-0.5 rounded-md">
-            Gateway
+          <span className="text-[9px] bg-[#0079c1]/10 text-[#003087] font-black text-sentence tracking-widest px-2 py-0.5 rounded-md">
+            Test Mode
           </span>
         </div>
-        <div className="bg-neutral-50 px-3 py-1.5 rounded-lg border border-neutral-200 text-right leading-none shrink-0">
-          <span className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider block">Total Amount:</span>
+        <div className="bg-neutral-50 px-3 py-1.5 rounded-lg   text-right leading-none shrink-0">
+          <span className="text-[9px] text-neutral-400 font-bold text-sentence tracking-wider block">Total Amount:</span>
           <span className="text-sm font-mono font-black text-neutral-800 tracking-tight block mt-1">
             {formattedAmount()}
           </span>
@@ -110,7 +110,7 @@ export default function PayPalCheckoutForm({
       </div>
 
       {errorMessage && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-semibold flex items-start gap-2 animate-fadeIn text-left">
+        <div className="mb-4 p-3 bg-red-50   text-red-700 rounded-xl text-xs font-semibold flex items-start gap-2 animate-fadeIn text-left">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{errorMessage}</span>
         </div>
@@ -119,21 +119,21 @@ export default function PayPalCheckoutForm({
       {/* IDLE state showing primary action buttons */}
       {payStep === 'idle' && (
         <div className="space-y-4 text-left">
-          <div className="bg-amber-50/40 border border-amber-200/80 rounded-xl p-4 flex gap-3">
+          <div className="bg-amber-50/40   rounded-xl p-4 flex gap-3">
             <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div className="text-xs font-semibold text-amber-800 leading-relaxed">
-              <p className="font-extrabold uppercase text-[10px] tracking-wide mb-1 text-amber-900">
-                PayPal Express Sandbox Enabled
+              <p className="font-extrabold text-sentence text-[10px] tracking-wide mb-1 text-amber-900">
+                Test Payment
               </p>
               <p className="font-medium text-amber-700">
-                Securely authenticating seat reservation details. Fill in your billing info above, click pay below, then login with any mock credentials to test safely.
+                This is a test checkout. Click Pay below, then enter any email and password to complete the test payment.
               </p>
             </div>
           </div>
 
           <div className="space-y-3">
             <div className="space-y-1">
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+              <label className="block text-[10px] font-bold text-sentence tracking-wider text-neutral-400">
                 Your PayPal Registered Email
               </label>
               <input 
@@ -142,7 +142,7 @@ export default function PayPalCheckoutForm({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your-paypal-account@email.com"
                 required
-                className="w-full bg-white border-2 border-neutral-200 rounded-xl px-4 py-2.5 text-xs font-bold text-neutral-800 placeholder-neutral-300 focus:border-[#0079c1] focus:outline-none focus:ring-0 transition-all font-sans"
+                className="w-full bg-white   rounded-xl px-4 py-2.5 text-xs font-bold text-neutral-800 placeholder-neutral-300  focus:outline-none focus:ring-0 transition-all font-sans"
               />
             </div>
 
@@ -151,7 +151,7 @@ export default function PayPalCheckoutForm({
               <button
                 type="button"
                 onClick={() => handleInitiatePayPal('standard')}
-                className="w-full py-4.5 bg-[#ffc439] hover:bg-[#f2ba36] text-[#003087] rounded-xl text-xs font-black uppercase tracking-wider transition-colors shadow-sm active:scale-98 flex items-center justify-center gap-2 cursor-pointer border border-[#EAC124]"
+                className="w-full py-4.5 bg-[#ffc439] hover:bg-[#f2ba36] text-[#003087] rounded-xl text-xs font-black text-sentence tracking-wider transition-colors shadow-sm active:scale-98 flex items-center justify-center gap-2 cursor-pointer  "
               >
                 <span className="italic font-serif font-black lowercase tracking-tighter text-sm">paypal</span>
                 <span>Checkout</span>
@@ -161,7 +161,7 @@ export default function PayPalCheckoutForm({
               <button
                 type="button"
                 onClick={() => handleInitiatePayPal('later')}
-                className="w-full py-4.5 bg-[#0070ba] hover:bg-[#005ea6] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-colors shadow-sm active:scale-98 flex items-center justify-center gap-2 cursor-pointer border border-[#00548c]"
+                className="w-full py-4.5 bg-[#0070ba] hover:bg-[#005ea6] text-white rounded-xl text-xs font-black text-sentence tracking-wider transition-colors shadow-sm active:scale-98 flex items-center justify-center gap-2 cursor-pointer  "
               >
                 <span className="italic font-serif font-black lowercase tracking-tighter text-sm text-amber-300">paypal</span>
                 <span>Pay Later</span>
@@ -174,14 +174,14 @@ export default function PayPalCheckoutForm({
       {/* LOGIN state */}
       {payStep === 'login' && (
         <form onSubmit={handleLoginSubmit} className="space-y-3.5 text-left animate-slideDown">
-          <div className="flex items-center justify-between border-b border-neutral-100 pb-2 mb-3">
-            <span className="text-[10px] font-bold text-[#003087] uppercase tracking-wider flex items-center gap-1">
+          <div className="flex items-center justify-between   pb-2 mb-3">
+            <span className="text-[10px] font-bold text-[#003087] text-sentence tracking-wider flex items-center gap-1">
               <Lock className="w-3 h-3 text-[#0079c1]" /> Secure Identification
             </span>
             <button 
               type="button" 
               onClick={() => setPayStep('idle')} 
-              className="text-[10px] text-neutral-400 hover:text-black font-black uppercase tracking-wider flex items-center gap-0.5"
+              className="text-[10px] text-neutral-400 hover:text-black font-black text-sentence tracking-wider flex items-center gap-0.5"
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Back
             </button>
@@ -189,7 +189,7 @@ export default function PayPalCheckoutForm({
 
           <div className="space-y-3">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">
+              <label className="block text-[10px] font-bold text-sentence tracking-wider text-neutral-400 mb-1">
                 Account Email
               </label>
               <input 
@@ -198,12 +198,12 @@ export default function PayPalCheckoutForm({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your-paypal-account@email.com"
                 required
-                className="w-full bg-white border-2 border-neutral-200 rounded-xl px-4 py-2.5 text-xs font-bold text-neutral-800 placeholder-neutral-300 focus:border-[#0079c1] focus:outline-none transition-all"
+                className="w-full bg-white   rounded-xl px-4 py-2.5 text-xs font-bold text-neutral-800 placeholder-neutral-300  focus:outline-none transition-all"
               />
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">
+              <label className="block text-[10px] font-bold text-sentence tracking-wider text-neutral-400 mb-1">
                 Password
               </label>
               <input 
@@ -212,14 +212,14 @@ export default function PayPalCheckoutForm({
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
                 required
-                className="w-full bg-white border-2 border-neutral-200 rounded-xl px-4 py-2.5 text-xs font-bold text-neutral-850 placeholder-neutral-300 focus:border-[#0079c1] focus:outline-none transition-all"
+                className="w-full bg-white   rounded-xl px-4 py-2.5 text-xs font-bold text-neutral-850 placeholder-neutral-300  focus:outline-none transition-all"
               />
             </div>
           </div>
 
           <button
             type="submit"
-            className="w-full py-3.5 bg-[#0070ba] hover:bg-[#005ea6] text-white rounded-xl text-xs font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-1.5 cursor-pointer mt-4"
+            className="w-full py-3.5 bg-[#0070ba] hover:bg-[#005ea6] text-white rounded-xl text-xs font-black text-sentence tracking-widest transition-colors flex items-center justify-center gap-1.5 cursor-pointer mt-4"
           >
             <span>Login to secure vault</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -230,14 +230,14 @@ export default function PayPalCheckoutForm({
       {/* OTP verification state */}
       {payStep === 'otp' && (
         <form onSubmit={handleOtpVerify} className="space-y-4 text-left animate-slideDown">
-          <div className="flex items-center justify-between border-b border-neutral-100 pb-2">
-            <span className="text-[10px] font-bold text-[#003087] uppercase tracking-wider flex items-center gap-1">
+          <div className="flex items-center justify-between   pb-2">
+            <span className="text-[10px] font-bold text-[#003087] text-sentence tracking-wider flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> Dynamic Code Verification
             </span>
             <button 
               type="button" 
               onClick={() => setPayStep('login')} 
-              className="text-[10px] text-neutral-400 hover:text-black font-black uppercase tracking-wider flex items-center gap-0.5"
+              className="text-[10px] text-neutral-400 hover:text-black font-black text-sentence tracking-wider flex items-center gap-0.5"
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Back
             </button>
@@ -248,7 +248,7 @@ export default function PayPalCheckoutForm({
           </p>
 
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">
+            <label className="block text-[10px] font-bold text-sentence tracking-wider text-neutral-400 mb-1.5">
               Enter 4-Digit Code
             </label>
             <input 
@@ -258,13 +258,13 @@ export default function PayPalCheckoutForm({
               onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
               placeholder="••••"
               required
-              className="w-full bg-white border-2 border-neutral-200 rounded-xl px-4 py-3 text-sm font-mono font-black text-center text-neutral-800 placeholder-neutral-300 focus:border-[#0079c1] focus:outline-none transition-all tracking-[0.5em]"
+              className="w-full bg-white   rounded-xl px-4 py-3 text-sm font-mono font-black text-center text-neutral-800 placeholder-neutral-300  focus:outline-none transition-all tracking-[0.5em]"
             />
           </div>
 
           <button
             type="submit"
-            className="w-full py-3.5 bg-[#0070ba] hover:bg-[#005ea6] text-white rounded-xl text-xs font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+            className="w-full py-3.5 bg-[#0070ba] hover:bg-[#005ea6] text-white rounded-xl text-xs font-black text-sentence tracking-widest transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <span>Verify & Continue</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -275,8 +275,8 @@ export default function PayPalCheckoutForm({
       {/* CONFIRMATION state */}
       {payStep === 'confirm' && (
         <div className="space-y-4 text-left animate-slideDown">
-          <div className="flex items-center justify-between border-b border-neutral-100 pb-2 mb-1">
-            <span className="text-[10px] font-bold text-[#003087] uppercase tracking-wider flex items-center gap-1">
+          <div className="flex items-center justify-between   pb-2 mb-1">
+            <span className="text-[10px] font-bold text-[#003087] text-sentence tracking-wider flex items-center gap-1">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Account Verified
             </span>
             <span className="text-[9px] text-[#003087] font-black">{email}</span>
@@ -289,8 +289,8 @@ export default function PayPalCheckoutForm({
           <div className="space-y-2.5">
             <div 
               onClick={() => setSelectedFunding('balance')}
-              className={`p-3.5 rounded-xl border-2 flex items-center justify-between cursor-pointer select-none transition-all ${
-                selectedFunding === 'balance' ? 'border-[#0079c1] bg-[#0079c1]/5' : 'border-neutral-200 hover:border-neutral-300'
+              className={`p-3.5 rounded-xl  flex items-center justify-between cursor-pointer select-none transition-all ${
+                selectedFunding === 'balance' ? ' bg-[#0079c1]/5' : ' '
               }`}
             >
               <div className="flex items-center gap-3">
@@ -300,15 +300,15 @@ export default function PayPalCheckoutForm({
                   <span className="text-[10px] text-neutral-400 font-bold block mt-1">Available Instant: {formattedAmount()}</span>
                 </div>
               </div>
-              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${selectedFunding === 'balance' ? 'border-[#0079c1] bg-[#0079c1]' : 'border-neutral-300'}`}>
+              <div className={`w-4 h-4 rounded-full  flex items-center justify-center ${selectedFunding === 'balance' ? ' bg-[#0079c1]' : ''}`}>
                 {selectedFunding === 'balance' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
               </div>
             </div>
 
             <div 
               onClick={() => setSelectedFunding('linked_card')}
-              className={`p-3.5 rounded-xl border-2 flex items-center justify-between cursor-pointer select-none transition-all ${
-                selectedFunding === 'linked_card' ? 'border-[#0079c1] bg-[#0079c1]/5' : 'border-neutral-200 hover:border-neutral-300'
+              className={`p-3.5 rounded-xl  flex items-center justify-between cursor-pointer select-none transition-all ${
+                selectedFunding === 'linked_card' ? ' bg-[#0079c1]/5' : ' '
               }`}
             >
               <div className="flex items-center gap-3">
@@ -318,7 +318,7 @@ export default function PayPalCheckoutForm({
                   <span className="text-[10px] text-neutral-400 font-bold block mt-1">Primary card ending in •••• 5678</span>
                 </div>
               </div>
-              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${selectedFunding === 'linked_card' ? 'border-[#0079c1] bg-[#0079c1]' : 'border-neutral-300'}`}>
+              <div className={`w-4 h-4 rounded-full  flex items-center justify-center ${selectedFunding === 'linked_card' ? ' bg-[#0079c1]' : ''}`}>
                 {selectedFunding === 'linked_card' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
               </div>
             </div>
@@ -327,7 +327,7 @@ export default function PayPalCheckoutForm({
           <button
             type="button"
             onClick={handleFinalPayment}
-            className="w-full py-4 bg-[#ffc439] hover:bg-[#f2ba36] text-[#003087] rounded-xl text-xs font-black uppercase tracking-widest transition-colors shadow-md active:scale-98 flex items-center justify-center gap-1.5 cursor-pointer mt-4"
+            className="w-full py-4 bg-[#ffc439] hover:bg-[#f2ba36] text-[#003087] rounded-xl text-xs font-black text-sentence tracking-widest transition-colors shadow-md active:scale-98 flex items-center justify-center gap-1.5 cursor-pointer mt-4"
           >
             <Lock className="w-3.5 h-3.5" />
             <span>Complete Authorization of {formattedAmount()}</span>
@@ -340,7 +340,7 @@ export default function PayPalCheckoutForm({
         <div className="py-10 text-center space-y-4 animate-pulse">
           <Loader2 className="w-8 h-8 text-[#0079c1] animate-spin mx-auto" />
           <div className="space-y-1.5">
-            <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest block">
+            <span className="text-[10px] font-black text-neutral-400 text-sentence tracking-widest block">
               SECURE DEPOSIT TRANSFERRING
             </span>
             <p className="text-xs font-bold text-neutral-800">
@@ -354,7 +354,7 @@ export default function PayPalCheckoutForm({
       )}
 
       {/* Compliance seal line */}
-      <div className="pt-4 border-t border-neutral-100 mt-4.5 flex flex-col sm:flex-row gap-2 items-center justify-between text-[9px] font-bold text-neutral-400 font-mono uppercase tracking-widest">
+      <div className="pt-4   mt-4.5 flex flex-col sm:flex-row gap-2 items-center justify-between text-[9px] font-bold text-neutral-400 font-mono text-sentence tracking-widest">
         <span className="flex items-center gap-1">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
           PayPal Encryption Certificate SSL-SHA256

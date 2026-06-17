@@ -1,14 +1,15 @@
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  query,
   where,
-  addDoc
+  addDoc,
+  getCountFromServer
 } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { EventItem } from '../types';
@@ -279,6 +280,95 @@ export async function deleteArtistProfile(id: string): Promise<void> {
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
     throw error;
+  }
+}
+
+/**
+ * ----------------------------------------------------
+ * FOLLOW / SOCIAL GRAPH FUNCTIONS
+ * ----------------------------------------------------
+ */
+
+export type FollowTargetType = 'artist' | 'organizer';
+
+export interface FollowRecord {
+  followerId: string;
+  targetType: FollowTargetType;
+  targetId: string;
+  createdAt: string;
+}
+
+// Deterministic doc id keeps a user's follow of a given target a single document,
+// so re-following after an unfollow can't create duplicate rows that inflate counts.
+function followDocId(followerId: string, targetType: FollowTargetType, targetId: string): string {
+  return `${followerId}_${targetType}_${targetId}`;
+}
+
+export async function followTarget(followerId: string, targetType: FollowTargetType, targetId: string): Promise<void> {
+  const id = followDocId(followerId, targetType, targetId);
+  const path = `follows/${id}`;
+  try {
+    const record: FollowRecord = {
+      followerId,
+      targetType,
+      targetId,
+      createdAt: new Date().toISOString()
+    };
+    await setDoc(doc(db, 'follows', id), record);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+    throw error;
+  }
+}
+
+export async function unfollowTarget(followerId: string, targetType: FollowTargetType, targetId: string): Promise<void> {
+  const id = followDocId(followerId, targetType, targetId);
+  const path = `follows/${id}`;
+  try {
+    await deleteDoc(doc(db, 'follows', id));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+    throw error;
+  }
+}
+
+export async function isFollowingTarget(followerId: string, targetType: FollowTargetType, targetId: string): Promise<boolean> {
+  const id = followDocId(followerId, targetType, targetId);
+  const path = `follows/${id}`;
+  try {
+    const snap = await getDoc(doc(db, 'follows', id));
+    return snap.exists();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+    return false;
+  }
+}
+
+export async function getFollowerCount(targetType: FollowTargetType, targetId: string): Promise<number> {
+  const path = `follows`;
+  try {
+    const q = query(collection(db, 'follows'), where('targetType', '==', targetType), where('targetId', '==', targetId));
+    const snap = await getCountFromServer(q);
+    return snap.data().count;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path);
+    return 0;
+  }
+}
+
+// Returns the set of targetIds a given user already follows for a target type,
+// so a listing page can resolve "following" state for many items in one query.
+export async function getFollowingIds(followerId: string, targetType: FollowTargetType): Promise<Set<string>> {
+  const path = `follows`;
+  try {
+    const q = query(collection(db, 'follows'), where('followerId', '==', followerId), where('targetType', '==', targetType));
+    const snap = await getDocs(q);
+    const ids = new Set<string>();
+    snap.forEach((d) => ids.add((d.data() as FollowRecord).targetId));
+    return ids;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path);
+    return new Set();
   }
 }
 

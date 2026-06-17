@@ -277,31 +277,31 @@ export default function UserDashboardPage({
   if (userStatus === 'suspended') {
     return (
       <div className="min-h-screen bg-neutral-950 flex items-center justify-center p-6 text-left">
-        <div className="bg-[#121212] border-2 border-red-500/30 rounded-3xl p-8 sm:p-10 max-w-md w-full shadow-lg text-center space-y-6 text-white text-sm">
-          <div className="w-16 h-16 bg-red-950/40 border border-red-500/40 rounded-2xl flex items-center justify-center mx-auto text-red-500 shadow-3xs">
+        <div className="bg-[#121212]   rounded-3xl p-8 sm:p-10 max-w-md w-full shadow-lg text-center space-y-6 text-white text-sm">
+          <div className="w-16 h-16 bg-red-950/40   rounded-2xl flex items-center justify-center mx-auto text-red-500 shadow-3xs">
             <ShieldCheck className="w-8 h-8" />
           </div>
           <div className="space-y-2">
-            <h2 className="font-display font-medium text-2xl text-[#E34718] uppercase">Access Restricted</h2>
-            <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider">Account status: Suspended</p>
+            <h2 className="font-display font-medium text-2xl text-[#E34718] text-sentence">Access Restricted</h2>
+            <p className="text-xs text-neutral-400 font-bold text-sentence tracking-wider">Account status: Suspended</p>
           </div>
           <p className="text-xs text-neutral-300 leading-relaxed font-semibold">
-            We regret to inform you that your registration status on Jazba Ticket Platform has been suspended due to system policy audits or administrative directives. Please contact platform administrators.
+            Your account has been suspended. If you believe this is a mistake, please contact our support team for help.
           </p>
-          <div className="bg-neutral-950 border border-neutral-850 rounded-xl p-4 text-xs font-bold text-neutral-400 text-left space-y-2.5">
+          <div className="bg-neutral-950   rounded-xl p-4 text-xs font-bold text-neutral-400 text-left space-y-2.5">
             <div>
-              <span className="text-[10px] text-neutral-500 uppercase tracking-widest block">Reference UID</span>
+              <span className="text-[10px] text-neutral-500 text-sentence tracking-widest block">Account ID</span>
               <span className="font-mono text-white/80">{auth.currentUser?.uid}</span>
             </div>
             <div>
-              <span className="text-[10px] text-neutral-500 uppercase tracking-widest block">Administrative Contact</span>
+              <span className="text-[10px] text-neutral-500 text-sentence tracking-widest block">Contact Support</span>
               <span className="text-white/80">support@jazbaticket.com</span>
             </div>
           </div>
           <div className="pt-2">
             <button 
               onClick={onLogout}
-              className="w-full py-3 bg-[#E34718] hover:bg-[#C23A12] text-white text-xs font-black uppercase tracking-wider rounded-full shadow-md active:scale-97 cursor-pointer transition-transform"
+              className="w-full py-3 bg-[#E34718] hover:bg-[#C23A12] text-white text-xs font-black text-sentence tracking-wider rounded-full shadow-md active:scale-97 cursor-pointer transition-transform"
             >
               Sign Out of Session
             </button>
@@ -320,7 +320,7 @@ export default function UserDashboardPage({
       
       {/* 0. GORGEOUS STYLISH HERO SECTION - FULL WIDTH (60vh left-aligned, matching the Home Page style) */}
       <section 
-        className="relative bg-[#121212] min-h-[420px] h-[60vh] px-4 sm:px-6 md:px-8 border-b border-neutral-900 overflow-visible z-10 flex items-center mb-10"
+        className="relative bg-[#121212] min-h-[420px] h-[60vh] px-4 sm:px-6 md:px-8   overflow-visible z-10 flex items-center mb-10"
         id="dashboard-hero"
       >
         {/* DARK MUSIC EVENT BACKGROUND PHOTO WITH GRADIENT OVERLAY */}
@@ -339,7 +339,7 @@ export default function UserDashboardPage({
         {/* Left aligned text / No forms / No action buttons */}
         <div className="max-w-7xl mx-auto w-full relative z-10 text-left space-y-4">
           {/* Path Breadcrumb */}
-          <div className="inline-flex items-center gap-2 text-[10px] font-black tracking-wider text-neutral-400 bg-neutral-905 border border-neutral-800 backdrop-blur-md px-3.5 py-1.5 rounded-full">
+          <div className="inline-flex items-center gap-2 text-[10px] font-black tracking-wider text-neutral-400 bg-neutral-905   backdrop-blur-md px-3.5 py-1.5 rounded-full">
             <span onClick={onBackToHome} className="hover:text-white hover:underline cursor-pointer transition-colors text-neutral-450">Home</span>
             <span>/</span>
             <span className="text-white">Customer Account Portal</span>
@@ -350,7 +350,7 @@ export default function UserDashboardPage({
           </h1>
 
           <p className="text-neutral-300 font-medium text-xs sm:text-sm md:text-base max-w-2xl leading-relaxed">
-            Verify barcode-active entry ticket credentials, edit secure connection settings, browse saved wishlist items, and review instant invoice records.
+            View your tickets, manage account settings, browse your watchlist, and review past orders.
           </p>
         </div>
       </section>
@@ -362,25 +362,25 @@ export default function UserDashboardPage({
           <div className="text-left">
             <h1 className="text-3xl font-display font-medium text-neutral-900 tracking-tight flex items-center gap-2">
               User Account Portal
-              <span className="text-[10px] uppercase font-bold tracking-wider bg-neutral-100 text-neutral-600 px-2.5 py-1 rounded-full border border-neutral-200">
+              <span className="text-[10px] text-sentence font-bold tracking-wider bg-neutral-100 text-neutral-600 px-2.5 py-1 rounded-full  ">
                 Verified Account
               </span>
             </h1>
             <p className="text-xs text-neutral-500 font-medium mt-1">
-              Verify scanning-ready entrance passes, saved watchlists, and secure transaction invoices.
+              Your tickets, watchlist, and order history, all in one place.
             </p>
           </div>
           
           <div className="flex items-center gap-2">
             <button
               onClick={onBackToHome}
-              className="py-2.5 px-5 bg-white border border-neutral-250 hover:bg-neutral-50 text-neutral-800 text-xs font-bold uppercase tracking-wider rounded-full transition-all active:scale-97 cursor-pointer"
+              className="py-2.5 px-5 bg-white   hover:bg-neutral-50 text-neutral-800 text-xs font-bold text-sentence tracking-wider rounded-full transition-all active:scale-97 cursor-pointer"
             >
               Back to Marketplace
             </button>
             <button
               onClick={onLogout}
-              className="py-2.5 px-5 bg-neutral-900 border border-transparent hover:bg-neutral-800 text-white hover:text-red-300 text-xs font-bold uppercase tracking-wider rounded-full transition-all active:scale-97 flex items-center gap-1.5 cursor-pointer"
+              className="py-2.5 px-5 bg-neutral-900   hover:bg-neutral-800 text-white hover:text-red-300 text-xs font-bold text-sentence tracking-wider rounded-full transition-all active:scale-97 flex items-center gap-1.5 cursor-pointer"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Log out</span>
@@ -389,17 +389,17 @@ export default function UserDashboardPage({
         </div>
 
         {/* 1. HERO PROFILE OVERVIEW CARD */}
-        <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-8 mb-8 relative overflow-hidden shadow-2xs text-left">
+        <div className="bg-white   rounded-2xl p-6 sm:p-8 mb-8 relative overflow-hidden shadow-2xs text-left">
           {/* Accent decoration overlay */}
           <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-[#E34718]/8 via-[#E34718]/4 to-transparent pointer-events-none"></div>
           
           <div className="flex flex-col sm:flex-row items-center gap-6 relative z-10">
             {/* Elegant luxury circular profile avatar badge with initials */}
-            <div className="w-20 h-20 bg-neutral-950 text-white rounded-2xl flex flex-col items-center justify-center border-2 border-neutral-800 shadow-md uppercase relative shrink-0">
+            <div className="w-20 h-20 bg-neutral-950 text-white rounded-2xl flex flex-col items-center justify-center   shadow-md text-sentence relative shrink-0">
               <span className="font-display font-black text-2xl tracking-tighter">
                 {profileName.substring(0, 2)}
               </span>
-              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#E34718] border-2 border-white flex items-center justify-center text-white" title="Verified Customer">
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#E34718]   flex items-center justify-center text-white" title="Verified Customer">
                 <CheckCircle className="w-4 h-4" />
               </div>
             </div>
@@ -407,7 +407,7 @@ export default function UserDashboardPage({
             <div className="flex-1 text-center sm:text-left">
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
                 <h2 className="font-display font-medium text-xl sm:text-2xl text-neutral-900">{profileName}</h2>
-                <span className="inline-flex bg-neutral-100 text-neutral-800 text-[10px] font-bold uppercase px-2.5 py-1 rounded-full border border-neutral-250">
+                <span className="inline-flex bg-neutral-100 text-neutral-800 text-[10px] font-bold text-sentence px-2.5 py-1 rounded-full  ">
                   Premium Member
                 </span>
               </div>
@@ -419,20 +419,20 @@ export default function UserDashboardPage({
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 mt-4 text-[11px] text-neutral-450 font-bold">
                 <div className="flex items-center gap-1.5 bg-neutral-55 bg-neutral-100 p-2 rounded-lg">
                   <Sparkles className="w-3.5 h-3.5 text-neutral-700" />
-                  <span>Account Limit: 10 active ticket passes maximum</span>
+                  <span>Up to 10 tickets per order</span>
                 </div>
                 <span>•</span>
-                <span>Active Region: Europe (GMT)</span>
+                <span>London, UK (GMT)</span>
               </div>
             </div>
 
             {/* Quick loyalty points badge */}
-            <div className="p-4 bg-neutral-50 border border-neutral-200/80 rounded-xl max-w-xs w-full sm:w-auto text-center shrink-0">
+            <div className="p-4 bg-neutral-50   rounded-xl max-w-xs w-full sm:w-auto text-center shrink-0">
               <div className="flex items-center gap-1 text-[#C23A12] justify-center mb-0.5">
                 <Gift className="w-4 h-4 shrink-0 fill-[#E34718]/10 text-[#C23A12]" />
                 <span className="font-mono font-black text-base text-neutral-900">1,280 pts</span>
               </div>
-              <span className="text-[9px] text-neutral-400 font-black uppercase tracking-wider block">Fidelity Reward Points</span>
+              <span className="text-[9px] text-neutral-400 font-black text-sentence tracking-wider block">Loyalty Points</span>
             </div>
           </div>
         </div>
@@ -440,42 +440,42 @@ export default function UserDashboardPage({
         {/* 2. STATS QUAD GRIDS */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           
-          <div className="bg-white border border-neutral-200/80 p-5 rounded-2xl shadow-2xs text-left">
-            <span className="text-[9px] text-neutral-400 font-black uppercase tracking-widest block leading-none mb-2">My Total Checked-out Passes</span>
+          <div className="bg-white   p-5 rounded-2xl shadow-2xs text-left">
+            <span className="text-[9px] text-neutral-400 font-black text-sentence tracking-widest block leading-none mb-2">Total Tickets</span>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="font-mono font-black text-2xl text-neutral-950">{totalPassesCount}</span>
-              <span className="text-[10px] text-neutral-400 font-medium">Entrance Voucher{totalPassesCount !== 1 ? 's' : ''}</span>
+              <span className="text-[10px] text-neutral-400 font-medium">Ticket{totalPassesCount !== 1 ? 's' : ''}</span>
             </div>
             <div className="w-full bg-neutral-100 h-1 rounded-full overflow-hidden mt-3.5">
               <div className="bg-[#E34718] h-full" style={{ width: `${Math.min(totalPassesCount * 10, 100)}%` }}></div>
             </div>
           </div>
 
-          <div className="bg-white border border-neutral-200/80 p-5 rounded-2xl shadow-2xs text-left">
-            <span className="text-[9px] text-neutral-400 font-black uppercase tracking-widest block leading-none mb-2">Saved Shows on Watchlist</span>
+          <div className="bg-white   p-5 rounded-2xl shadow-2xs text-left">
+            <span className="text-[9px] text-neutral-400 font-black text-sentence tracking-widest block leading-none mb-2">Watchlist</span>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="font-mono font-black text-2xl text-neutral-950">{watchlist.length}</span>
-              <span className="text-[10px] text-neutral-400 font-medium">Shows verified</span>
+              <span className="text-[10px] text-neutral-400 font-medium">Shows saved</span>
             </div>
             <div className="w-full bg-neutral-100 h-1 rounded-full overflow-hidden mt-3.5">
               <div className="bg-[#E34718] h-full" style={{ width: `${Math.min(watchlist.length * 20, 100)}%` }}></div>
             </div>
           </div>
 
-          <div className="bg-white border border-neutral-200/80 p-5 rounded-2xl shadow-2xs text-left">
-            <span className="text-[9px] text-neutral-400 font-black uppercase tracking-widest block leading-none mb-2">Verified Amount Deposited</span>
+          <div className="bg-white   p-5 rounded-2xl shadow-2xs text-left">
+            <span className="text-[9px] text-neutral-400 font-black text-sentence tracking-widest block leading-none mb-2">Total Spent</span>
             <div className="flex items-baseline gap-1 mt-1">
               <span className="text-sm font-semibold text-neutral-500">$</span>
               <span className="font-mono font-black text-2xl text-neutral-950">{totalAmountSpent}</span>
-              <span className="text-[10px] text-neutral-400 font-medium ml-1">USD equivalent</span>
+              <span className="text-[10px] text-neutral-400 font-medium ml-1">USD</span>
             </div>
             <div className="w-full bg-neutral-100 h-1 rounded-full overflow-hidden mt-3.5">
               <div className="bg-neutral-800 h-full w-2/3"></div>
             </div>
           </div>
 
-          <div className="bg-white border border-neutral-200/80 p-5 rounded-2xl shadow-2xs text-left">
-            <span className="text-[9px] text-neutral-400 font-black uppercase tracking-widest block leading-none mb-2">Average Satisfaction Metric</span>
+          <div className="bg-white   p-5 rounded-2xl shadow-2xs text-left">
+            <span className="text-[9px] text-neutral-400 font-black text-sentence tracking-widest block leading-none mb-2">Average Rating</span>
             <div className="flex items-baseline gap-1 mt-1">
               <span className="font-mono font-black text-2xl text-neutral-950">4.95</span>
               <span className="text-[#E34718] font-mono text-sm">★★★★★</span>
@@ -493,18 +493,18 @@ export default function UserDashboardPage({
           {/* TAB SIDEBAR: VISUALLY DISCIPLINED PREMIUM COLUMN */}
           <div className="col-span-1 lg:col-span-3 space-y-3">
             
-            <div className="bg-white border border-neutral-200/80 rounded-2xl p-4 shadow-2xs text-left">
-              <span className="text-[10px] font-black tracking-widest uppercase text-neutral-400 block px-3.5 pb-2 border-b border-neutral-100 mb-3">
+            <div className="bg-white   rounded-2xl p-4 shadow-2xs text-left">
+              <span className="text-[10px] font-black tracking-widest text-sentence text-neutral-400 block px-3.5 pb-2   mb-3">
                 Navigation Directory
               </span>
               
               <nav className="space-y-1">
                 <button 
                   onClick={() => setActiveTab('overview')}
-                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold text-sentence tracking-wider transition-all cursor-pointer ${
                     activeTab === 'overview' 
-                      ? 'bg-[#E34718] text-white border-transparent shadow-xs' 
-                      : 'bg-white text-neutral-600 hover:bg-neutral-50 hover:text-black border border-transparent'
+                      ? 'bg-[#E34718] text-white  shadow-xs' 
+                      : 'bg-white text-neutral-600 hover:bg-neutral-50 hover:text-black  '
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -516,10 +516,10 @@ export default function UserDashboardPage({
 
                 <button 
                   onClick={() => setActiveTab('passes')}
-                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold text-sentence tracking-wider transition-all cursor-pointer ${
                     activeTab === 'passes' 
-                      ? 'bg-[#E34718] text-white border-transparent shadow-xs' 
-                      : 'bg-white text-neutral-600 hover:bg-neutral-50 hover:text-black border border-transparent'
+                      ? 'bg-[#E34718] text-white  shadow-xs' 
+                      : 'bg-white text-neutral-600 hover:bg-neutral-50 hover:text-black  '
                   }`}
                   id="tab-btn-passes"
                 >
@@ -534,27 +534,27 @@ export default function UserDashboardPage({
 
                 <button 
                   onClick={() => setActiveTab('watchlist')}
-                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold text-sentence tracking-wider transition-all cursor-pointer ${
                     activeTab === 'watchlist' 
-                      ? 'bg-[#E34718] text-white border-transparent shadow-xs' 
-                      : 'bg-white text-neutral-600 hover:bg-neutral-50 hover:text-black border border-transparent'
+                      ? 'bg-[#E34718] text-white  shadow-xs' 
+                      : 'bg-white text-neutral-600 hover:bg-neutral-50 hover:text-black  '
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <Heart className="w-4 h-4 shrink-0" />
                     <span>Saved Watchlist</span>
                   </div>
-                  <span className="bg-neutral-100 text-neutral-500 border border-neutral-200 text-[9px] font-mono font-bold px-2 py-0.5 rounded-full">
+                  <span className="bg-neutral-100 text-neutral-500   text-[9px] font-mono font-bold px-2 py-0.5 rounded-full">
                     {watchlist.length}
                   </span>
                 </button>
 
                 <button 
                   onClick={() => setActiveTab('billing')}
-                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold text-sentence tracking-wider transition-all cursor-pointer ${
                     activeTab === 'billing' 
-                      ? 'bg-[#E34718] text-white border-transparent shadow-xs' 
-                      : 'bg-white text-neutral-600 hover:bg-neutral-50 hover:text-black border border-transparent'
+                      ? 'bg-[#E34718] text-white  shadow-xs' 
+                      : 'bg-white text-neutral-600 hover:bg-neutral-50 hover:text-black  '
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -566,10 +566,10 @@ export default function UserDashboardPage({
 
                 <button 
                   onClick={() => setActiveTab('settings')}
-                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold text-sentence tracking-wider transition-all cursor-pointer ${
                     activeTab === 'settings' 
-                      ? 'bg-[#E34718] text-white border-transparent shadow-xs' 
-                      : 'bg-white text-neutral-600 hover:bg-neutral-50 hover:text-black border border-transparent'
+                      ? 'bg-[#E34718] text-white  shadow-xs' 
+                      : 'bg-white text-neutral-600 hover:bg-neutral-50 hover:text-black  '
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -582,10 +582,10 @@ export default function UserDashboardPage({
                 {userRole === 'admin' && (
                   <button 
                     onClick={() => setActiveTab('admin')}
-                    className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                    className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold text-sentence tracking-wider transition-all cursor-pointer ${
                       activeTab === 'admin' 
-                        ? 'bg-neutral-900 text-white border-transparent shadow-xs' 
-                        : 'bg-red-50 text-red-750 hover:bg-red-100 border border-red-200'
+                        ? 'bg-neutral-900 text-white  shadow-xs' 
+                        : 'bg-red-50 text-red-750 hover:bg-red-100  '
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -599,10 +599,10 @@ export default function UserDashboardPage({
                 {userRole === 'organizer' && (
                   <button 
                     onClick={() => setActiveTab('organizer')}
-                    className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                    className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold text-sentence tracking-wider transition-all cursor-pointer ${
                       activeTab === 'organizer' 
-                        ? 'bg-neutral-800 text-white border-transparent shadow-xs' 
-                        : 'bg-orange-50 text-orange-750 hover:bg-orange-100 border border-orange-200'
+                        ? 'bg-neutral-800 text-white  shadow-xs' 
+                        : 'bg-orange-50 text-orange-750 hover:bg-orange-100  '
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -616,10 +616,10 @@ export default function UserDashboardPage({
                 {userRole === 'artist' && (
                   <button 
                     onClick={() => setActiveTab('artist')}
-                    className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                    className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold text-sentence tracking-wider transition-all cursor-pointer ${
                       activeTab === 'artist' 
-                        ? 'bg-neutral-800 text-white border-transparent shadow-xs' 
-                        : 'bg-indigo-50 text-indigo-750 hover:bg-indigo-100 border border-indigo-200'
+                        ? 'bg-neutral-800 text-white  shadow-xs' 
+                        : 'bg-indigo-50 text-indigo-750 hover:bg-indigo-100  '
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -633,13 +633,13 @@ export default function UserDashboardPage({
             </div>
 
             {/* Loyalty and support block */}
-            <div className="bg-white border border-neutral-200/80 rounded-2xl p-5 shadow-2xs text-left">
-              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block mb-2 leading-none">Need assistance?</span>
+            <div className="bg-white   rounded-2xl p-5 shadow-2xs text-left">
+              <span className="text-[10px] font-bold text-neutral-400 text-sentence tracking-widest block mb-2 leading-none">Need assistance?</span>
               <p className="text-[11px] text-neutral-505 leading-relaxed font-semibold">
                 Our support team resolves checkout queries 24/7. Get in touch via <strong className="text-black">support@jazbaticket.com</strong> or call Westminster center.
               </p>
-              <div className="pt-3.5 border-t border-neutral-100 mt-4">
-                <span className="inline-flex items-center gap-1.5 text-[9px] uppercase font-bold tracking-wider text-neutral-600 bg-neutral-100 rounded-full px-2.5 py-1 border border-neutral-200">
+              <div className="pt-3.5   mt-4">
+                <span className="inline-flex items-center gap-1.5 text-[9px] text-sentence font-bold tracking-wider text-neutral-600 bg-neutral-100 rounded-full px-2.5 py-1  ">
                   <span className="w-1.5 h-1.5 rounded-full bg-neutral-400"></span>
                   Support Assistant Online
                 </span>
@@ -665,17 +665,17 @@ export default function UserDashboardPage({
                 >
                   {/* NEXT PASS EVENT SUMMARY HIGHLIGHT BILLBOARD */}
                   {userBookings.length > 0 ? (
-                    <div className="bg-neutral-900 border border-neutral-800 text-white rounded-2xl p-6 sm:p-8 relative overflow-hidden text-left shadow-lg">
+                    <div className="bg-neutral-900   text-white rounded-2xl p-6 sm:p-8 relative overflow-hidden text-left shadow-lg">
                       {/* background map styling */}
                       <div className="absolute inset-0 opacity-[0.05] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:12px_12px] pointer-events-none"></div>
-                             <div className="flex items-center justify-between flex-wrap gap-3 mb-5 border-b border-white/10 pb-4 relative z-10">
+                             <div className="flex items-center justify-between flex-wrap gap-3 mb-5   pb-4 relative z-10">
                         <div className="flex items-center gap-2">
                            <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#E34718]"></span>
-                           <span className="text-[10px] font-black text-[#E34718] uppercase tracking-widest">
+                           <span className="text-[10px] font-black text-[#E34718] text-sentence tracking-widest">
                             Your Next Live Event Coming Up!
                           </span>
                         </div>
-                        <span className="text-[10px] bg-white/10 border border-white/15 text-neutral-300 font-mono font-bold px-2.5 py-1 rounded-full">
+                        <span className="text-[10px] bg-white/10   text-neutral-300 font-mono font-bold px-2.5 py-1 rounded-full">
                           Digital Gate Open
                         </span>
                       </div>
@@ -686,13 +686,13 @@ export default function UserDashboardPage({
                             src={userBookings[0].event.image} 
                             alt={userBookings[0].event.title}
                             referrerPolicy="no-referrer"
-                            className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover shrink-0 border border-white/10 shadow-md"
+                            className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover shrink-0   shadow-md"
                           />
                           <div className="min-w-0">
-                            <span className="text-[10px] text-[#E34718] font-bold uppercase tracking-wider block">
+                            <span className="text-[10px] text-[#E34718] font-bold text-sentence tracking-wider block">
                               {userBookings[0].event.category.toUpperCase()} SHOW
                             </span>
-                            <h3 className="font-display font-medium text-lg sm:text-2xl text-white truncate mt-0.5 uppercase">
+                            <h3 className="font-display font-medium text-lg sm:text-2xl text-white truncate mt-0.5 text-sentence">
                               {userBookings[0].event.title}
                             </h3>
                             
@@ -720,24 +720,24 @@ export default function UserDashboardPage({
                             const element = document.getElementById('tab-btn-passes');
                             if (element) element.scrollIntoView({ behavior: 'smooth' });
                           }}
-                          className="w-full md:w-auto bg-[#E34718] hover:bg-[#C23A12] text-white px-6 py-3 rounded-full text-xs font-black tracking-wider uppercase transition-all shadow-md active:scale-97 cursor-pointer shrink-0 text-center"
+                          className="w-full md:w-auto bg-[#E34718] hover:bg-[#C23A12] text-white px-6 py-3 rounded-full text-xs font-black tracking-wider text-sentence transition-all shadow-md active:scale-97 cursor-pointer shrink-0 text-center"
                         >
                           View Pass QR Code
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-white border border-neutral-200/80 rounded-2xl p-8 text-center text-left shadow-2xs">
-                      <div className="w-10 h-10 bg-[#E34718]/15 text-neutral-800 rounded-full flex items-center justify-center mx-auto mb-3 border border-[#E34718]/30">
+                    <div className="bg-white   rounded-2xl p-8 text-center text-left shadow-2xs">
+                      <div className="w-10 h-10 bg-[#E34718]/15 text-neutral-800 rounded-full flex items-center justify-center mx-auto mb-3  ">
                         <Compass className="w-5 h-5 shrink-0" />
                       </div>
-                      <h3 className="font-display font-medium text-base text-neutral-900">No Active Ticket Passes Found</h3>
+                      <h3 className="font-display font-medium text-base text-neutral-900">No Tickets Yet</h3>
                       <p className="text-xs text-neutral-550 max-w-sm mx-auto mt-1">
-                        You have not reserved any live events during this session. Browse premium shows in hamilton and Westminster.
+                        You haven't booked any tickets yet. Browse upcoming shows in London and Hamilton to get started.
                       </p>
                       <button
                         onClick={onExploreEvents}
-                        className="mt-4 px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all active:scale-95 cursor-pointer"
+                        className="mt-4 px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold text-sentence tracking-wider rounded-full transition-all active:scale-95 cursor-pointer"
                       >
                         Explore Shows Directory
                       </button>
@@ -745,53 +745,53 @@ export default function UserDashboardPage({
                   )}
 
                   {/* ACCOUNT LOG & ALERTS */}
-                  <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-8 text-left shadow-2xs">
-                    <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest border-b border-neutral-100 pb-3 mb-4">
-                      Security Notifications &amp; System Alerts
+                  <div className="bg-white   rounded-2xl p-6 sm:p-8 text-left shadow-2xs">
+                    <h3 className="text-[10px] font-black text-neutral-400 text-sentence tracking-widest   pb-3 mb-4">
+                      Notifications
                     </h3>
 
                     <div className="space-y-3">
-                      <div className="flex items-start gap-4 p-3.5 bg-neutral-50 border border-neutral-200 rounded-xl">
-                        <div className="w-8 h-8 rounded-full bg-orange-50 text-[#C23A12] flex items-center justify-center shrink-0 border border-orange-200/50">
+                      <div className="flex items-start gap-4 p-3.5 bg-neutral-50   rounded-xl">
+                        <div className="w-8 h-8 rounded-full bg-orange-50 text-[#C23A12] flex items-center justify-center shrink-0  ">
                           <ShieldCheck className="w-4 h-4" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <span className="text-xs font-black text-neutral-800 uppercase block">Account Identity Secured</span>
+                            <span className="text-xs font-black text-neutral-800 text-sentence block">Account Verified</span>
                             <span className="text-[9px] text-neutral-400 font-mono">Today at 11:35</span>
                           </div>
                           <p className="text-xs text-neutral-500 font-semibold mt-1">
-                            Your billing profile has been linked successfully. No fraudulent or outside API integrations were discovered.
+                            Your account is all set up and ready to go.
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex items-start gap-4 p-3.5 bg-neutral-50 border border-neutral-200 rounded-xl">
-                        <div className="w-8 h-8 rounded-full bg-[#E34718]/15 text-neutral-805 flex items-center justify-center shrink-0 border border-[#E34718]/30">
+                      <div className="flex items-start gap-4 p-3.5 bg-neutral-50   rounded-xl">
+                        <div className="w-8 h-8 rounded-full bg-[#E34718]/15 text-neutral-805 flex items-center justify-center shrink-0  ">
                           <Sparkles className="w-4 h-4 text-[#C23A12]" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <span className="text-xs font-black text-neutral-800 uppercase block">Fidelity Voucher Unlocked</span>
+                            <span className="text-xs font-black text-neutral-800 text-sentence block">Special Offer</span>
                             <span className="text-[9px] text-neutral-400 font-mono">Yesterday</span>
                           </div>
                           <p className="text-xs text-neutral-500 font-semibold mt-1">
-                            Claim 18% Off on all events today with the absolute promotional coupon code: <strong className="font-mono text-black">JAZBA18</strong>. Apply this code during Checkout to enjoy this massive discount!
+                            Get 18% off any event with code <strong className="font-mono text-black">JAZBA18</strong> at checkout.
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex items-start gap-4 p-3.5 bg-neutral-50 border border-neutral-200 rounded-xl">
-                        <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-110">
+                      <div className="flex items-start gap-4 p-3.5 bg-neutral-50   rounded-xl">
+                        <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0  ">
                           <Bell className="w-4 h-4" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <span className="text-xs font-black text-neutral-800 uppercase block">Fidelity Points Credited</span>
+                            <span className="text-xs font-black text-neutral-800 text-sentence block">Loyalty Points Earned</span>
                             <span className="text-[9px] text-neutral-400 font-mono">May 24, 2026</span>
                           </div>
                           <p className="text-xs text-neutral-500 font-semibold mt-1">
-                            Received <strong>+350 pts</strong> for registering physical ticket reservations for "The Phantom of the Opera".
+                            You earned <strong>+350 pts</strong> for booking "The Phantom of the Opera".
                           </p>
                         </div>
                       </div>
@@ -799,11 +799,11 @@ export default function UserDashboardPage({
                   </div>
 
                   {/* RECOMMENDED SHOW DIRECTORY ROW */}
-                  <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-8 text-left shadow-2xs">
-                    <div className="flex items-center justify-between mb-5 border-b border-neutral-100 pb-3">
+                  <div className="bg-white   rounded-2xl p-6 sm:p-8 text-left shadow-2xs">
+                    <div className="flex items-center justify-between mb-5   pb-3">
                       <div>
-                        <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">
-                          Highly Recommended Showcase Performances
+                        <h3 className="text-[10px] font-black text-neutral-400 text-sentence tracking-widest">
+                          Recommended For You
                         </h3>
                         <p className="text-xs text-neutral-450 mt-0.5">Based on your category selections</p>
                       </div>
@@ -820,7 +820,7 @@ export default function UserDashboardPage({
                       {allEvents.slice(0, 4).map((evt) => (
                         <div 
                           key={evt.id}
-                          className="flex items-center gap-3.5 p-3.5 border border-neutral-200 hover:border-neutral-350 rounded-xl bg-neutral-50/20 transition-all group"
+                          className="flex items-center gap-3.5 p-3.5    rounded-xl bg-neutral-50/20 transition-all group"
                         >
                           <img 
                             src={evt.image} 
@@ -829,7 +829,7 @@ export default function UserDashboardPage({
                             className="w-14 h-14 rounded-lg object-cover shrink-0"
                           />
                           <div className="min-w-0 flex-1">
-                            <span className="text-[9px] text-neutral-400 font-black tracking-widest uppercase block mb-0.5">
+                            <span className="text-[9px] text-neutral-400 font-black tracking-widest text-sentence block mb-0.5">
                               {evt.category}
                             </span>
                             <h4 className="font-bold text-xs sm:text-sm text-neutral-900 group-hover:text-black block truncate">
@@ -842,7 +842,7 @@ export default function UserDashboardPage({
                           
                           <button
                             onClick={() => onViewShowDetail(evt)}
-                            className="w-8 h-8 rounded-full border border-neutral-200/80 bg-white hover:bg-neutral-50 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform cursor-pointer"
+                            className="w-8 h-8 rounded-full   bg-white hover:bg-neutral-50 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform cursor-pointer"
                             title="View Details"
                           >
                             <ArrowRight className="w-3.5 h-3.5 text-neutral-700" />
@@ -865,16 +865,16 @@ export default function UserDashboardPage({
                   transition={{ duration: 0.2 }}
                   className="space-y-6"
                 >
-                  <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-8 text-left shadow-2xs">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 pb-4 mb-6">
+                  <div className="bg-white   rounded-2xl p-6 sm:p-8 text-left shadow-2xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4   pb-4 mb-6">
                       <div>
-                        <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">
+                        <h3 className="text-[10px] font-black text-neutral-400 text-sentence tracking-widest">
                           Scan-Ready Entrance Vouchers
                         </h3>
                         <p className="text-xs text-neutral-500 font-medium mt-1">Please display QR codes on entry arches. Printed copies are also accepted.</p>
                       </div>
 
-                      <span className="bg-neutral-100 text-neutral-600 border border-neutral-200 px-3 py-1 text-xs font-bold rounded-full block w-fit shrink-0">
+                      <span className="bg-neutral-100 text-neutral-600   px-3 py-1 text-xs font-bold rounded-full block w-fit shrink-0">
                         {userBookings.length} Gate passes active
                       </span>
                     </div>
@@ -884,7 +884,7 @@ export default function UserDashboardPage({
                         {userBookings.map((pass, pIdx) => (
                           <div 
                             key={pass.id}
-                            className="bg-neutral-55 border border-neutral-250 rounded-2xl overflow-hidden shadow-xs relative"
+                            className="bg-neutral-55   rounded-2xl overflow-hidden shadow-xs relative"
                           >
                             <div className="absolute top-0 bg-[#E34718] h-1.5 inset-x-0"></div>
 
@@ -892,17 +892,17 @@ export default function UserDashboardPage({
                             <div className="grid grid-cols-1 md:grid-cols-12">
                               
                               {/* Left main info corridor */}
-                              <div className="md:col-span-8 p-6 border-b md:border-b-0 md:border-r border-dashed border-neutral-250 text-left space-y-4">
-                                <div className="flex items-center justify-between flex-wrap gap-2 pb-2.5 border-b border-neutral-100">
+                              <div className="md:col-span-8 p-6      text-left space-y-4">
+                                <div className="flex items-center justify-between flex-wrap gap-2 pb-2.5  ">
                                   <div className="flex items-center gap-2">
                                     <span className="w-8 h-8 bg-neutral-900 rounded-lg flex items-center justify-center text-white text-xs font-black">
                                       {pIdx + 1}
                                     </span>
-                                    <span className="text-[10px] uppercase font-black text-neutral-400 tracking-widest">
+                                    <span className="text-[10px] text-sentence font-black text-neutral-400 tracking-widest">
                                       Order Ref: {pass.orderId}
                                     </span>
                                   </div>
-                                  <span className="bg-[#E34718]/10 border border-[#E34718]/30 text-[#C23A12] text-[10px] font-bold uppercase tracking-wide px-2.5 py-0.5 rounded-full">
+                                  <span className="bg-[#E34718]/10   text-[#C23A12] text-[10px] font-bold text-sentence tracking-wide px-2.5 py-0.5 rounded-full">
                                     {pass.tier.toUpperCase()} LEVEL PASS
                                   </span>
                                 </div>
@@ -912,32 +912,32 @@ export default function UserDashboardPage({
                                     src={pass.event.image} 
                                     alt={pass.event.title}
                                     referrerPolicy="no-referrer"
-                                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover border border-neutral-200 shadow-3xs shrink-0"
+                                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover   shadow-3xs shrink-0"
                                   />
                                   <div className="min-w-0">
-                                    <h4 className="font-display font-medium text-base text-neutral-950 uppercase leading-none truncate">
+                                    <h4 className="font-display font-medium text-base text-neutral-950 text-sentence leading-none truncate">
                                       {pass.event.title}
                                     </h4>
-                                    <span className="text-[10px] text-neutral-400 font-bold uppercase block mt-1.5 tracking-wider">
+                                    <span className="text-[10px] text-neutral-400 font-bold text-sentence block mt-1.5 tracking-wider">
                                       Category: {pass.event.category}
                                     </span>
                                   </div>
                                 </div>
 
                                 {/* Logistics strip parameters */}
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-neutral-100 text-[11px] text-neutral-505 font-bold">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4   text-[11px] text-neutral-505 font-bold">
                                   <div>
-                                    <span className="block text-[8px] uppercase tracking-wider text-neutral-400 leading-none">Time Slot</span>
+                                    <span className="block text-[8px] text-sentence tracking-wider text-neutral-400 leading-none">Time Slot</span>
                                     <span className="text-neutral-900 block font-mono mt-1.5">{pass.event.time}</span>
                                   </div>
 
                                   <div>
-                                    <span className="block text-[8px] uppercase tracking-wider text-neutral-400 leading-none">Aisle Assignment</span>
+                                    <span className="block text-[8px] text-sentence tracking-wider text-neutral-400 leading-none">Aisle Assignment</span>
                                     <span className="text-neutral-900 block mt-1.5">{pass.seat}</span>
                                   </div>
 
                                   <div>
-                                    <span className="block text-[8px] uppercase tracking-wider text-neutral-400 leading-none">Venue Location</span>
+                                    <span className="block text-[8px] text-sentence tracking-wider text-neutral-400 leading-none">Venue Location</span>
                                     <span className="text-neutral-900 block mt-1.5 truncate" title={pass.event.location}>
                                       {pass.event.location}
                                     </span>
@@ -948,7 +948,7 @@ export default function UserDashboardPage({
                                 <div className="flex flex-wrap items-center gap-2 pt-4">
                                   <button
                                     onClick={() => window.print()}
-                                    className="flex items-center gap-1.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-[10px] uppercase tracking-wider px-4 py-2 rounded-full transition-all active:scale-97 cursor-pointer"
+                                    className="flex items-center gap-1.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-[10px] text-sentence tracking-wider px-4 py-2 rounded-full transition-all active:scale-97 cursor-pointer"
                                   >
                                     <Printer className="w-3.5 h-3.5 text-[#E34718]" />
                                     <span>Print Pass PDF</span>
@@ -958,7 +958,7 @@ export default function UserDashboardPage({
                                       navigator.clipboard.writeText(JSON.stringify(pass));
                                       alert("Entrance pass configurations copied to clipboard!");
                                     }}
-                                    className="flex items-center gap-1.5 bg-white border border-neutral-250 hover:bg-neutral-50 text-neutral-880 font-bold text-[10px] uppercase tracking-wider px-4 py-2 rounded-full transition-all active:scale-97 cursor-pointer"
+                                    className="flex items-center gap-1.5 bg-white   hover:bg-neutral-50 text-neutral-880 font-bold text-[10px] text-sentence tracking-wider px-4 py-2 rounded-full transition-all active:scale-97 cursor-pointer"
                                   >
                                     <Share2 className="w-3.5 h-3.5" />
                                     <span>Share Pass</span>
@@ -969,8 +969,8 @@ export default function UserDashboardPage({
                               {/* Right barcode scan-ready section */}
                               <div className="md:col-span-4 bg-neutral-100/50 p-6 flex flex-col items-center justify-center text-center">
                                 {/* Simulated QR core */}
-                                <div className="bg-white p-3 rounded-xl border border-neutral-200 shadow-sm relative">
-                                  <div className="w-24 h-24 bg-neutral-904 grid grid-cols-6 gap-px border-2 border-neutral-900 p-1 bg-white">
+                                <div className="bg-white p-3 rounded-xl   shadow-sm relative">
+                                  <div className="w-24 h-24 bg-neutral-904 grid grid-cols-6 gap-px   p-1 bg-white">
                                     {/* Matrix mockup */}
                                     {Array.from({ length: 36 }).map((_, i) => {
                                       const filled = (i % 3 === 0) || (i % 5 === 1) || (i < 6) || (i > 30) || (i % 6 === 0);
@@ -984,10 +984,10 @@ export default function UserDashboardPage({
                                   </div>
                                 </div>
 
-                                <span className="font-mono text-[9px] font-black uppercase tracking-widest text-neutral-500 mt-3 block">
+                                <span className="font-mono text-[9px] font-black text-sentence tracking-widest text-neutral-500 mt-3 block">
                                   CODE: #{pass.barCode.substring(0, 4)}-{pass.barCode.substring(4, 8)}
                                 </span>
-                                <span className="text-[9px] text-[#C23A12] font-black uppercase tracking-wider mt-1.5 block px-2.5 py-0.5 bg-[#E34718]/10 rounded-full border border-[#E34718]/20">
+                                <span className="text-[9px] text-[#C23A12] font-black text-sentence tracking-wider mt-1.5 block px-2.5 py-0.5 bg-[#E34718]/10 rounded-full  ">
                                   ✓ QR Valid
                                 </span>
                               </div>
@@ -999,8 +999,8 @@ export default function UserDashboardPage({
                     ) : (
                       <div className="py-12 text-center">
                         <Compass className="w-11 h-11 text-neutral-300 mx-auto mb-3" />
-                        <h4 className="font-bold text-neutral-800">No Passes Registered Yet</h4>
-                        <p className="text-xs text-neutral-400 mt-1 max-w-xs mx-auto">Please select premium events to checkout scanning tickets.</p>
+                        <h4 className="font-bold text-neutral-800">No Tickets Yet</h4>
+                        <p className="text-xs text-neutral-400 mt-1 max-w-xs mx-auto">Book an event to see your tickets here.</p>
                       </div>
                     )}
                   </div>
@@ -1017,9 +1017,9 @@ export default function UserDashboardPage({
                   transition={{ duration: 0.2 }}
                   className="space-y-6"
                 >
-                  <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-8 text-left shadow-2xs">
-                    <div className="border-b border-neutral-100 pb-4 mb-6">
-                      <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">
+                  <div className="bg-white   rounded-2xl p-6 sm:p-8 text-left shadow-2xs">
+                    <div className="  pb-4 mb-6">
+                      <h3 className="text-[10px] font-black text-neutral-400 text-sentence tracking-widest">
                         Saved Watchlist &amp; Interested Shows
                       </h3>
                       <p className="text-xs text-neutral-500 mt-1">Book directly or remove from tracking once satisfied.</p>
@@ -1030,17 +1030,17 @@ export default function UserDashboardPage({
                         {watchlist.map((show) => (
                           <div 
                             key={show.id}
-                            className="p-4 bg-white border border-neutral-200 hover:border-neutral-350 rounded-2xl flex items-center gap-4 transition-all group relative"
+                            className="p-4 bg-white    rounded-2xl flex items-center gap-4 transition-all group relative"
                           >
                             <img 
                               src={show.image} 
                               alt={show.title}
                               referrerPolicy="no-referrer"
-                              className="w-16 h-16 rounded-xl object-cover border border-neutral-200 shrink-0"
+                              className="w-16 h-16 rounded-xl object-cover   shrink-0"
                             />
                             
                             <div className="min-w-0 flex-1 text-left">
-                              <span className="text-[9px] text-[#C23A12] font-black uppercase tracking-widest block bg-orange-50 px-2 py-0.5 rounded-full w-fit">
+                              <span className="text-[9px] text-[#C23A12] font-black text-sentence tracking-widest block bg-orange-50 px-2 py-0.5 rounded-full w-fit">
                                 {show.category}
                               </span>
                               
@@ -1056,13 +1056,13 @@ export default function UserDashboardPage({
                             <div className="flex flex-col gap-1.5 shrink-0">
                               <button
                                 onClick={() => onViewShowDetail(show)}
-                                className="px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white text-[10px] font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer"
+                                className="px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white text-[10px] font-bold text-sentence tracking-wider rounded-full transition-all cursor-pointer"
                               >
                                 Book
                               </button>
                               <button
                                 onClick={() => handleRemoveFromWatchlist(show.id)}
-                                className="px-3.5 py-1.5 bg-neutral-50 hover:bg-red-50 text-neutral-400 hover:text-red-500 border border-neutral-200 hover:border-red-200 text-[10px] font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer"
+                                className="px-3.5 py-1.5 bg-neutral-50 hover:bg-red-50 text-neutral-400 hover:text-red-500    text-[10px] font-bold text-sentence tracking-wider rounded-full transition-all cursor-pointer"
                               >
                                 Remove
                               </button>
@@ -1071,13 +1071,13 @@ export default function UserDashboardPage({
                         ))}
                       </div>
                     ) : (
-                      <div className="p-10 text-center bg-neutral-50 rounded-2xl border-2 border-dashed border-neutral-200">
+                      <div className="p-10 text-center bg-neutral-50 rounded-2xl   ">
                         <Heart className="w-9 h-9 text-neutral-300 mx-auto mb-2" />
                         <h4 className="font-bold text-neutral-700">Watchlist Empty</h4>
                         <p className="text-xs text-neutral-450 mt-1">You do not have any saved shows currently. Save shows by clicking the heart button in detailed event profiles.</p>
                         <button
                           onClick={onExploreEvents}
-                          className="mt-4 px-4 py-2 bg-neutral-950 hover:bg-neutral-850 text-white text-xs font-bold uppercase tracking-wider rounded-full transition-all cursor-pointer"
+                          className="mt-4 px-4 py-2 bg-neutral-950 hover:bg-neutral-850 text-white text-xs font-bold text-sentence tracking-wider rounded-full transition-all cursor-pointer"
                         >
                           Discover Live Events
                         </button>
@@ -1097,18 +1097,18 @@ export default function UserDashboardPage({
                   transition={{ duration: 0.2 }}
                   className="space-y-6"
                 >
-                  <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-8 text-left shadow-2xs">
-                    <div className="border-b border-neutral-100 pb-4 mb-6">
-                      <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">
+                  <div className="bg-white   rounded-2xl p-6 sm:p-8 text-left shadow-2xs">
+                    <div className="  pb-4 mb-6">
+                      <h3 className="text-[10px] font-black text-neutral-400 text-sentence tracking-widest">
                         Itemized Transaction Receipts &amp; Billings
                       </h3>
                       <p className="text-xs text-neutral-500 mt-1">Tax compliant digital receipts. Original printings are kept strictly secure.</p>
                     </div>
 
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse">
+                      <table className="w-full text-left ">
                         <thead>
-                          <tr className="border-b border-neutral-200/60 text-[9px] uppercase font-black text-neutral-400 tracking-wider">
+                          <tr className="  text-[9px] text-sentence font-black text-neutral-400 tracking-wider">
                             <th className="py-3 px-4 font-extrabold">Invoice Ref ID</th>
                             <th className="py-3 px-4 font-extrabold">Event description</th>
                             <th className="py-3 px-4 font-extrabold text-center">Qty</th>
@@ -1117,18 +1117,18 @@ export default function UserDashboardPage({
                             <th className="py-3 px-4 font-extrabold text-right">Date Issued</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-neutral-100 text-xs text-neutral-600 font-bold">
+                        <tbody className="  text-xs text-neutral-600 font-bold">
                           {userBookings.map((bk) => (
                             <tr key={bk.id} className="hover:bg-neutral-50/50">
                               <td className="py-4 px-4 font-mono text-neutral-900">{bk.orderId}</td>
                               <td className="py-4 px-4">
                                 <div className="font-semibold text-neutral-900 truncate max-w-[200px]">{bk.event.title}</div>
-                                <div className="text-[10px] text-neutral-400 font-bold uppercase mt-0.5">{bk.tier} tier pass</div>
+                                <div className="text-[10px] text-neutral-400 font-bold text-sentence mt-0.5">{bk.tier} tier pass</div>
                               </td>
                               <td className="py-4 px-4 text-center font-mono">{bk.quantity}x</td>
                               <td className="py-4 px-4 text-right font-mono text-neutral-900">${bk.pricePaid}.00</td>
                               <td className="py-4 px-4 text-center">
-                                <span className="inline-flex items-center gap-1 bg-orange-50 text-[#C23A12] text-[10px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full border border-orange-200/50">
+                                <span className="inline-flex items-center gap-1 bg-orange-50 text-[#C23A12] text-[10px] font-black tracking-wider text-sentence px-2.5 py-0.5 rounded-full  ">
                                   <span className="w-1 h-1 rounded-full bg-[#E34718]"></span>
                                   Success
                                 </span>
@@ -1140,10 +1140,10 @@ export default function UserDashboardPage({
                       </table>
                     </div>
 
-                    <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 mt-6 text-left">
-                      <strong className="text-xs text-neutral-800 uppercase tracking-wider block mb-1">Tax-Compliance Notes</strong>
+                    <div className="bg-neutral-50 p-4 rounded-xl   mt-6 text-left">
+                      <strong className="text-xs text-neutral-800 text-sentence tracking-wider block mb-1">Billing Notes</strong>
                       <p className="text-[11px] text-neutral-500 leading-relaxed font-semibold">
-                        Jazba Premiere Productions invoices include standard VAT tax elements (calculated at 20% standard rate across selected cities in Westminster/United Kingdom/Hamilton). To request enterprise corporate accounts, please submit registration info.
+                        All bookings include 20% VAT for events in the UK. Need a business account for your company? Contact our support team.
                       </p>
                     </div>
                   </div>
@@ -1160,9 +1160,9 @@ export default function UserDashboardPage({
                   transition={{ duration: 0.2 }}
                   className="space-y-6"
                 >
-                  <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-8 text-left shadow-2xs">
-                    <div className="border-b border-neutral-100 pb-4 mb-6">
-                      <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">
+                  <div className="bg-white   rounded-2xl p-6 sm:p-8 text-left shadow-2xs">
+                    <div className="  pb-4 mb-6">
+                      <h3 className="text-[10px] font-black text-neutral-400 text-sentence tracking-widest">
                         Personal Account Settings
                       </h3>
                       <p className="text-xs text-neutral-500 mt-1">Manage public profile variables, active notifications, and city regions.</p>
@@ -1171,14 +1171,14 @@ export default function UserDashboardPage({
                     <form onSubmit={handleProfileSave} className="space-y-5">
                       
                       {saveSuccess && (
-                        <div className="bg-orange-50 text-[#C23A12] p-4 border border-orange-200/50 rounded-xl text-xs font-extrabold flex items-center gap-2">
+                        <div className="bg-orange-50 text-[#C23A12] p-4   rounded-xl text-xs font-extrabold flex items-center gap-2">
                           <CheckCircle className="w-5 h-5 shrink-0" />
                           <span>Profile details saved successfully!</span>
                         </div>
                       )}
 
                       {saveError && (
-                        <div className="bg-red-50 text-red-700 p-4 border border-red-100 rounded-xl text-xs font-extrabold flex items-center gap-2 animate-shake">
+                        <div className="bg-red-50 text-red-700 p-4   rounded-xl text-xs font-extrabold flex items-center gap-2 animate-shake">
                           <Info className="w-5 h-5 shrink-0" />
                           <span>{saveError}</span>
                         </div>
@@ -1186,7 +1186,7 @@ export default function UserDashboardPage({
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-[11px] font-black uppercase text-neutral-400 mb-1">Full Name</label>
+                          <label className="block text-[11px] font-black text-sentence text-neutral-400 mb-1">Full Name</label>
                           <div className="relative">
                             <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-neutral-400">
                               <User className="w-4 h-4" />
@@ -1196,13 +1196,13 @@ export default function UserDashboardPage({
                               value={profileName}
                               onChange={(e) => setProfileName(e.target.value)}
                               placeholder="Name"
-                              className="w-full bg-white border border-neutral-250 rounded-xl pl-9 pr-4 py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-[#E34718] text-neutral-850"
+                              className="w-full bg-white   rounded-xl pl-9 pr-4 py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-[#E34718] text-neutral-850"
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-black uppercase text-neutral-400 mb-1">Email representation</label>
+                          <label className="block text-[11px] font-black text-sentence text-neutral-400 mb-1">Email representation</label>
                           <div className="relative">
                             <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-neutral-400">
                               <Mail className="w-4 h-4" />
@@ -1212,13 +1212,13 @@ export default function UserDashboardPage({
                               value={profileEmail}
                               onChange={(e) => setProfileEmail(e.target.value)}
                               placeholder="Email address"
-                              className="w-full bg-white border border-neutral-250 rounded-xl pl-9 pr-4 py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-[#E34718] text-neutral-850"
+                              className="w-full bg-white   rounded-xl pl-9 pr-4 py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-[#E34718] text-neutral-850"
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-black uppercase text-neutral-400 mb-1">Phone Number</label>
+                          <label className="block text-[11px] font-black text-sentence text-neutral-400 mb-1">Phone Number</label>
                           <div className="relative">
                             <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-neutral-400">
                               <Phone className="w-4 h-4" />
@@ -1228,13 +1228,13 @@ export default function UserDashboardPage({
                               value={profilePhone}
                               onChange={(e) => setProfilePhone(e.target.value)}
                               placeholder="Phone"
-                              className="w-full bg-white border border-neutral-250 rounded-xl pl-9 pr-4 py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-[#E34718] text-neutral-850"
+                              className="w-full bg-white   rounded-xl pl-9 pr-4 py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-[#E34718] text-neutral-850"
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-black uppercase text-neutral-400 mb-1">Active City Region</label>
+                          <label className="block text-[11px] font-black text-sentence text-neutral-400 mb-1">Active City Region</label>
                           <div className="relative">
                             <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-neutral-400">
                               <MapPin className="w-4 h-4" />
@@ -1244,15 +1244,15 @@ export default function UserDashboardPage({
                               value={profileCity}
                               onChange={(e) => setProfileCity(e.target.value)}
                               placeholder="City"
-                              className="w-full bg-white border border-neutral-250 rounded-xl pl-9 pr-4 py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-[#E34718] text-neutral-850"
+                              className="w-full bg-white   rounded-xl pl-9 pr-4 py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-[#E34718] text-neutral-850"
                             />
                           </div>
                         </div>
                       </div>
 
                       {/* Pref notification switches block */}
-                      <div className="pt-4 border-t border-neutral-100">
-                        <strong className="text-xs text-neutral-800 uppercase tracking-wider block mb-3.5">Notification Preferences</strong>
+                      <div className="pt-4  ">
+                        <strong className="text-xs text-neutral-800 text-sentence tracking-wider block mb-3.5">Notification Preferences</strong>
                         
                         <div className="space-y-3.5 text-xs font-semibold text-neutral-700">
                           <label className="flex items-center gap-3 cursor-pointer">
@@ -1260,7 +1260,7 @@ export default function UserDashboardPage({
                               type="checkbox" 
                               checked={emailAlerts}
                               onChange={() => setEmailAlerts(!emailAlerts)}
-                              className="w-4 h-4 rounded border-neutral-300 text-[#E34718] focus:ring-0"
+                              className="w-4 h-4 rounded  text-[#E34718] focus:ring-0"
                             />
                             <div>
                               <span>Email Order confirmations &amp; PDF Receipts</span>
@@ -1273,7 +1273,7 @@ export default function UserDashboardPage({
                               type="checkbox" 
                               checked={smsAlerts}
                               onChange={() => setSmsAlerts(!smsAlerts)}
-                              className="w-4 h-4 rounded border-neutral-300 text-[#E34718] focus:ring-0"
+                              className="w-4 h-4 rounded  text-[#E34718] focus:ring-0"
                             />
                             <div>
                               <span>SMS Boarding notifications</span>
@@ -1286,7 +1286,7 @@ export default function UserDashboardPage({
                               type="checkbox" 
                               checked={artistUpdates}
                               onChange={() => setArtistUpdates(!artistUpdates)}
-                              className="w-4 h-4 rounded border-neutral-300 text-[#E34718] focus:ring-0"
+                              className="w-4 h-4 rounded  text-[#E34718] focus:ring-0"
                             />
                             <div>
                               <span>Artist Tours &amp; Grand opera announcements</span>
@@ -1299,7 +1299,7 @@ export default function UserDashboardPage({
                               type="checkbox" 
                               checked={walletIntegration}
                               onChange={() => setWalletIntegration(!walletIntegration)}
-                              className="w-4 h-4 rounded border-neutral-300 text-[#E34718] focus:ring-0"
+                              className="w-4 h-4 rounded  text-[#E34718] focus:ring-0"
                             />
                             <div>
                               <span>Add to Apple Wallet link generation</span>
@@ -1311,7 +1311,7 @@ export default function UserDashboardPage({
 
                       <button
                         type="submit"
-                        className="bg-neutral-900 hover:bg-neutral-800 text-white font-black text-xs uppercase tracking-wider px-6 py-3 rounded-full transition-all active:scale-97 cursor-pointer"
+                        className="bg-neutral-900 hover:bg-neutral-800 text-white font-black text-xs text-sentence tracking-wider px-6 py-3 rounded-full transition-all active:scale-97 cursor-pointer"
                       >
                         Keep Changes Details
                       </button>
@@ -1319,25 +1319,25 @@ export default function UserDashboardPage({
                   </div>
 
                   {/* SECURITY PASSWORD BLOCK */}
-                  <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-8 text-left shadow-2xs">
-                    <div className="border-b border-neutral-100 pb-4 mb-6">
-                      <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">
-                        Security Encryption Password Reset
+                  <div className="bg-white   rounded-2xl p-6 sm:p-8 text-left shadow-2xs">
+                    <div className="  pb-4 mb-6">
+                      <h3 className="text-[10px] font-black text-neutral-400 text-sentence tracking-widest">
+                        Change Password
                       </h3>
-                      <p className="text-xs text-neutral-500 mt-1">Keep credentials original and protected behind 256-bit hash encryption layers.</p>
+                      <p className="text-xs text-neutral-500 mt-1">Use a strong, unique password to keep your account secure.</p>
                     </div>
 
                     <form onSubmit={handlePasswordResetSubmit} className="space-y-4">
                       
                       {passwordSuccess && (
-                        <div className="bg-orange-50 text-[#C23A12] p-4 border border-orange-200/50 rounded-xl text-xs font-extrabold flex items-center gap-2">
+                        <div className="bg-orange-50 text-[#C23A12] p-4   rounded-xl text-xs font-extrabold flex items-center gap-2">
                           <CheckCircle className="w-5 h-5 shrink-0" />
-                          <span>Password modified successfully! Accounts are synchronized.</span>
+                          <span>Password changed successfully.</span>
                         </div>
                       )}
 
                       {passwordError && (
-                        <div className="bg-red-50 text-red-700 p-4 border border-red-100 rounded-xl text-xs font-extrabold flex items-center gap-2">
+                        <div className="bg-red-50 text-red-700 p-4   rounded-xl text-xs font-extrabold flex items-center gap-2">
                           <Info className="w-5 h-5 shrink-0" />
                           <span>{passwordError}</span>
                         </div>
@@ -1345,44 +1345,44 @@ export default function UserDashboardPage({
 
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
-                          <label className="block text-[11px] font-black uppercase text-neutral-400 mb-1">Current Password</label>
+                          <label className="block text-[11px] font-black text-sentence text-neutral-400 mb-1">Current Password</label>
                           <input 
                             type="password" 
                             placeholder="Password"
                             value={currentPassword}
                             onChange={(e) => setCurrentPassword(e.target.value)}
-                            className="w-full bg-white border border-neutral-250 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-[#E34718] text-neutral-850 placeholder-neutral-300"
+                            className="w-full bg-white   rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-[#E34718] text-neutral-850 placeholder-neutral-300"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-black uppercase text-neutral-400 mb-1">New Password</label>
+                          <label className="block text-[11px] font-black text-sentence text-neutral-400 mb-1">New Password</label>
                           <input 
                             type="password" 
-                            placeholder="Min. 6 values"
+                            placeholder="Min. 6 characters"
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
-                            className="w-full bg-white border border-neutral-250 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-[#E34718] text-neutral-850 placeholder-neutral-300"
+                            className="w-full bg-white   rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-[#E34718] text-neutral-850 placeholder-neutral-300"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-black uppercase text-neutral-400 mb-1">Confirm New Password</label>
+                          <label className="block text-[11px] font-black text-sentence text-neutral-400 mb-1">Confirm New Password</label>
                           <input 
                             type="password" 
-                            placeholder="Match values exact"
+                            placeholder="Re-enter new password"
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="w-full bg-white border border-neutral-250 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-[#E34718] text-neutral-850 placeholder-neutral-300"
+                            className="w-full bg-white   rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-[#E34718] text-neutral-850 placeholder-neutral-300"
                           />
                         </div>
                       </div>
 
                       <button
                         type="submit"
-                        className="bg-neutral-900 hover:bg-neutral-800 text-white font-black text-xs uppercase tracking-wider px-6 py-3 rounded-full transition-all active:scale-97 cursor-pointer"
+                        className="bg-neutral-900 hover:bg-neutral-800 text-white font-black text-xs text-sentence tracking-wider px-6 py-3 rounded-full transition-all active:scale-97 cursor-pointer"
                       >
-                        Reset Credentials
+                        Change Password
                       </button>
                     </form>
                   </div>

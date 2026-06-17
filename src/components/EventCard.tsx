@@ -32,7 +32,7 @@ export default function EventCard({ event, onBook, onViewDetail }: EventCardProp
   return (
     <div 
       onClick={() => onViewDetail?.(event)}
-      className="group bg-white border border-neutral-200 hover:border-neutral-300 rounded-2xl overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between cursor-pointer"
+      className="group bg-white    rounded-2xl overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between cursor-pointer"
       id={`event-card-${event.id}`}
     >
       <div className="relative">
@@ -49,15 +49,15 @@ export default function EventCard({ event, onBook, onViewDetail }: EventCardProp
         </div>
 
         {/* DATE BADGE */}
-        <div className={`absolute top-3.5 left-3.5 w-11 h-12 rounded-xl flex flex-col items-center justify-center border border-white/20 font-black leading-none shadow-sm shrink-0 ${getBadgeColorClass(event.badgeColor)}`}>
+        <div className={`absolute top-3.5 left-3.5 w-11 h-12 rounded-xl flex flex-col items-center justify-center   font-black leading-none shadow-sm shrink-0 ${getBadgeColorClass(event.badgeColor)}`}>
           <span className="text-[15px] font-display font-black">{day || '18'}</span>
-          <span className="text-[9px] uppercase font-bold tracking-wider mt-0.5">{month || 'Feb'}</span>
+          <span className="text-[9px] text-sentence font-bold tracking-wider mt-0.5">{month || 'Feb'}</span>
         </div>
 
         {/* FAVORITE HEART WITH REAL INTERACTIVE STATE */}
         <button 
           onClick={(e) => { e.stopPropagation(); setIsLiked(!isLiked); }}
-          className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-white/95 hover:bg-white flex items-center justify-center border border-neutral-100/50 shadow-md transition-transform duration-200 hover:scale-110 active:scale-95 cursor-pointer"
+          className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-white/95 hover:bg-white flex items-center justify-center   shadow-md transition-transform duration-200 hover:scale-110 active:scale-95 cursor-pointer"
           title="Add to wishlist"
           id={`btn-like-${event.id}`}
         >
@@ -92,9 +92,9 @@ export default function EventCard({ event, onBook, onViewDetail }: EventCardProp
         </div>
 
         {/* INTERACTIVE BOOK BUTTON */}
-        <div className="pt-3.5 border-t border-neutral-100/80 flex items-center justify-between">
+        <div className="pt-3.5   flex items-center justify-between">
           <div>
-            <span className="text-[9px] font-semibold text-neutral-400 block uppercase tracking-wider">Prices from</span>
+            <span className="text-[9px] font-semibold text-neutral-400 block text-sentence tracking-wider">Prices from</span>
             <span className="font-display font-black text-neutral-900 text-lg">${event.price}</span>
           </div>
           <button 

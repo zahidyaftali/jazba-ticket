@@ -58,7 +58,7 @@ export default function EventsForYou({ events, onBook, onViewDetail }: EventsFor
 
   return (
     <section 
-      className="bg-[#C5E85C] border-b border-black/5 py-18 px-4 sm:px-6 md:px-8 relative overflow-hidden"
+      className="bg-[#C5E85C]   py-18 px-4 sm:px-6 md:px-8 relative overflow-hidden"
       id="for-you"
     >
       <div className="absolute inset-0 opacity-[0.06] bg-[radial-gradient(#000000_1px,transparent_1px)] [background-size:12px_12px]"></div>
@@ -123,11 +123,11 @@ export default function EventsForYou({ events, onBook, onViewDetail }: EventsFor
               <div 
                 key={item.id}
                 onClick={() => onViewDetail?.(item)}
-                className="bg-white border border-neutral-200 hover:border-neutral-300 rounded-2xl p-4.5 sm:p-5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between cursor-pointer group"
+                className="bg-white    rounded-2xl p-4.5 sm:p-5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between cursor-pointer group"
               >
                 {/* Image panel */}
                 <div>
-                  <div className="relative h-44 rounded-xl overflow-hidden border border-neutral-100">
+                  <div className="relative h-44 rounded-xl overflow-hidden  ">
                     <img 
                       src={item.image} 
                       alt={item.title} 
@@ -142,7 +142,7 @@ export default function EventsForYou({ events, onBook, onViewDetail }: EventsFor
                   {/* Title and details */}
                   <div className="mt-4">
                     <div className="flex items-center gap-1">
-                      <span className="font-display font-bold text-[10px] text-[#C23A12] bg-orange-50/50 border border-orange-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">{item.category}</span>
+                      <span className="font-display font-bold text-[10px] text-[#C23A12] bg-orange-50/50   px-2.5 py-0.5 rounded-full text-sentence tracking-wider">{item.category}</span>
                     </div>
 
                     <h3 className="font-display font-bold text-base text-neutral-850 mt-2 hover:text-[#E34718] transition-colors">
@@ -156,8 +156,8 @@ export default function EventsForYou({ events, onBook, onViewDetail }: EventsFor
                 </div>
 
                 {/* THE PRIZE COUNTDOWN COMPONENT BLOCK (MATCHING THE IMAGE) */}
-                <div className="mt-5 pt-4.5 border-t border-dashed border-neutral-200">
-                  <div className="bg-neutral-50 border border-neutral-200/60 rounded-xl p-3 flex flex-col gap-2">
+                <div className="mt-5 pt-4.5   ">
+                  <div className="bg-neutral-50   rounded-xl p-3 flex flex-col gap-2">
                     <div className="flex items-center justify-between text-xs text-neutral-400 font-bold">
                       <span>Live offer timer:</span>
                       <Hourglass className="w-3.5 h-3.5 text-[#E34718]" />
@@ -165,17 +165,17 @@ export default function EventsForYou({ events, onBook, onViewDetail }: EventsFor
 
                     {/* DIGITS DISPLAY CARD */}
                     <div className="grid grid-cols-3 gap-2 text-center">
-                      <div className="bg-white border border-neutral-200/60 rounded-lg p-1.5">
+                      <div className="bg-white   rounded-lg p-1.5">
                         <span className="block font-display font-black text-lg text-neutral-800">{formatWithZero(timeData.h)}</span>
-                        <span className="text-[9px] font-semibold uppercase text-neutral-400">Hours</span>
+                        <span className="text-[9px] font-semibold text-sentence text-neutral-400">Hours</span>
                       </div>
-                      <div className="bg-white border border-neutral-200/60 rounded-lg p-1.5">
+                      <div className="bg-white   rounded-lg p-1.5">
                         <span className="block font-display font-black text-lg text-neutral-800">{formatWithZero(timeData.m)}</span>
-                        <span className="text-[9px] font-semibold uppercase text-neutral-400">Mins</span>
+                        <span className="text-[9px] font-semibold text-sentence text-neutral-400">Mins</span>
                       </div>
-                      <div className="bg-white border border-neutral-200/60 rounded-lg p-1.5">
+                      <div className="bg-white   rounded-lg p-1.5">
                         <span className="block font-display font-black text-lg text-red-500">{formatWithZero(timeData.s)}</span>
-                        <span className="text-[9px] font-semibold uppercase text-neutral-400">Secs</span>
+                        <span className="text-[9px] font-semibold text-sentence text-neutral-400">Secs</span>
                       </div>
                     </div>
                   </div>
@@ -183,7 +183,7 @@ export default function EventsForYou({ events, onBook, onViewDetail }: EventsFor
                   {/* Checkout/Book Action */}
                   <button 
                     onClick={(e) => { e.stopPropagation(); onBook(item); }}
-                    className="mt-4.5 w-full bg-neutral-900 hover:bg-neutral-800 text-[#C5E85C] py-3 rounded-full font-bold text-xs uppercase tracking-wide transition-all shadow-sm active:scale-95 cursor-pointer"
+                    className="mt-4.5 w-full bg-neutral-900 hover:bg-neutral-800 text-[#C5E85C] py-3 rounded-full font-bold text-xs text-sentence tracking-wide transition-all shadow-sm active:scale-95 cursor-pointer"
                   >
                     Claim Special Pass (${item.price})
                   </button>
