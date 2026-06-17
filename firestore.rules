@@ -1,0 +1,145 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default-deny catch-all rule
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Role-based helper functions
+    function isBootstrappedAdmin() {
+      return request.auth.token.email == 'zahidyaftali999@gmail.com';
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        isBootstrappedAdmin() || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isOrganizer() {
+      return isSignedIn() && (
+        isBootstrappedAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'organizer')
+      );
+    }
+
+    function isArtist() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'artist'
+      );
+    }
+
+    // Entity validator function for User profiles
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'name', 'role', 'status', 'createdAt'])
+        && data.keys().size() <= 8
+        && data.uid is string && data.uid.size() <= 128 && data.uid == request.auth.uid
+        && data.email is string && data.email.size() <= 128
+        && data.name is string && data.name.size() <= 128
+        && data.role is string && (data.role == 'admin' || data.role == 'organizer' || data.role == 'artist' || data.role == 'user')
+        && data.status is string && (data.status == 'active' || data.status == 'suspended')
+        && data.createdAt is string && data.createdAt.size() <= 64
+        && (!data.keys().hasAny(['phone']) || (data.phone is string && data.phone.size() <= 32))
+        && (!data.keys().hasAny(['profileImage']) || (data.profileImage is string && data.profileImage.size() <= 512));
+    }
+
+    // Match rules for users collection
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUser(incoming()) && (incoming().role == 'user' || isBootstrappedAdmin());
+      allow update: if (isOwner(userId) && isValidId(userId) && isValidUser(incoming()) && (incoming().role == existing().role || isBootstrappedAdmin() || isAdmin())) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Match rules for organizers collection
+    match /organizers/{organizerId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid) && (isOrganizer() || isAdmin()) && isValidId(organizerId);
+      allow update: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin()) && (incoming().userId == existing().userId) && isValidId(organizerId);
+      allow delete: if isAdmin();
+    }
+
+    // Match rules for artists collection
+    match /artists/{artistId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isValidId(artistId) && (isAdmin() || (incoming().userId == request.auth.uid && isArtist()));
+      allow update: if isSignedIn() && isValidId(artistId) && (isAdmin() || (existing().userId == request.auth.uid && incoming().userId == existing().userId));
+      allow delete: if isAdmin();
+    }
+
+    // Match rules for events collection
+    match /events/{eventId} {
+      allow read: if true;
+      allow create: if isSignedIn() && (isOrganizer() || isAdmin()) && isValidId(eventId);
+      allow update: if isSignedIn() && (isOrganizer() || isAdmin()) && isValidId(eventId);
+      allow delete: if isSignedIn() && (isOrganizer() || isAdmin()) && isValidId(eventId);
+    }
+
+    // Match rules for bookings collection
+    match /bookings/{bookingId} {
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidId(bookingId);
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin()) && isValidId(bookingId);
+      allow update: if isAdmin() || (isOrganizer()) && isValidId(bookingId);
+      allow delete: if isAdmin();
+    }
+
+    // Match rules for tickets collection
+    match /tickets/{ticketId} {
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidId(ticketId);
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin()) && isValidId(ticketId);
+      allow update: if isAdmin() || (isOrganizer()) && isValidId(ticketId);
+      allow delete: if isAdmin();
+    }
+
+    // Match rules for payments collection
+    match /payments/{paymentId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin()) && isValidId(paymentId);
+      allow update: if isAdmin() && isValidId(paymentId);
+      allow delete: if isAdmin();
+    }
+
+    // Match rules for notifications collection
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Match rules for analytics collection
+    match /analytics/{analyticsDocId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+  }
+}
