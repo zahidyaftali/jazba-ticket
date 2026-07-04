@@ -9,98 +9,81 @@ interface UpcomingRowsProps {
   onViewDetail?: (event: EventItem) => void;
 }
 
+const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
+
 export default function UpcomingRows({ events, onBook, onViewAll, onViewDetail }: UpcomingRowsProps) {
-  // Grab events that belong to 'upcoming'
   const displayEvents = events.filter((e) => e.type === 'upcoming');
 
   return (
-    <section 
-      className="bg-[#F8F6F0]   py-18 px-4 sm:px-6 md:px-8"
-      id="upcoming"
-    >
+    <section className="bg-[#f7f7f7] py-20 px-4 sm:px-6 md:px-8" id="upcoming">
       <div className="max-w-7xl mx-auto">
-        
-        {/* SECTION HEADER */}
-        <div className="flex items-center justify-between mb-10">
+
+        {/* Header */}
+        <div className="flex items-end justify-between mb-10">
           <div>
-            <h2 className="text-3xl font-display font-bold text-neutral-900 tracking-tight">
-              Upcoming Shows
+            <span className={`${overline} text-[#666]`}>On sale soon</span>
+            <h2 className="font-display font-bold text-3xl md:text-4xl leading-[0.95] tracking-tight mt-2">
+              Upcoming shows
             </h2>
-            <p className="text-[17px] text-neutral-500 mt-2 font-normal">
-              New shows going on sale soon.
-            </p>
           </div>
-          <button 
+          <button
             onClick={onViewAll}
-            className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-neutral-800 hover:text-black hover:underline cursor-pointer group"
+            className="text-sm font-bold underline cursor-pointer shrink-0"
           >
-            View All
-            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1 text-[#E34718]" />
+            View all
           </button>
         </div>
 
-        {/* LIST OF ROWS */}
-        <div className="space-y-4">
-          {displayEvents.map((item, index) => {
-            const isFirst = index === 0;
-
+        {/* Rows */}
+        <div className="bg-white border border-[#e4e4e4]">
+          {displayEvents.map((item) => {
+            const [day, month] = item.date.split(' ');
             return (
-              <div 
+              <div
                 key={item.id}
                 onClick={() => onViewDetail?.(item)}
-                className="bg-white    rounded-2xl p-4.5 sm:p-5.5 md:p-6 shadow-xs hover:shadow-sm hover:-translate-y-0.5 transition-all duration-300 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 cursor-pointer group/row"
+                className="flex flex-col md:flex-row md:items-center gap-5 md:gap-8 px-6 py-6 border-b border-[#f2f2f2] last:border-b-0 cursor-pointer group hover:bg-[#f7f7f7]/60 transition-colors"
                 id={`upcoming-row-${item.id}`}
               >
-                {/* DATE SEGMENT (LEFT) */}
-                <div className="flex items-center gap-4.5     pb-3 md:pb-0 md:pr-8 shrink-0 min-w-[140px]">
-                  <span className="text-3xl sm:text-4xl font-display font-black text-[#E34718] tracking-tight">
-                    {item.date}
+                {/* Date block — clear gap before the divider column */}
+                <div className="flex items-baseline gap-3 shrink-0 md:w-36">
+                  <span className="font-display font-bold text-4xl leading-none">
+                    {day || '18'}
                   </span>
-                  <div className="leading-tight">
-                    <span className="block text-[10px] text-sentence font-black tracking-widest text-neutral-400">February</span>
-                    <span className="text-xs sm:text-sm font-bold text-neutral-500">{item.year || '2025'}</span>
-                  </div>
+                  <span className="leading-tight">
+                    <span className={`${overline} text-[#8a8a8a] block`}>{month || 'Feb'}</span>
+                    <span className="text-sm font-bold">{item.year || '2026'}</span>
+                  </span>
                 </div>
 
-                {/* INFO DETAILS SEGMENT (MIDDLE) */}
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-display font-bold text-base sm:text-lg text-neutral-800 tracking-tight group-hover/row:text-[#E34718] cursor-pointer transition-colors line-clamp-1">
+                {/* Details */}
+                <div className="flex-1 min-w-0 md:border-l md:border-[#f2f2f2] md:pl-8">
+                  <h3 className="font-display font-bold text-lg sm:text-xl leading-[0.95] truncate group-hover:underline">
                     {item.title}
                   </h3>
-                  
-                  {/* METADATA WRAPPERS */}
-                  <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 mt-2.5 text-neutral-500 font-medium text-xs sm:text-[13px]">
-                    <div className="flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                      <span>{item.location}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                      <span>{item.time}</span>
-                    </div>
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 mt-2.5 text-sm text-[#666]">
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 shrink-0" /> {item.location}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 shrink-0" /> {item.time}
+                    </span>
                   </div>
                 </div>
 
-                {/* ACTION BUTTON SEGMENT (RIGHT) */}
-                <div className="shrink-0 flex items-center justify-between md:justify-end gap-5 pt-2.5 md:pt-0   ">
-                  <div className="md:hidden">
-                    <span className="text-[9px] text-neutral-400 font-semibold text-sentence block">Ticket Price</span>
-                    <span className="font-display font-black text-neutral-900 text-base">${item.price}</span>
+                {/* Price + action */}
+                <div className="flex items-center justify-between md:justify-end gap-6 shrink-0">
+                  <div className="text-left md:text-right">
+                    <span className={`${overline} text-[#8a8a8a] block`}>From</span>
+                    <span className="font-display font-bold text-xl leading-none">${item.price}</span>
                   </div>
-
                   <button
                     onClick={(e) => { e.stopPropagation(); onBook(item); }}
-                    className={`px-5.5 py-2.5 rounded-full font-bold text-xs text-sentence tracking-wider transition-all duration-200 active:scale-95 cursor-pointer flex items-center gap-1.5 ${
-                      isFirst
-                        ? 'bg-neutral-900 hover:bg-neutral-800 text-[#E34718] shadow-sm'
-                        : 'bg-white hover:bg-neutral-50 text-neutral-800   shadow-sm'
-                    }`}
+                    className="bg-black text-white px-5 py-3 text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors flex items-center gap-2"
                   >
-                    Buy Tickets
-                    <ArrowRight className="w-3 h-3 text-[#E34718]" />
+                    Buy tickets <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
-
               </div>
             );
           })}

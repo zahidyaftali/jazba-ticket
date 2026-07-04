@@ -341,25 +341,25 @@ export default function AdminHub() {
     <div className="space-y-6 text-left" id="admin-hub-root">
       
       {/* Tab Header Status */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4   pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-black pb-5">
         <div>
-          <h2 className="font-display font-medium text-2xl text-neutral-900 flex items-center gap-2">
-            Admin Dashboard
-            <span className="text-[10px] bg-red-100 text-red-700 font-bold px-2.5 py-0.5 rounded-full text-sentence  ">
-              Administrator
-            </span>
+          <span className="text-[10px] font-bold tracking-[0.18em] uppercase bg-[#ffed00] text-black px-3 py-1.5 inline-block">
+            Administrator
+          </span>
+          <h2 className="font-display font-bold text-3xl leading-[0.95] text-black mt-3">
+            Admin console
           </h2>
-          <p className="text-xs text-neutral-500 mt-1">
-            Manage events, artists, bookings, and user accounts.
+          <p className="text-sm text-[#666] mt-2">
+            Everything on the platform — events, artists, orders, users and revenue — managed from one place.
           </p>
         </div>
 
         <button
           onClick={loadData}
-          className="flex items-center gap-1.5 py-2 px-4 bg-white   hover:bg-neutral-50 text-neutral-850 text-xs font-bold text-sentence tracking-wider rounded-full shadow-3xs cursor-pointer active:scale-97"
+          className="flex items-center gap-2 py-2.5 px-5 bg-white border border-black hover:bg-[#f7f7f7] text-black text-sm font-bold cursor-pointer transition-colors shrink-0"
         >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>Refresh</span>
+          <RefreshCw className="w-4 h-4" />
+          <span>Refresh data</span>
         </button>
       </div>
 
@@ -378,57 +378,27 @@ export default function AdminHub() {
       )}
 
       {/* Sub tabs navigation */}
-      <div className="flex items-center gap-1.5   pb-1 flex-wrap">
-        <button 
-          onClick={() => setActiveSubTab('analytics')}
-          className={`px-4.5 py-2.5 text-xs font-bold text-sentence tracking-wider  transition-all cursor-pointer ${
-            activeSubTab === 'analytics' 
-              ? ' text-[#E34718]' 
-              : ' text-neutral-500 hover:text-black'
-          }`}
-        >
-          Platform Analytics
-        </button>
-        <button 
-          onClick={() => setActiveSubTab('users')}
-          className={`px-4.5 py-2.5 text-xs font-bold text-sentence tracking-wider  transition-all cursor-pointer ${
-            activeSubTab === 'users' 
-              ? ' text-[#E34718]' 
-              : ' text-neutral-500 hover:text-black'
-          }`}
-        >
-          Manage Users ({users.length})
-        </button>
-        <button 
-          onClick={() => setActiveSubTab('bookings')}
-          className={`px-4.5 py-2.5 text-xs font-bold text-sentence tracking-wider  transition-all cursor-pointer ${
-            activeSubTab === 'bookings' 
-              ? ' text-[#E34718]' 
-              : ' text-neutral-500 hover:text-black'
-          }`}
-        >
-          Bookings &amp; Payments ({bookings.length})
-        </button>
-        <button
-          onClick={() => setActiveSubTab('events')}
-          className={`px-4.5 py-2.5 text-xs font-bold text-sentence tracking-wider  transition-all cursor-pointer ${
-            activeSubTab === 'events'
-              ? ' text-[#E34718]'
-              : ' text-neutral-500 hover:text-black'
-          }`}
-        >
-          Events Control ({events.length})
-        </button>
-        <button
-          onClick={() => setActiveSubTab('artists')}
-          className={`px-4.5 py-2.5 text-xs font-bold text-sentence tracking-wider  transition-all cursor-pointer ${
-            activeSubTab === 'artists'
-              ? ' text-[#E34718]'
-              : ' text-neutral-500 hover:text-black'
-          }`}
-        >
-          Artists ({artists.length})
-        </button>
+      <div className="flex items-center border-b border-[#f2f2f2] flex-wrap overflow-x-auto">
+        {([
+          { id: 'analytics', label: 'Analytics' },
+          { id: 'users', label: `Users (${users.length})` },
+          { id: 'bookings', label: `Orders (${bookings.length})` },
+          { id: 'events', label: `Events (${events.length})` },
+          { id: 'artists', label: `Artists (${artists.length})` },
+        ] as const).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveSubTab(tab.id)}
+            className={`px-5 py-3.5 text-sm font-bold transition-colors cursor-pointer relative whitespace-nowrap ${
+              activeSubTab === tab.id ? 'text-black' : 'text-[#8a8a8a] hover:text-black'
+            }`}
+          >
+            {tab.label}
+            {activeSubTab === tab.id && (
+              <span className="absolute bottom-0 left-0 right-0 h-[3px] bg-black" />
+            )}
+          </button>
+        ))}
       </div>
 
       {loading ? (
@@ -445,53 +415,53 @@ export default function AdminHub() {
               
               {/* Analytics grid cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white   p-5 rounded-2xl shadow-3xs">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[10px] font-black text-sentence text-neutral-450 tracking-wider">Total Registered Accounts</span>
-                    <Users className="w-5 h-5 text-[#E34718]" />
+                <div className="bg-white border border-[#e4e4e4] p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-[#666]">Registered users</span>
+                    <Users className="w-5 h-5 text-black" />
                   </div>
-                  <span className="font-mono font-black text-3xl text-neutral-900">{analytics.totalUsers || users.length}</span>
-                  <div className="text-[10px] text-neutral-400 mt-1 font-bold">Across all system roles</div>
+                  <span className="font-display font-bold text-3xl text-black leading-none">{analytics.totalUsers || users.length}</span>
+                  <div className="text-xs text-[#8a8a8a] mt-2">Across all roles</div>
                 </div>
 
-                <div className="bg-white   p-5 rounded-2xl shadow-3xs">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[10px] font-black text-sentence text-neutral-450 tracking-wider">Total Events</span>
-                    <Calendar className="w-5 h-5 text-[#E34718]" />
+                <div className="bg-white border border-[#e4e4e4] p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-[#666]">Events listed</span>
+                    <Calendar className="w-5 h-5 text-black" />
                   </div>
-                  <span className="font-mono font-black text-3xl text-neutral-900">{analytics.totalEvents || events.length}</span>
-                  <div className="text-[10px] text-neutral-400 mt-1 font-bold">Published &amp; drafts</div>
+                  <span className="font-display font-bold text-3xl text-black leading-none">{analytics.totalEvents || events.length}</span>
+                  <div className="text-xs text-[#8a8a8a] mt-2">Published &amp; drafts</div>
                 </div>
 
-                <div className="bg-white   p-5 rounded-2xl shadow-3xs">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[10px] font-black text-sentence text-neutral-450 tracking-wider">Gate Entrance Passes Sold</span>
-                    <Ticket className="w-5 h-5 text-[#E34718]" />
+                <div className="bg-white border border-[#e4e4e4] p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-[#666]">Tickets sold</span>
+                    <Ticket className="w-5 h-5 text-black" />
                   </div>
-                  <span className="font-mono font-black text-3xl text-neutral-900">{analytics.totalTicketsSold}</span>
-                  <div className="text-[10px] text-neutral-400 mt-1 font-bold">Verified tickets</div>
+                  <span className="font-display font-bold text-3xl text-black leading-none">{analytics.totalTicketsSold}</span>
+                  <div className="text-xs text-[#8a8a8a] mt-2">Issued &amp; verified</div>
                 </div>
 
-                <div className="bg-white   p-5 rounded-2xl shadow-3xs bg-neutral-900 text-white ">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[10px] font-black text-sentence text-neutral-400 tracking-wider">Aggregate Sales Revenue</span>
-                    <DollarSign className="w-5 h-5 text-[#E34718]" />
+                <div className="bg-black text-white p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-white/60">Total revenue</span>
+                    <DollarSign className="w-5 h-5 text-[#ffed00]" />
                   </div>
-                  <span className="font-mono font-black text-3xl text-white">${analytics.totalRevenue}</span>
-                  <div className="text-[10px] text-[#E34718] mt-1 font-black">USD Equivalent</div>
+                  <span className="font-display font-bold text-3xl text-white leading-none">${analytics.totalRevenue}</span>
+                  <div className="text-xs text-[#ffed00] mt-2 font-bold">USD equivalent</div>
                 </div>
               </div>
 
               {/* Extra analytic numbers charts simulation */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-white   p-6 rounded-2xl shadow-3xs text-left">
-                  <h3 className="text-xs font-black text-sentence text-neutral-450 tracking-wider   pb-2 mb-4">Role Distribution</h3>
+                  <h3 className="text-[10px] font-bold tracking-[0.15em] uppercase text-[#666] border-b border-[#f2f2f2] pb-3 mb-4">Users by role</h3>
                   <div className="space-y-3.5">
                     {[
-                      { role: 'Platform Admin', count: users.filter(u => u.role === 'admin').length, color: 'bg-red-500' },
-                      { role: 'Business Organizer', count: users.filter(u => u.role === 'organizer').length, color: 'bg-amber-500' },
-                      { role: 'Featured Artist', count: users.filter(u => u.role === 'artist').length, color: 'bg-indigo-500' },
-                      { role: 'Ticket Customers', count: users.filter(u => u.role === 'user').length, color: 'bg-[#E34718]' }
+                      { role: 'Administrators', count: users.filter(u => u.role === 'admin').length, color: 'bg-black' },
+                      { role: 'Organisers', count: users.filter(u => u.role === 'organizer').length, color: 'bg-[#333333]' },
+                      { role: 'Artists', count: users.filter(u => u.role === 'artist').length, color: 'bg-[#666666]' },
+                      { role: 'Customers', count: users.filter(u => u.role === 'user').length, color: 'bg-[#ffed00]' }
                     ].map((item, idx) => (
                       <div key={idx} className="space-y-1">
                         <div className="flex justify-between text-xs font-bold text-neutral-700">
@@ -507,7 +477,7 @@ export default function AdminHub() {
                 </div>
 
                 <div className="bg-white   p-6 rounded-2xl shadow-3xs text-left">
-                  <h3 className="text-xs font-black text-sentence text-neutral-450 tracking-wider   pb-2 mb-4">Sales Overview</h3>
+                  <h3 className="text-[10px] font-bold tracking-[0.15em] uppercase text-[#666] border-b border-[#f2f2f2] pb-3 mb-4">Sales at a glance</h3>
                   <div className="space-y-4 text-xs font-bold">
                     <div className="flex justify-between py-2  ">
                       <span className="text-neutral-500">Average Order Value:</span>

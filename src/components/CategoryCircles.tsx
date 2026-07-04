@@ -21,37 +21,37 @@ export default function CategoryCircles({
       case 'music':
         return {
           icon: <Music className={`w-7 h-7 ${iconColor}`} strokeWidth={1.3} />,
-          bgColor: 'bg-[#F2ECE1] hover:bg-[#EAE2D1]'
+          bgColor: 'bg-[#f7f7f7] hover:bg-[#ededed] border border-[#e4e4e4]'
         };
       case 'theater':
         return {
           icon: <Drama className={`w-7 h-7 ${iconColor}`} strokeWidth={1.3} />,
-          bgColor: 'bg-[#F2ECE1] hover:bg-[#EAE2D1]'
+          bgColor: 'bg-[#f7f7f7] hover:bg-[#ededed] border border-[#e4e4e4]'
         };
       case 'sports':
         return {
           icon: <Trophy className={`w-7 h-7 ${iconColor}`} strokeWidth={1.3} />,
-          bgColor: 'bg-[#F2ECE1] hover:bg-[#EAE2D1]'
+          bgColor: 'bg-[#f7f7f7] hover:bg-[#ededed] border border-[#e4e4e4]'
         };
       case 'festivals':
         return {
           icon: <Sparkles className={`w-7 h-7 ${iconColor}`} strokeWidth={1.3} />,
-          bgColor: 'bg-[#F2ECE1] hover:bg-[#EAE2D1]'
+          bgColor: 'bg-[#f7f7f7] hover:bg-[#ededed] border border-[#e4e4e4]'
         };
       case 'conferences':
         return {
           icon: <Presentation className={`w-7 h-7 ${iconColor}`} strokeWidth={1.3} />,
-          bgColor: 'bg-[#F2ECE1] hover:bg-[#EAE2D1]'
+          bgColor: 'bg-[#f7f7f7] hover:bg-[#ededed] border border-[#e4e4e4]'
         };
       case 'exhibitions':
         return {
           icon: <GalleryHorizontal className={`w-7 h-7 ${iconColor}`} strokeWidth={1.3} />,
-          bgColor: 'bg-[#F2ECE1] hover:bg-[#EAE2D1]'
+          bgColor: 'bg-[#f7f7f7] hover:bg-[#ededed] border border-[#e4e4e4]'
         };
       default:
         return {
           icon: <Compass className={`w-7 h-7 ${iconColor}`} strokeWidth={1.3} />,
-          bgColor: 'bg-[#F2ECE1] hover:bg-[#EAE2D1]'
+          bgColor: 'bg-[#f7f7f7] hover:bg-[#ededed] border border-[#e4e4e4]'
         };
     }
   };
@@ -62,12 +62,10 @@ export default function CategoryCircles({
       id="discover"
     >
       <div className="max-w-xl mx-auto mb-12">
-        <h2 className="text-3xl md:text-4xl font-display font-bold text-neutral-900 tracking-tight">
-          Discover Live Shows
+        <span className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#666]">Browse by category</span>
+        <h2 className="text-3xl md:text-4xl font-display font-bold text-black tracking-tight leading-[0.95] mt-2">
+          What's your kind of night?
         </h2>
-        <p className="text-[17px] text-neutral-500 mt-2 font-normal">
-          Browse events by category to find what you're looking for.
-        </p>
       </div>
 
       {/* HORIZONTAL WRAPPER AND FLEX */}
@@ -81,7 +79,7 @@ export default function CategoryCircles({
                 className="flex flex-col items-center focus:outline-none group cursor-pointer"
               >
                 <div 
-                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center transition-all duration-300 bg-[#F2ECE1] hover:bg-[#EAE2D1]   shadow-xs hover:-translate-y-0.5"
+                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center transition-all duration-300 bg-[#f7f7f7] hover:bg-[#ededed] border border-[#e4e4e4]   shadow-xs hover:-translate-y-0.5"
                 >
                   <Compass className="w-7 h-7 transition-transform duration-300 text-neutral-800 group-hover:rotate-12" strokeWidth={1.3} />
                 </div>

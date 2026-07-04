@@ -1,18 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  ArrowLeft, 
-  Mail, 
-  Check, 
+import {
+  Check,
   X,
-  Plus,
   Share2,
   Globe,
-  Sparkles,
   MapPin,
   Star,
-  ExternalLink,
-  MessageCircle
+  ArrowRight,
+  ShieldCheck,
 } from 'lucide-react';
 import { ArtistItem } from './ArtistsPage';
 import { EventItem } from '../types';
@@ -30,28 +26,11 @@ interface ArtistDetailPageProps {
 }
 
 export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShowDetail, onBookEvent, onRequireLogin }: ArtistDetailPageProps) {
-  const [isLiked, setIsLiked] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followBusy, setFollowBusy] = useState(false);
 
-  // Load real follow state & follower count for this artist on mount/artist change
-  useEffect(() => {
-    let cancelled = false;
-    getFollowerCount('artist', artist.id).then((count) => {
-      if (!cancelled) setFollowerCount(count);
-    });
-    const user = auth.currentUser;
-    if (user) {
-      isFollowingTarget(user.uid, 'artist', artist.id).then((following) => {
-        if (!cancelled) setIsLiked(following);
-      });
-    } else {
-      setIsLiked(false);
-    }
-    return () => { cancelled = true; };
-  }, [artist]);
-
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'past' | 'collections'>('upcoming');
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'past' | 'about'>('upcoming');
   const [showContactModal, setShowContactModal] = useState(false);
   const [contactEmail, setContactEmail] = useState('');
   const [contactName, setContactName] = useState('');
@@ -60,14 +39,28 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
   const [sendSuccess, setSendSuccess] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Sync scroll to top on mount
+  // Load real follow state & follower count for this artist
+  useEffect(() => {
+    let cancelled = false;
+    getFollowerCount('artist', artist.id).then((count) => {
+      if (!cancelled) setFollowerCount(count);
+    });
+    const user = auth.currentUser;
+    if (user) {
+      isFollowingTarget(user.uid, 'artist', artist.id).then((following) => {
+        if (!cancelled) setIsFollowing(following);
+      });
+    } else {
+      setIsFollowing(false);
+    }
+    return () => { cancelled = true; };
+  }, [artist]);
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [artist]);
 
-  // Handle follow toggle - requires an authenticated user, persists to Firestore
-  const handleToggleFollow = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleToggleFollow = async () => {
     const user = auth.currentUser;
     if (!user) {
       onRequireLogin();
@@ -76,13 +69,13 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
     if (followBusy) return;
     setFollowBusy(true);
     try {
-      if (isLiked) {
+      if (isFollowing) {
         await unfollowTarget(user.uid, 'artist', artist.id);
-        setIsLiked(false);
+        setIsFollowing(false);
         setFollowerCount((c) => Math.max(0, c - 1));
       } else {
         await followTarget(user.uid, 'artist', artist.id);
-        setIsLiked(true);
+        setIsFollowing(true);
         setFollowerCount((c) => c + 1);
       }
     } catch (err) {
@@ -92,41 +85,29 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
     }
   };
 
-  // Safe search for upcoming events in the catalog matching correct category
+  // Upcoming events in this artist's category
   const upcomingEvents = useMemo(() => {
-    const matched = allEvents.filter((evt) => {
-      return evt.category === artist.category;
-    });
+    const matched = allEvents.filter((evt) => evt.category === artist.category);
     return matched.length > 0 ? matched.slice(0, 3) : allEvents.slice(0, 3);
   }, [artist, allEvents]);
 
-  // Generate nice dates/venues for past shows mapping
-  const pastShowsMapped = useMemo(() => {
+  // Past shows mapped with sample dates/venues
+  const pastShows = useMemo(() => {
     const sampleDates = ['October 2025', 'December 2025', 'March 2026', 'May 2026'];
-    const sampleLocations = ['Wembley Arena', 'Broadway Theatre', 'Royal Festival Hall', 'Symphony Hall'];
-    return artist.recentShows.map((showName, idx) => {
-      return {
-        title: showName,
-        date: sampleDates[idx % sampleDates.length],
-        venue: sampleLocations[idx % sampleLocations.length]
-      };
-    });
+    const sampleVenues = ['Wembley Arena', 'Broadway Theatre', 'Royal Festival Hall', 'Symphony Hall'];
+    return artist.recentShows.map((title, idx) => ({
+      title,
+      date: sampleDates[idx % sampleDates.length],
+      venue: sampleVenues[idx % sampleVenues.length],
+    }));
   }, [artist]);
 
-  // Display statistics; followers come from real Firestore counts, the rest are derived from profile data
-  const stats = useMemo(() => {
-    const hostingDuration = `${artist.experienceYears || 3} years`;
-    const totalEventsCount = artist.recentShows.length + 3;
-    const totalAttendeesCount = `${((artist.name.length * 280 + artist.experienceYears * 540) / 1000).toFixed(1)}k`;
+  const stats = useMemo(() => ({
+    hosting: `${artist.experienceYears || 3} yrs`,
+    totalEvents: artist.recentShows.length + 3,
+    attendees: `${((artist.name.length * 280 + artist.experienceYears * 540) / 1000).toFixed(1)}k`,
+  }), [artist]);
 
-    return {
-      hosting: hostingDuration,
-      totalEvents: totalEventsCount,
-      totalAttendees: totalAttendeesCount
-    };
-  }, [artist]);
-
-  // Handle share profile logic
   const handleShare = () => {
     try {
       navigator.clipboard.writeText(window.location.href);
@@ -137,12 +118,10 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
     }
   };
 
-  // Handle contact submission simulation
   const handleContactSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!contactEmail || !contactMessage) return;
     setIsSending(true);
-
     setTimeout(() => {
       setIsSending(false);
       setSendSuccess(true);
@@ -154,463 +133,375 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
     }, 1200);
   };
 
+  const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
+
   return (
-    <div className="jz-page bg-[#FAFBFD] min-h-screen text-neutral-900 font-sans pb-24" id={`artist-detail-${artist.id}`}>
-      
-      {/* 1. HEADER NAVIGATION */}
-      <div className="bg-white   sticky top-0 z-30 shadow-xs" id="artist-navigator-header">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <button 
-            onClick={onBack}
-            className="flex items-center gap-2 text-neutral-600 hover:text-[#E34718] text-xs font-semibold tracking-wider transition-colors cursor-pointer group"
-          >
-            <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
-            <span>Return to Artists Directory</span>
-          </button>
-          
-          <span className="text-xs text-neutral-400 font-semibold tracking-wide">
-            Artist profile
-          </span>
-        </div>
-      </div>
+    <div className="jz-page bg-white min-h-screen text-black" id={`artist-detail-${artist.id}`}>
 
-      {/* 2. GORGEOUS STYLED BANNER BACKDROP */}
-      <div className="w-full h-44 sm:h-52 md:h-60 bg-gradient-to-r from-neutral-100 to-neutral-200/50 relative overflow-hidden  " id="artist-profile-banner">
-        {/* Subtle geometric grid backdrop matching home page */}
-        <div className="absolute inset-0 bg-[radial-gradient(rgba(227,71,24,0.03)_1px,transparent_1px)] [background-size:24px_24px] opacity-80" />
-        <div className="absolute -right-20 -top-20 w-80 h-80 bg-[#E34718]/5 rounded-full blur-[90px] pointer-events-none" />
-        <div className="absolute top-1/2 left-1/4 -translate-y-1/2 w-[350px] h-[350px] bg-orange-100/30 rounded-full blur-[80px] pointer-events-none" />
-      </div>
+      {/* ── HERO — black storytelling band ────────────────────── */}
+      <section className="bg-black text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-14 sm:py-20">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-10">
 
-      {/* 3. ATTACHED IMAGE PROFILE HEADER AND DETAILS SECTION */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        
-        {/* Main Header flex container matching layout precisely */}
-        <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6 pt-6 pb-8  " id="artist-profile-header-meta">
-          
-          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left w-full md:w-auto">
-            {/* Elegant avatar presentation with pristine thick white padding, straddling the banner bottom divider */}
-            <div className="w-32 h-32 md:w-36 md:h-36 rounded-full   bg-white shadow-md relative z-20 select-none overflow-hidden shrink-0 -mt-16 md:-mt-22">
-              <img 
-                src={artist.avatar} 
-                alt={artist.name} 
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-              />
-            </div>
-
-            {/* Title & Metadata with precise sizes and colors, situated fully below the divider */}
-            <div className="space-y-4 py-1 flex-1 text-center md:text-left">
-              <div>
-                <h1 className="text-2xl md:text-3.5xl font-display font-medium tracking-tight text-neutral-900 leading-tight">
-                  {artist.name} <span className="text-neutral-300 font-light mx-2">|</span> <span className="text-neutral-500 font-normal text-lg md:text-xl">{artist.subCategory}</span>
-                </h1>
-              </div>
-
-              {/* STATS AREA FROM THE IMAGE LAYOUT - Followers, Hosting, Total Events & Total Attendees */}
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-6 gap-y-2 text-xs font-sans">
-                
-                <div className="flex flex-col items-center md:items-start min-w-[70px]">
-                  <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Followers</span>
-                  <span className="font-bold text-neutral-800 text-sm mt-0.5">{followerCount}</span>
-                </div>
-
-                <div className="w-px h-6 bg-neutral-200 hidden md:block" />
-
-                <div className="flex flex-col items-center md:items-start min-w-[70px]">
-                  <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Hosting</span>
-                  <span className="font-bold text-neutral-800 text-sm mt-0.5">{stats.hosting}</span>
-                </div>
-
-                <div className="w-px h-6 bg-neutral-200 hidden md:block" />
-
-                <div className="flex flex-col items-center md:items-start min-w-[70px]">
-                  <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Total events</span>
-                  <span className="font-bold text-neutral-800 text-sm mt-0.5">{stats.totalEvents}</span>
-                </div>
-
-                <div className="w-px h-6 bg-neutral-200 hidden md:block" />
-
-                <div className="flex flex-col items-center md:items-start min-w-[70px]">
-                  <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Total attendees</span>
-                  <span className="font-bold text-neutral-800 text-sm mt-0.5">{stats.totalAttendees}</span>
-                </div>
-
-              </div>
-
-              {/* GLOBE WEBSITE ICON */}
-              <div className="flex items-center justify-center md:justify-start gap-2 pt-0.5">
-                <a 
-                  href={artist.socials?.web || `https://jazba.live/artists/${artist.id}`} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-neutral-500 hover:text-[#E34718] text-xs font-semibold tracking-wide transition-colors"
-                >
-                  <Globe className="w-4 h-4 text-neutral-400" />
-                  <span>{artist.socials?.web ? artist.socials.web.replace('https://', '') : 'jazba.live/performer'}</span>
-                  <ExternalLink className="w-3 h-3 text-neutral-300" />
-                </a>
-              </div>
-            </div>
-          </div>
-
-          {/* ACTION BUTTON PACK */}
-          <div className="flex flex-row items-center gap-2.5 shrink-0 self-center md:self-start pt-2">
-            
-            {/* Follow action - solid orange accent matching your home page theme */}
-            <button
-              onClick={handleToggleFollow}
-              disabled={followBusy}
-              className={`py-2 px-6 rounded-full text-xs font-bold tracking-wide transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5  min-h-[40px] shadow-xs disabled:opacity-60 ${
-                isLiked
-                  ? 'bg-neutral-100 text-neutral-800  hover:bg-neutral-200'
-                  : 'bg-[#E34718] text-white  hover:bg-[#C23A12]'
-              }`}
-              id="artist-detail-follow"
-            >
-              {isLiked ? (
-                <>
-                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>Following</span>
-                </>
-              ) : (
-                <span>Follow</span>
-              )}
-            </button>
-
-            {/* Contact Action */}
-            <button
-              onClick={() => setShowContactModal(true)}
-              className="bg-white hover:bg-neutral-50 text-neutral-900    py-2 px-6 rounded-full text-xs font-bold tracking-wide transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 min-h-[40px] shadow-xs"
-              id="artist-detail-contact"
-            >
-              <span>Contact</span>
-            </button>
-
-            {/* Share profile with copy clipboard */}
-            <button
-              onClick={handleShare}
-              className="p-2.5 bg-white hover:bg-neutral-50 text-neutral-600    rounded-full transition-all active:scale-95 cursor-pointer relative shadow-xs"
-              title="Share profile link"
-              id="artist-detail-share"
-            >
-              {copied && (
-                <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-neutral-900 text-white text-[10px] py-1 px-3 rounded shadow-md whitespace-nowrap z-40 font-bold block">
-                  Copied link!
-                </div>
-              )}
-              <Share2 className="w-4 h-4" />
-            </button>
-
-          </div>
-
-        </div>
-
-        {/* 4. TABS COMPONENT ROW - Upcoming, Past, Collections */}
-        <div className="flex border-b border-neutral-200/80 mt-10" id="artist-tabs-row">
-          {(['upcoming', 'past', 'collections'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-6 py-4 font-display text-xs sm:text-sm font-bold tracking-tight  transition-all relative cursor-pointer text-sentence ${
-                activeTab === tab
-                  ? ' text-neutral-900'
-                  : ' text-neutral-400 hover:text-neutral-600'
-              }`}
-            >
-              {tab === 'collections' ? 'Collections & Bio' : tab}
-              {activeTab === tab && (
-                <motion.div 
-                  layoutId="activeTabUnderline" 
-                  className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-[#E34718]"
+            {/* Identity block */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-7">
+              <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-full overflow-hidden shrink-0 border border-white/20">
+                <img
+                  src={artist.avatar}
+                  alt={artist.name}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
                 />
+              </div>
+
+              <div>
+                <span className={`${overline} text-[#ffed00]`}>{artist.subCategory}</span>
+                <h1 className="font-display font-bold text-4xl sm:text-5xl md:text-[56px] leading-[0.95] tracking-tight mt-2">
+                  {artist.name}
+                </h1>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mt-4 text-sm text-white/70">
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4" /> {artist.location}
+                  </span>
+                  <a
+                    href={artist.socials?.web || `https://jazba.live/artists/${artist.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 hover:text-white transition-colors"
+                  >
+                    <Globe className="w-4 h-4" />
+                    {artist.socials?.web ? artist.socials.web.replace('https://', '') : 'jazba.live'}
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                onClick={handleToggleFollow}
+                disabled={followBusy}
+                className={`h-12 px-7 text-sm font-bold cursor-pointer transition-colors disabled:opacity-60 flex items-center gap-2 ${
+                  isFollowing
+                    ? 'bg-black text-white border border-white hover:bg-white/10'
+                    : 'bg-[#ffed00] text-black hover:bg-[#e6d200]'
+                }`}
+                id="artist-detail-follow"
+              >
+                {isFollowing ? (<><Check className="w-4 h-4 stroke-[3]" /> Following</>) : 'Follow'}
+              </button>
+              <button
+                onClick={() => setShowContactModal(true)}
+                className="h-12 px-7 bg-black text-white border border-white text-sm font-bold cursor-pointer hover:bg-white/10 transition-colors"
+                id="artist-detail-contact"
+              >
+                Contact
+              </button>
+              <button
+                onClick={handleShare}
+                className="h-12 w-12 bg-black text-white border border-white flex items-center justify-center cursor-pointer hover:bg-white/10 transition-colors relative"
+                title="Copy profile link"
+                id="artist-detail-share"
+              >
+                {copied && (
+                  <span className="absolute -top-9 left-1/2 -translate-x-1/2 bg-white text-black text-[10px] font-bold py-1 px-3 whitespace-nowrap">
+                    Link copied
+                  </span>
+                )}
+                <Share2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Stats row — divider-dark separated, breathing room on both sides */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-6 border-t border-white/15 mt-12 pt-8">
+            {[
+              { label: 'Followers', value: followerCount },
+              { label: 'On stage', value: stats.hosting },
+              { label: 'Events hosted', value: stats.totalEvents },
+              { label: 'Total audience', value: stats.attendees },
+            ].map((s) => (
+              <div key={s.label} className="pr-4 sm:px-10 sm:first:pl-0 sm:border-r sm:border-white/15 sm:last:border-r-0">
+                <div className={`${overline} text-white/50`}>{s.label}</div>
+                <div className="font-display font-bold text-2xl sm:text-3xl mt-2">{s.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── TABS — white catalogue band ───────────────────────── */}
+      <div className="border-b border-[#f2f2f2] bg-white sticky top-[60px] z-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 flex">
+          {([
+            { id: 'upcoming', label: 'Upcoming shows' },
+            { id: 'past', label: 'Past shows' },
+            { id: 'about', label: 'About & booking' },
+          ] as const).map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-5 sm:px-7 py-4 text-sm font-bold transition-colors relative cursor-pointer ${
+                activeTab === tab.id ? 'text-black' : 'text-[#8a8a8a] hover:text-black'
+              }`}
+            >
+              {tab.label}
+              {activeTab === tab.id && (
+                <motion.div layoutId="artistTabLine" className="absolute bottom-0 left-0 right-0 h-[3px] bg-black" />
               )}
             </button>
           ))}
         </div>
+      </div>
 
-        {/* 5. TABS CONTENT */}
-        <div className="mt-8">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.2 }}
-            >
-              {activeTab === 'upcoming' && (
-                <div className="space-y-6 text-left">
+      {/* ── TAB CONTENT ───────────────────────────────────────── */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-14 pb-24">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.18 }}
+          >
+            {/* UPCOMING */}
+            {activeTab === 'upcoming' && (
+              <div>
+                <div className="flex items-end justify-between mb-8">
                   <div>
-                    <h3 className="font-display font-semibold text-neutral-900 text-sm tracking-wide">
-                      Upcoming events
-                    </h3>
-                    <p className="text-xs text-neutral-500 mt-1">Book ticket passes matching your live aesthetic preferences.</p>
+                    <h2 className="font-display font-bold text-3xl leading-[0.95]">Upcoming shows</h2>
+                    <p className="text-[#666] text-sm mt-2">Live dates featuring {artist.name}. Tickets go fast.</p>
                   </div>
+                </div>
 
-                  {upcomingEvents.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {upcomingEvents.map((evt) => (
-                        <EventCard 
-                          key={evt.id}
-                          event={evt}
-                          onBook={onBookEvent || (() => {})}
-                          onViewDetail={() => onViewShowDetail(evt.title)}
-                        />
-                      ))}
+                {upcomingEvents.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {upcomingEvents.map((evt) => (
+                      <EventCard
+                        key={evt.id}
+                        event={evt}
+                        onBook={onBookEvent || (() => {})}
+                        onViewDetail={() => onViewShowDetail(evt.title)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="border border-[#f2f2f2] py-16 text-center">
+                    <p className="font-bold text-black">No live dates announced yet.</p>
+                    <button
+                      onClick={() => setShowContactModal(true)}
+                      className="mt-4 text-sm font-bold underline cursor-pointer"
+                    >
+                      Enquire about a private booking
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* PAST */}
+            {activeTab === 'past' && (
+              <div>
+                <div className="mb-8">
+                  <h2 className="font-display font-bold text-3xl leading-[0.95]">Past shows</h2>
+                  <p className="text-[#666] text-sm mt-2">A track record of sold-out rooms and standing ovations.</p>
+                </div>
+
+                <div className="border-t border-[#f2f2f2]">
+                  {pastShows.length > 0 ? pastShows.map((show, idx) => (
+                    <div
+                      key={idx}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-6 border-b border-[#f2f2f2]"
+                    >
+                      <div className="flex items-center gap-6">
+                        <span className="text-sm text-[#666] w-32 shrink-0">{show.date}</span>
+                        <div>
+                          <h4 className="font-display font-bold text-lg leading-tight">{show.title}</h4>
+                          <span className="flex items-center gap-1.5 text-sm text-[#666] mt-1">
+                            <MapPin className="w-3.5 h-3.5" /> {show.venue}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-[#8a8a8a] border border-[#e4e4e4] px-3 py-1.5 w-fit">
+                        Completed
+                      </span>
                     </div>
-                  ) : (
-                    <div className="py-12 text-center bg-white   rounded-3xl space-y-2">
-                      <p className="font-semibold text-neutral-500 text-sm">No scheduled live dates currently.</p>
-                      <button 
-                        onClick={() => setShowContactModal(true)}
-                        className="text-xs text-[#E34718] font-bold hover:underline"
-                      >
-                        Request custom performance booking
-                      </button>
-                    </div>
+                  )) : (
+                    <p className="py-10 text-sm text-[#666]">Show history will appear here.</p>
                   )}
                 </div>
-              )}
+              </div>
+            )}
 
-              {activeTab === 'past' && (
-                <div className="space-y-6 text-left">
-                  <div>
-                    <h3 className="font-display font-semibold text-neutral-900 text-sm tracking-wide">
-                      Past events
-                    </h3>
-                    <p className="text-xs text-neutral-500 mt-1 font-sans">Historic recitals and arena gigs completed in partnership with Jazba.</p>
-                  </div>
+            {/* ABOUT & BOOKING */}
+            {activeTab === 'about' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {pastShowsMapped.map((show, idx) => (
-                      <div 
-                        key={idx}
-                        className="bg-white   rounded-2xl p-5 flex items-center justify-between shadow-xs  transition-all"
-                      >
-                        <div className="space-y-1.5 pr-4">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="bg-neutral-100 text-neutral-600 text-[9px] font-bold px-2 py-0.5 rounded-full   text-sentence tracking-widest font-mono">
-                              ARCHIVED SHOW
-                            </span>
-                            <span className="text-[11px] font-bold text-neutral-400">{show.date}</span>
-                          </div>
-                          <h4 className="font-display font-bold text-neutral-850 text-sm leading-snug">
-                            {show.title}
-                          </h4>
-                          <div className="flex items-center gap-1 text-neutral-400 text-xs font-medium">
-                            <MapPin className="w-3.5 h-3.5" />
-                            <span>{show.venue}</span>
-                          </div>
-                        </div>
+                {/* Biography */}
+                <div className="lg:col-span-7">
+                  <h2 className="font-display font-bold text-3xl leading-[0.95]">About {artist.name}</h2>
+                  <p className="text-[#222] text-base leading-relaxed mt-6 whitespace-pre-line">
+                    {artist.bio}
+                  </p>
 
-                        <span className="text-[10px] bg-neutral-100/85 text-neutral-500 font-bold px-3.5 py-1.5 rounded-full   shrink-0 select-none">
-                          Completed
-                        </span>
+                  {/* Fact rows */}
+                  <div className="border-t border-[#f2f2f2] mt-10">
+                    {[
+                      { label: 'Fee per event', value: `$${artist.hourlyRate.toLocaleString()}` },
+                      { label: 'Experience', value: `${artist.experienceYears} years on stage` },
+                      { label: 'Based in', value: artist.location || 'London, UK' },
+                      { label: 'Category', value: artist.subCategory },
+                    ].map((row) => (
+                      <div key={row.label} className="flex items-center justify-between py-5 border-b border-[#f2f2f2]">
+                        <span className={`${overline} text-[#666]`}>{row.label}</span>
+                        <span className="font-display font-bold text-lg">{row.value}</span>
                       </div>
                     ))}
                   </div>
                 </div>
-              )}
 
-              {activeTab === 'collections' && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 text-left">
-                  
-                  {/* Biography text content */}
-                  <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-white   rounded-3xl p-6 sm:p-8 space-y-4 shadow-xs">
-                      <h4 className="text-lg font-display font-bold text-neutral-900">Artist biography</h4>
-                      <p className="text-xs sm:text-[13px] text-neutral-600 font-medium leading-relaxed font-sans whitespace-pre-line">
-                        {artist.bio}
-                      </p>
+                {/* Booking rail */}
+                <div className="lg:col-span-5 space-y-px">
+
+                  {/* Rating tile */}
+                  <div className="border border-black p-7">
+                    <span className={`${overline} text-[#666]`}>Audience rating</span>
+                    <div className="flex items-center gap-3 mt-3">
+                      <Star className="w-6 h-6 fill-black text-black" />
+                      <span className="font-display font-bold text-4xl leading-none">{artist.rating.toFixed(1)}</span>
+                      <span className="text-sm text-[#666]">({artist.totalReviews} reviews)</span>
                     </div>
-
-                    {/* Rates & Specifications card */}
-                    <div className="bg-white   rounded-3xl p-6 sm:p-8 grid grid-cols-2 sm:grid-cols-3 gap-4 shadow-xs">
-                      <div>
-                        <span className="text-[10px] text-neutral-400 font-bold text-sentence tracking-widest block">Fee per event</span>
-                        <span className="text-base font-bold text-neutral-800 mt-1 block">${artist.hourlyRate}<span className="text-xs font-medium text-neutral-400"> / event</span></span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-neutral-400 font-bold text-sentence tracking-widest block">experience</span>
-                        <span className="text-base font-bold text-neutral-800 mt-1 block">{artist.experienceYears} Years Active</span>
-                      </div>
-                      <div className="col-span-2 sm:col-span-1">
-                        <span className="text-[10px] text-neutral-400 font-bold text-sentence tracking-widest block">location</span>
-                        <span className="text-base font-bold text-neutral-800 mt-1 block">{artist.location || 'London'}</span>
-                      </div>
+                    <div className="flex items-start gap-3 border-t border-[#f2f2f2] mt-6 pt-5">
+                      <ShieldCheck className="w-5 h-5 shrink-0" />
+                      <p className="text-sm text-[#222]">
+                        <strong className="font-bold">Verified performer.</strong> Identity checked, fee agreed upfront, payment held in escrow until the show is done.
+                      </p>
                     </div>
                   </div>
 
-                  {/* Trust metrics columns */}
-                  <div className="space-y-6">
-                    
-                    {/* Verified system badge */}
-                    <div className="bg-white   rounded-3xl p-6 sm:p-8 space-y-4 shadow-xs">
-                      <h4 className="text-xs font-bold text-neutral-400 text-sentence tracking-widest">Rating</h4>
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center text-amber-500">
-                          <Star className="w-5 h-5 fill-current" />
-                        </div>
-                        <span className="font-extrabold text-xl text-neutral-900">{artist.rating.toFixed(1)}</span>
-                        <span className="text-xs text-neutral-400 font-medium mt-0.5">({artist.totalReviews} reviews)</span>
-                      </div>
+                  {/* Booking CTA tile — the one yellow moment */}
+                  <div className="bg-[#ffed00] text-black p-7 mt-6">
+                    <span className={`${overline} text-black/60`}>Book this artist</span>
+                    <h3 className="font-display font-bold text-2xl leading-[0.95] mt-2">
+                      One flat fee. One great night.
+                    </h3>
+                    <p className="text-sm text-black/70 mt-3">
+                      From ${artist.hourlyRate.toLocaleString()} per event — venue, date and set agreed directly with our booking team.
+                    </p>
+                    <button
+                      onClick={() => setShowContactModal(true)}
+                      className="mt-5 bg-black text-white text-sm font-bold px-6 py-3.5 cursor-pointer hover:bg-neutral-800 transition-colors flex items-center gap-2"
+                    >
+                      Request availability <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
 
-                      <div className="pt-3.5   flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#E34718]/10 flex items-center justify-center shrink-0">
-                          <Sparkles className="w-4 h-4 text-[#E34718]" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-neutral-800">Verified Profile</p>
-                          <p className="text-[11px] text-neutral-500 font-medium">Transparent, upfront pricing.</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Streaming indicators */}
-                    <div className="bg-white   rounded-3xl p-6 sm:p-8 space-y-3.5 shadow-xs">
-                      <h4 className="text-xs font-bold text-neutral-400 text-sentence tracking-widest">Connected streams</h4>
-                      
-                      <div className="space-y-2">
-                        <a 
-                          href={artist.socials?.spotify || "https://spotify.com"} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="flex items-center justify-between p-2.5 hover:bg-neutral-50 rounded-xl transition-all   "
-                        >
-                          <span className="text-xs font-bold text-neutral-700 font-sans">Spotify Profile</span>
-                          <span className="text-[10px] font-extrabold text-[#E34718] text-sentence tracking-wide">Listen Now</span>
-                        </a>
-
-                        <a 
-                          href={artist.socials?.youtube || "https://youtube.com"} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="flex items-center justify-between p-2.5 hover:bg-neutral-50 rounded-xl transition-all   "
-                        >
-                          <span className="text-xs font-bold text-neutral-700 font-sans">YouTube Channel</span>
-                          <span className="text-[10px] font-extrabold text-[#E34718] text-sentence tracking-wide">Watch video</span>
-                        </a>
-                      </div>
-                    </div>
-
+                  {/* Streams */}
+                  <div className="border border-[#e4e4e4] mt-6">
+                    <div className={`${overline} text-[#666] px-6 pt-5 pb-3`}>Listen & watch</div>
+                    <a
+                      href={artist.socials?.spotify || 'https://spotify.com'}
+                      target="_blank" rel="noopener noreferrer"
+                      className="flex items-center justify-between px-6 py-4 border-t border-[#f2f2f2] hover:bg-[#f7f7f7] transition-colors"
+                    >
+                      <span className="text-sm font-bold">Spotify</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </a>
+                    <a
+                      href={artist.socials?.youtube || 'https://youtube.com'}
+                      target="_blank" rel="noopener noreferrer"
+                      className="flex items-center justify-between px-6 py-4 border-t border-[#f2f2f2] hover:bg-[#f7f7f7] transition-colors"
+                    >
+                      <span className="text-sm font-bold">YouTube</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </a>
                   </div>
 
                 </div>
-              )}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
-      {/* 6. MODAL CONTACT FORM */}
+      {/* ── CONTACT MODAL ─────────────────────────────────────── */}
       <AnimatePresence>
         {showContactModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fade-in" id="contact-overlay">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.96, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 15 }}
-              className="bg-white   rounded-[2rem] max-w-md w-full p-6 sm:p-8 relative shadow-xl overflow-hidden"
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" id="contact-overlay">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 16 }}
+              className="bg-white max-w-md w-full p-8 relative border border-black"
               id="contact-artist-modal"
             >
-              
-              {/* Corner Close button */}
-              <button 
+              <button
                 onClick={() => setShowContactModal(false)}
-                className="absolute top-5 right-5 text-neutral-400 hover:text-black w-8 h-8 rounded-full   flex items-center justify-center transition-colors hover:bg-neutral-50 cursor-pointer"
-                aria-label="Close message window"
+                className="absolute top-5 right-5 w-9 h-9 border border-[#e4e4e4] flex items-center justify-center hover:border-black transition-colors cursor-pointer"
+                aria-label="Close"
               >
                 <X className="w-4 h-4" />
               </button>
 
-              <div className="space-y-2 mb-6 text-left">
-                <span className="text-[10px] font-bold text-[#E34718] flex items-center gap-1 text-sentence tracking-widest">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Inquiry dispatch</span>
-                </span>
-                <h3 className="text-xl font-display font-bold text-neutral-900">
-                  Contact {artist.name}
-                </h3>
-                <p className="text-xs text-neutral-500 font-medium font-sans leading-normal">
-                  Detail your live acoustic request, location requirements, or schedule coordinates.
-                </p>
-              </div>
+              <span className={`${overline} text-[#666]`}>Booking enquiry</span>
+              <h3 className="font-display font-bold text-2xl leading-[0.95] mt-2">
+                Contact {artist.name}
+              </h3>
+              <p className="text-sm text-[#666] mt-3">
+                Tell us your date, venue and audience size — we'll confirm availability and a fixed per-event fee within 2 hours.
+              </p>
 
               {sendSuccess ? (
-                <div className="py-8 text-center space-y-3" id="contact-success-notice">
-                  <div className="w-12 h-12 bg-orange-50 text-[#C23A12] rounded-full flex items-center justify-center mx-auto  ">
-                    <Check className="w-6 h-6 stroke-[3]" />
+                <div className="mt-8 flex items-start gap-3" id="contact-success-notice">
+                  <div className="w-10 h-10 bg-[#ffed00] flex items-center justify-center shrink-0">
+                    <Check className="w-5 h-5 text-black stroke-[3]" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-neutral-900">Message delivered</h4>
-                    <p className="text-[11px] text-neutral-400 mt-1 max-w-xs mx-auto font-medium">
-                      Your schedule details were safely dispatched directly. Expect a response review setup within 2 hours.
+                    <h4 className="font-bold text-base">Enquiry sent</h4>
+                    <p className="text-sm text-[#666] mt-1">
+                      Our booking team will reply to your email with a quote and available dates.
                     </p>
                   </div>
                 </div>
               ) : (
-                <form onSubmit={handleContactSubmit} className="space-y-4 text-left">
-                  
-                  {/* Name field */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-neutral-450 text-sentence tracking-widest pl-1 block">
-                      Inquirer name
-                    </label>
-                    <input 
-                      type="text" 
-                      required
-                      value={contactName}
+                <form onSubmit={handleContactSubmit} className="mt-6 space-y-5">
+                  <div>
+                    <label className={`${overline} text-[#666] block mb-2`}>Your name</label>
+                    <input
+                      type="text" required value={contactName}
                       onChange={(e) => setContactName(e.target.value)}
-                      placeholder="e.g. Liam Hall"
-                      className="w-full bg-neutral-50 hover:bg-neutral-100/60   focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none  focus:ring-1 focus:ring-[#E34718]/45 placeholder-neutral-400 min-h-[40px]"
+                      placeholder="Liam Hall"
+                      className="w-full bg-[#f7f7f7] px-3 py-3 text-sm text-black placeholder-[#8a8a8a]"
                     />
                   </div>
-
-                  {/* Email address */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-neutral-450 text-sentence tracking-widest pl-1 block">
-                      Your email address
-                    </label>
-                    <input 
-                      type="email" 
-                      required
-                      value={contactEmail}
+                  <div>
+                    <label className={`${overline} text-[#666] block mb-2`}>Email address</label>
+                    <input
+                      type="email" required value={contactEmail}
                       onChange={(e) => setContactEmail(e.target.value)}
-                      placeholder="name@gmail.com"
-                      className="w-full bg-neutral-50 hover:bg-neutral-100/60   focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none  focus:ring-1 focus:ring-[#E34718]/45 placeholder-neutral-400 min-h-[40px]"
+                      placeholder="you@example.com"
+                      className="w-full bg-[#f7f7f7] px-3 py-3 text-sm text-black placeholder-[#8a8a8a]"
                     />
                   </div>
-
-                  {/* Message body */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-neutral-450 text-sentence tracking-widest pl-1 block">
-                      Request description
-                    </label>
-                    <textarea 
-                      required
-                      rows={4}
-                      value={contactMessage}
+                  <div>
+                    <label className={`${overline} text-[#666] block mb-2`}>Event details</label>
+                    <textarea
+                      required rows={4} value={contactMessage}
                       onChange={(e) => setContactMessage(e.target.value)}
-                      placeholder="Share details of your upcoming gig, date, and venue requirements..."
-                      className="w-full bg-neutral-50 hover:bg-neutral-100/60   focus:bg-white rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none  focus:ring-1 focus:ring-[#E34718]/45 placeholder-neutral-400 resize-none"
+                      placeholder="Date, venue, city and audience size…"
+                      className="w-full bg-[#f7f7f7] px-3 py-3 text-sm text-black placeholder-[#8a8a8a] resize-none"
                     />
                   </div>
-
-                  {/* Submit button */}
                   <button
                     type="submit"
                     disabled={isSending}
-                    className="w-full bg-neutral-900   hover:bg-neutral-800 text-white font-extrabold text-[10px] text-sentence py-3.5 px-5 rounded-full tracking-widest transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-98 min-h-[40px]"
+                    className="w-full bg-[#ffed00] text-black font-bold text-sm py-4 cursor-pointer hover:bg-[#e6d200] transition-colors disabled:opacity-60"
                     id="submit-contact-form"
                   >
-                    <span>{isSending ? 'Sending inquiry...' : 'Verify & dispatch message'}</span>
+                    {isSending ? 'Sending…' : 'Send enquiry'}
                   </button>
-
                 </form>
               )}
-
             </motion.div>
           </div>
         )}

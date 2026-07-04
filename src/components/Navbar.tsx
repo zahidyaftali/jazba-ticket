@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Ticket, Menu, X } from 'lucide-react';
+import { Ticket, Menu, X, ChevronRight } from 'lucide-react';
 
 interface NavbarProps {
   onScrollToSection: (id: string) => void;
@@ -10,248 +10,174 @@ interface NavbarProps {
   isHome: boolean;
 }
 
-export default function Navbar({ onScrollToSection, onOpenAuth, currentUser, onGoToDashboard, onLogout, isHome }: NavbarProps) {
+const NAV_LINKS = [
+  { id: 'explorer', label: 'Events' },
+  { id: 'artists', label: 'Artists' },
+  { id: 'help', label: 'Help' },
+  { id: 'about', label: 'About' },
+];
+
+export default function Navbar({ onScrollToSection, onOpenAuth, currentUser, onGoToDashboard, onLogout }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
 
+  // Lock body scroll while the mobile drawer is open
   useEffect(() => {
-    if (!isHome) {
-      setIsScrolled(true);
-      return;
-    }
+    document.body.style.overflow = isOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen]);
 
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
-    };
-
-    // Initialize state
-    handleScroll();
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [isHome]);
-
-  // CONTAINER STYLING: Transparent overlay on home-top, elegant blurred white otherwise
-  const navContainerClass = `
-    ${isHome ? (isScrolled ? 'fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md   shadow-xs' : 'fixed top-0 left-0 right-0 bg-transparent  ') : 'sticky top-0 bg-white   shadow-xs'}
-    z-50 px-4 py-3.5 sm:px-6 md:px-8 transition-all duration-300 w-full
-  `;
-
-  // LOGO TEXT: White on raw transparent hero, charcoal-dark otherwise
-  const logoTextClass = `font-display font-black text-2xl tracking-tight transition-colors duration-300 ${
-    isHome && !isScrolled ? 'text-white' : 'text-neutral-900'
-  }`;
-
-  // TICKET ICON WRAPPER BORDER Color
-  const logoIconClass = `w-9 h-9 rounded-full bg-[#E34718] flex items-center justify-center  shadow-sm transition-transform duration-300 group-hover:scale-110 ${
-    isHome && !isScrolled ? '' : ''
-  }`;
-
-  // TEXTS AND LINKS Color Theme inside Navbar
-  const navLinkClass = `font-semibold transition-colors cursor-pointer text-sm tracking-wide ${
-    isHome && !isScrolled 
-      ? 'text-white/85 hover:text-[#ffed00]' 
-      : 'text-neutral-700 hover:text-[#C23A12] hover:text-opacity-100 font-semibold'
-  }`;
-
-  const greetingClass = `text-[13px] font-semibold tracking-wide transition-colors duration-300 ${
-    isHome && !isScrolled ? 'text-white/80' : 'text-neutral-650'
-  }`;
-
-  const logoutLinkClass = `text-[11px] font-black text-sentence tracking-wider transition-colors duration-300 cursor-pointer ${
-    isHome && !isScrolled 
-      ? 'text-white/65 hover:text-[#E34718] hover:underline' 
-      : 'text-neutral-450 hover:text-red-500 hover:underline'
-  }`;
-
-  const signupBtnClass = `font-semibold text-sm transition-colors cursor-pointer ${
-    isHome && !isScrolled ? 'text-white/85 hover:text-[#ffed00]' : 'text-neutral-600 hover:text-black'
-  }`;
-
-  // Mobile drawer trigger bubble action buttons
-  const mobileToggleClass = `md:hidden w-10 h-10 flex items-center justify-center rounded-full shadow-sm transition-all focus:outline-none ${
-    isHome && !isScrolled 
-      ? 'bg-white/10   text-white hover:bg-white/20' 
-      : 'bg-white   text-black hover:bg-neutral-50'
-  }`;
-
-  // Mobile drawer panel styling
-  const drawerClass = `md:hidden absolute top-full left-0 right-0 p-5 shadow-2xl flex flex-col gap-3.5 z-40  transition-all duration-300 ${
-    isHome && !isScrolled 
-      ? 'bg-neutral-950/98 backdrop-blur-md  text-neutral-100' 
-      : 'bg-white  text-neutral-950'
-  }`;
-
-  const drawerLinkClass = `font-bold text-left py-2  transition-colors cursor-pointer text-sm ${
-    isHome && !isScrolled 
-      ? 'text-white/90 hover:text-[#ffed00] '
-      : 'text-neutral-900 hover:text-[#E34718] '
-  }`;
+  const go = (id: string) => {
+    onScrollToSection(id);
+    setIsOpen(false);
+  };
 
   return (
-    <nav className={navContainerClass.trim()} id="main-navigation-header">
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
-        
-        {/* LOGO */}
-        <div 
-          onClick={() => onScrollToSection('top')} 
-          className="flex items-center gap-2.5 cursor-pointer group"
+    <header className="sticky top-0 z-50 bg-white border-b border-[#f2f2f2]" id="main-navigation-header">
+      <nav className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 h-[60px] flex items-center justify-between gap-6">
+
+        {/* LOGO — flat yellow mark + wordmark */}
+        <button
+          onClick={() => go('top')}
+          className="flex items-center gap-2.5 cursor-pointer shrink-0"
           id="nav-logo"
         >
-          <div className={logoIconClass}>
-            <Ticket className="w-4.5 h-4.5 text-black rotate-[15deg] group-hover:rotate-0 transition-transform duration-300" />
-          </div>
-          <span className={logoTextClass}>
-            Jazba<span className={isHome && !isScrolled ? 'text-[#ffed00] font-black' : 'text-black font-extrabold'}>ticket</span>
+          <span className="w-9 h-9 bg-[#ffed00] flex items-center justify-center">
+            <Ticket className="w-4.5 h-4.5 text-black" />
           </span>
+          <span className="font-display font-bold text-xl tracking-tight text-black">
+            Jazbaticket
+          </span>
+        </button>
+
+        {/* CENTER NAV (desktop) */}
+        <div className="hidden md:flex items-center gap-1">
+          {NAV_LINKS.map((link) => (
+            <button
+              key={link.id}
+              onClick={() => go(link.id)}
+              className="px-4 h-[60px] text-sm font-bold text-[#666] hover:text-black cursor-pointer transition-colors relative group"
+              id={`btn-nav-${link.id}`}
+            >
+              {link.label}
+              <span className="absolute bottom-0 left-4 right-4 h-[3px] bg-black scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
+            </button>
+          ))}
         </div>
 
-        {/* DESKTOP MENU & AUTH */}
-        <div className="hidden md:flex items-center gap-8">
-          <div className="flex items-center gap-6">
-            <button 
-              onClick={() => onScrollToSection('explorer')} 
-              className={navLinkClass}
-              id="btn-nav-explorer"
-            >
-              Events
-            </button>
-            <button 
-              onClick={() => onScrollToSection('artists')} 
-              className={navLinkClass}
-              id="btn-nav-artists"
-            >
-              Artist
-            </button>
-            <button 
-              onClick={() => onScrollToSection('help')} 
-              className={navLinkClass}
-              id="link-nav-help"
-            >
-              Help
-            </button>
-          </div>
-
+        {/* RIGHT — account (desktop) */}
+        <div className="hidden md:flex items-center gap-3 shrink-0">
           {currentUser ? (
-            <div className="flex items-center gap-4" id="nav-user-controls">
-              <span className={greetingClass} id="nav-user-greeting">
-                Hi, <span className="font-bold">{currentUser.name.split(' ')[0]}</span>
+            <>
+              <span className="text-sm text-[#666]" id="nav-user-greeting">
+                Hi, <span className="font-bold text-black">{currentUser.name.split(' ')[0]}</span>
               </span>
-              <button 
+              <button
                 onClick={onGoToDashboard}
-                className="bg-neutral-900 hover:bg-neutral-800 px-5.5 py-2.5 rounded-full font-bold text-xs tracking-wider text-white transition-all duration-200 shadow-xs hover:shadow-sm active:scale-95 cursor-pointer flex items-center gap-1.5  "
+                className="h-10 px-5 bg-black text-white text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors flex items-center gap-2"
                 id="btn-nav-dashboard"
               >
-                <span>My Dashboard</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-[#E34718] inline-block"></span>
+                My account
+                <span className="w-1.5 h-1.5 rounded-full bg-[#ffed00]" />
               </button>
               {onLogout && (
-                <button 
+                <button
                   onClick={onLogout}
-                  className={logoutLinkClass}
+                  className="text-sm font-bold text-[#666] hover:text-black cursor-pointer transition-colors"
                   id="btn-nav-logout"
                 >
-                  Logout
+                  Sign out
                 </button>
               )}
-            </div>
+            </>
           ) : (
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => onOpenAuth('signup')}
-                className={signupBtnClass}
-                id="btn-signup"
-              >
-                Signup
-              </button>
-              <button 
+            <>
+              <button
                 onClick={() => onOpenAuth('login')}
-                className="bg-neutral-900 hover:bg-neutral-800 px-5.5 py-2 rounded-full font-bold text-xs tracking-wider text-white transition-all duration-200 shadow-xs hover:shadow-sm active:scale-95 cursor-pointer  "
+                className="h-10 px-5 bg-white text-black border border-black text-sm font-bold cursor-pointer hover:bg-[#f7f7f7] transition-colors"
                 id="btn-login"
               >
-                Login
+                Sign in
               </button>
-            </div>
+              <button
+                onClick={() => onOpenAuth('signup')}
+                className="h-10 px-5 bg-[#ffed00] text-black text-sm font-bold cursor-pointer hover:bg-[#e6d200] transition-colors"
+                id="btn-signup"
+              >
+                Sign up
+              </button>
+            </>
           )}
         </div>
 
-        {/* MOBILE MENU TOGGLE */}
-        <button 
+        {/* MOBILE TOGGLE */}
+        <button
           onClick={() => setIsOpen(!isOpen)}
-          className={mobileToggleClass}
+          className="md:hidden w-10 h-10 border border-black flex items-center justify-center cursor-pointer"
+          aria-label="Menu"
           id="btn-mobile-menu"
         >
           {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
-      </div>
+      </nav>
 
       {/* MOBILE DRAWER */}
       {isOpen && (
-        <div className={drawerClass} id="mobile-navbar-drawer">
-          <button 
-            onClick={() => { onScrollToSection('explorer'); setIsOpen(false); }} 
-            className={drawerLinkClass}
-          >
-            Events
-          </button>
-          <button 
-            onClick={() => { onScrollToSection('artists'); setIsOpen(false); }} 
-            className={drawerLinkClass}
-          >
-            Artist
-          </button>
-          <button 
-            onClick={() => { onScrollToSection('help'); setIsOpen(false); }} 
-            className={drawerLinkClass}
-          >
-            Help &amp; Contact
-          </button>
-           {currentUser ? (
-            <div className="flex flex-col gap-3.5 pt-1.5" id="mobile-nav-user-controls">
-              <div className={`text-xs font-bold text-left px-1 flex items-center justify-between   pb-2 ${
-                isHome && !isScrolled ? ' text-white/90' : ' text-neutral-850'
-              }`} id="mobile-nav-profile-info">
-                <span className="opacity-60 text-sentence text-[10px] tracking-wider">Account</span>
-                <span>{currentUser.name}</span>
-              </div>
-              <button 
-                onClick={() => { onGoToDashboard(); setIsOpen(false); }}
-                className="w-full bg-neutral-900 text-white py-3 rounded-full font-bold text-center   shadow-sm flex items-center justify-center gap-2 cursor-pointer text-xs"
+        <div className="md:hidden absolute top-full left-0 right-0 bg-white border-b border-black max-h-[calc(100vh-60px)] overflow-y-auto" id="mobile-navbar-drawer">
+          <div className="border-t border-[#f2f2f2]">
+            {NAV_LINKS.map((link) => (
+              <button
+                key={link.id}
+                onClick={() => go(link.id)}
+                className="w-full flex items-center justify-between px-6 py-4 border-b border-[#f2f2f2] text-base font-bold text-black cursor-pointer hover:bg-[#f7f7f7] transition-colors text-left"
               >
-                <span>My Dashboard</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-[#E34718] inline-block"></span>
+                {link.label}
+                <ChevronRight className="w-4 h-4 text-[#8a8a8a]" />
               </button>
-              {onLogout && (
-                <button 
-                  onClick={() => { onLogout(); setIsOpen(false); }}
-                  className="w-full bg-red-500/10 hover:bg-red-500/15 text-red-650 py-3 rounded-full font-black text-center   shadow-3xs cursor-pointer text-xs mt-1"
+            ))}
+          </div>
+
+          <div className="p-6">
+            {currentUser ? (
+              <div className="space-y-3" id="mobile-nav-user-controls">
+                <div className="flex items-center justify-between text-sm pb-3 border-b border-[#f2f2f2]" id="mobile-nav-profile-info">
+                  <span className="text-[#8a8a8a] font-bold uppercase tracking-[0.15em] text-[10px]">Account</span>
+                  <span className="font-bold">{currentUser.name}</span>
+                </div>
+                <button
+                  onClick={() => { onGoToDashboard(); setIsOpen(false); }}
+                  className="w-full h-12 bg-black text-white text-sm font-bold cursor-pointer flex items-center justify-center gap-2"
                 >
-                  SIGN OUT
+                  My account
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#ffed00]" />
                 </button>
-              )}
-            </div>
-          ) : (
-            <div className="flex gap-4 pt-2">
-              <button 
-                onClick={() => { onOpenAuth('signup'); setIsOpen(false); }}
-                className="flex-1 bg-[#E34718] text-white py-2.5 rounded-full font-bold text-center   shadow-sm text-xs transition-all hover:bg-[#C23A12] cursor-pointer"
-              >
-                Signup
-              </button>
-              <button 
-                onClick={() => { onOpenAuth('login'); setIsOpen(false); }}
-                className={`flex-1 py-2.5 rounded-full font-bold text-center  text-xs transition-all cursor-pointer ${
-                  isHome && !isScrolled
-                    ? 'bg-white/10 text-white  hover:bg-white/10'
-                    : 'bg-neutral-900 text-white  hover:bg-neutral-800'
-                }`}
-              >
-                Login
-              </button>
-            </div>
-          )}
+                {onLogout && (
+                  <button
+                    onClick={() => { onLogout(); setIsOpen(false); }}
+                    className="w-full h-12 bg-white text-black border border-black text-sm font-bold cursor-pointer hover:bg-[#f7f7f7] transition-colors"
+                  >
+                    Sign out
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => { onOpenAuth('login'); setIsOpen(false); }}
+                  className="h-12 bg-white text-black border border-black text-sm font-bold cursor-pointer hover:bg-[#f7f7f7] transition-colors"
+                >
+                  Sign in
+                </button>
+                <button
+                  onClick={() => { onOpenAuth('signup'); setIsOpen(false); }}
+                  className="h-12 bg-[#ffed00] text-black text-sm font-bold cursor-pointer hover:bg-[#e6d200] transition-colors"
+                >
+                  Sign up
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
-    </nav>
+    </header>
   );
 }

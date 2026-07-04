@@ -57,6 +57,33 @@ function ScrollToTop() {
   return null;
 }
 
+/** Keep the browser-tab title in sync with the current route (SEO + UX). */
+const PAGE_TITLES: Array<{ match: (path: string) => boolean; title: string }> = [
+  { match: (p) => p === '/', title: 'Jazbaticket — Book Live Events, Concerts & Artists' },
+  { match: (p) => p === '/events', title: 'All Events — Jazbaticket' },
+  { match: (p) => p.startsWith('/events/'), title: 'Event Details — Jazbaticket' },
+  { match: (p) => p === '/artists', title: 'Book an Artist — Jazbaticket' },
+  { match: (p) => p.startsWith('/artists/'), title: 'Artist Profile — Jazbaticket' },
+  { match: (p) => p === '/checkout', title: 'Secure Checkout — Jazbaticket' },
+  { match: (p) => p === '/dashboard', title: 'My Account — Jazbaticket' },
+  { match: (p) => p === '/help', title: 'Help Centre — Jazbaticket' },
+  { match: (p) => p === '/about', title: 'About Us — Jazbaticket' },
+  { match: (p) => p === '/contact', title: 'Contact — Jazbaticket' },
+  { match: (p) => p === '/refund-policies', title: 'Refund Policy — Jazbaticket' },
+  { match: (p) => p === '/terms-of-use', title: 'Terms of Use — Jazbaticket' },
+  { match: (p) => p === '/login', title: 'Sign In — Jazbaticket' },
+  { match: (p) => p === '/signup', title: 'Sign Up — Jazbaticket' },
+];
+
+function PageTitle() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const entry = PAGE_TITLES.find((t) => t.match(pathname));
+    document.title = entry ? entry.title : 'Page Not Found — Jazbaticket';
+  }, [pathname]);
+  return null;
+}
+
 function PageLoading() {
   return (
     <div className="min-h-[60vh] flex items-center justify-center bg-white">
@@ -135,18 +162,16 @@ function HomeView({ events }: { events: EventItem[] }) {
 
       {/* TOP EVENTS */}
       <section className="max-w-7xl mx-auto px-4 py-16 sm:px-6 md:px-8" id="top-events">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-end justify-between mb-10">
           <div>
-            <h2 className="text-3xl font-display font-bold text-black tracking-tight">Top events</h2>
-            <p className="text-[17px] text-neutral-500 mt-2 font-normal">
-              The biggest shows in London and Hamilton right now.
-            </p>
+            <span className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#666]">Trending now</span>
+            <h2 className="text-3xl md:text-4xl font-display font-bold text-black tracking-tight leading-[0.95] mt-2">Top events</h2>
           </div>
           <button
             onClick={() => navigate('/events')}
-            className="flex items-center gap-1.5 text-xs sm:text-sm font-black text-black hover:underline cursor-pointer group shrink-0"
+            className="text-sm font-bold text-black underline cursor-pointer shrink-0"
           >
-            View All Events ↗
+            View all
           </button>
         </div>
 
@@ -169,18 +194,16 @@ function HomeView({ events }: { events: EventItem[] }) {
 
       {/* NEAR BY */}
       <section className="max-w-7xl mx-auto px-4 py-16 sm:px-6 md:px-8" id="near-by">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-end justify-between mb-10">
           <div>
-            <h2 className="text-3xl font-display font-bold text-black tracking-tight">Events near you</h2>
-            <p className="text-[17px] text-neutral-500 mt-2 font-normal">
-              Concerts, comedy and matches happening close to home.
-            </p>
+            <span className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#666]">Close to home</span>
+            <h2 className="text-3xl md:text-4xl font-display font-bold text-black tracking-tight leading-[0.95] mt-2">Events near you</h2>
           </div>
           <button
             onClick={() => navigate('/events')}
-            className="flex items-center gap-1.5 text-xs sm:text-sm font-black text-black hover:underline cursor-pointer group shrink-0"
+            className="text-sm font-bold text-black underline cursor-pointer shrink-0"
           >
-            View All Events ↗
+            View all
           </button>
         </div>
 
@@ -236,6 +259,10 @@ function EventDetailView({ events, eventsLoaded }: { events: EventItem[]; events
   const { id } = useParams();
   const navigate = useNavigate();
   const event = events.find((e) => e.id === id);
+
+  useEffect(() => {
+    if (event) document.title = `${event.title} — Tickets | Jazbaticket`;
+  }, [event]);
 
   if (!eventsLoaded) return <PageLoading />;
   if (!event) return <NotFoundView />;
@@ -310,6 +337,10 @@ function ArtistDetailView({ events }: { events: EventItem[] }) {
       cancelled = true;
     };
   }, [id, passed]);
+
+  useEffect(() => {
+    if (artist) document.title = `${artist.name} — Book This Artist | Jazbaticket`;
+  }, [artist]);
 
   if (notFound) return <NotFoundView />;
   if (!artist) return <PageLoading />;
@@ -488,6 +519,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
+      <PageTitle />
       <AppShell />
     </BrowserRouter>
   );

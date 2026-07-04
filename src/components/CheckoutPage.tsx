@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  ArrowLeft, MapPin, Clock, Ticket, Check, User, Mail,
-  Printer, CreditCard, Smartphone, ShieldCheck, Wallet, Globe,
-  Calendar, Info, AlertCircle, ShoppingBag, Sparkles, Loader2
+import {
+  ArrowLeft, MapPin, Clock, Ticket, Check,
+  Printer, ShieldCheck, Globe, Calendar, Loader2, Minus, Plus,
 } from 'lucide-react';
 import { EventItem } from '../types';
 import { doc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
-import { motion, AnimatePresence } from 'motion/react';
 import StripeCheckoutForm from './StripeCheckoutForm';
 import PayPalCheckoutForm from './PayPalCheckoutForm';
 
@@ -19,14 +17,58 @@ interface CheckoutPageProps {
   onGoToDashboard: () => void;
 }
 
-export default function CheckoutPage({ 
-  event, 
-  initialQuantity = 1, 
-  initialTier = 'general', 
+type Region = 'PK' | 'UK' | 'US';
+
+interface RegionProfile {
+  currencyLabel: string;
+  methods: { id: string; name: string; note: string }[];
+  defaultMethod: string;
+}
+
+// Payment options are decided by the visitor's detected location — never picked manually.
+const REGION_PROFILES: Record<Region, RegionProfile> = {
+  PK: {
+    currencyLabel: 'Pakistani Rupee (PKR)',
+    methods: [
+      { id: 'easypaisa', name: 'Easypaisa', note: 'Mobile wallet' },
+      { id: 'jazzcash', name: 'JazzCash', note: 'Mobile wallet' },
+      { id: 'stripe', name: 'Card', note: 'Visa / Mastercard' },
+    ],
+    defaultMethod: 'easypaisa',
+  },
+  UK: {
+    currencyLabel: 'Pound Sterling (GBP)',
+    methods: [
+      { id: 'paypal', name: 'PayPal', note: 'Express checkout' },
+      { id: 'stripe', name: 'Card', note: 'Visa / Mastercard / Amex' },
+    ],
+    defaultMethod: 'paypal',
+  },
+  US: {
+    currencyLabel: 'US Dollar (USD)',
+    methods: [
+      { id: 'stripe', name: 'Card', note: 'Visa / Mastercard / Amex' },
+      { id: 'paypal', name: 'PayPal', note: 'Express checkout' },
+      { id: 'applepay', name: 'Apple Pay', note: 'Express wallet' },
+      { id: 'googlepay', name: 'Google Pay', note: 'Express wallet' },
+    ],
+    defaultMethod: 'stripe',
+  },
+};
+
+const TIER_META: Record<'general' | 'vip' | 'elite', { name: string; note: string }> = {
+  general: { name: 'General admission', note: 'Standard entry, unreserved seating' },
+  vip: { name: 'VIP', note: 'Reserved seating and priority entry' },
+  elite: { name: 'Elite', note: 'Front rows, lounge access and artist meet' },
+};
+
+export default function CheckoutPage({
+  event,
+  initialQuantity = 1,
+  initialTier = 'general',
   onBack,
-  onGoToDashboard
+  onGoToDashboard,
 }: CheckoutPageProps) {
-  // --- States ---
   const [step, setStep] = useState<'details' | 'loading' | 'ticket'>('details');
   const [ticketCount, setTicketCount] = useState(initialQuantity);
   const [ticketTier, setTicketTier] = useState<'general' | 'vip' | 'elite'>(initialTier);
@@ -35,67 +77,49 @@ export default function CheckoutPage({
   const [ticketCode] = useState(() => `TT-${Math.floor(100000 + Math.random() * 900000)}`);
   const [seatConfig] = useState(() => `${String.fromCharCode(65 + Math.floor(Math.random() * 10))}-${Math.floor(1 + Math.random() * 24)}`);
 
-  // Promo code states
+  // Promo
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
   const [promoError, setPromoError] = useState('');
 
-  // Regional Payment System configuration states
-  const [paymentRegion, setPaymentRegion] = useState<'PK' | 'UK' | 'US'>('PK');
-  const [paymentMethod, setPaymentMethod] = useState<string>('easypaisa');
+  // Region is resolved from the visitor's IP — the checkout adapts automatically.
+  const [paymentRegion, setPaymentRegion] = useState<Region>('US');
+  const [paymentMethod, setPaymentMethod] = useState<string>('stripe');
   const [pkMobileNumber, setPkMobileNumber] = useState('');
-  const [cardHolder, setCardHolder] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
-  const [isDetectingIp, setIsDetectingIp] = useState(true);
+  const [isDetecting, setIsDetecting] = useState(true);
+  const [detectedPlace, setDetectedPlace] = useState('');
 
-  // Auto detect IP zone on checkout initialization
   useEffect(() => {
-    setIsDetectingIp(true);
+    setIsDetecting(true);
     fetch('https://ipapi.co/json/')
       .then((res) => {
-        if (!res.ok) throw new Error('API down');
+        if (!res.ok) throw new Error('geo lookup failed');
         return res.json();
       })
       .then((data) => {
-        if (data && data.country_code) {
-          const cc = data.country_code.toUpperCase();
-          if (cc === 'PK') {
-            setPaymentRegion('PK');
-            setPaymentMethod('easypaisa');
-          } else if (cc === 'GB' || cc === 'UK') {
-            setPaymentRegion('UK');
-            setPaymentMethod('paypal');
-          } else if (cc === 'US') {
-            setPaymentRegion('US');
-            setPaymentMethod('card');
-          } else {
-            setPaymentRegion('PK');
-            setPaymentMethod('easypaisa');
-          }
-        }
+        const cc = (data?.country_code || '').toUpperCase();
+        const place = [data?.city, data?.country_name].filter(Boolean).join(', ');
+        setDetectedPlace(place);
+        let region: Region = 'US';
+        if (cc === 'PK') region = 'PK';
+        else if (cc === 'GB' || cc === 'UK') region = 'UK';
+        setPaymentRegion(region);
+        setPaymentMethod(REGION_PROFILES[region].defaultMethod);
       })
-      .catch((err) => {
-        console.warn('IP geolocator offline, defaulting to Pakistan PK standard.', err);
-        setPaymentRegion('PK');
-        setPaymentMethod('easypaisa');
+      .catch(() => {
+        // Fallback: infer from timezone, otherwise international card checkout
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+        let region: Region = 'US';
+        if (tz.includes('Karachi')) region = 'PK';
+        else if (tz.includes('London')) region = 'UK';
+        setPaymentRegion(region);
+        setPaymentMethod(REGION_PROFILES[region].defaultMethod);
+        setDetectedPlace('');
       })
-      .finally(() => {
-        setIsDetectingIp(false);
-      });
+      .finally(() => setIsDetecting(false));
   }, []);
 
-  const handleRegionChange = (newRegion: 'PK' | 'UK' | 'US') => {
-    setPaymentRegion(newRegion);
-    if (newRegion === 'PK') {
-      setPaymentMethod('easypaisa');
-    } else if (newRegion === 'UK') {
-      setPaymentMethod('paypal');
-    } else {
-      setPaymentMethod('card');
-    }
-  };
+  const profile = REGION_PROFILES[paymentRegion];
 
   const tierPricing = {
     general: event.price,
@@ -103,42 +127,25 @@ export default function CheckoutPage({
     elite: Math.round(event.price * 2.1),
   };
 
-  const getTierPrice = () => tierPricing[ticketTier];
-  const getSubtotal = () => getTierPrice() * ticketCount;
+  const getSubtotal = () => tierPricing[ticketTier] * ticketCount;
+  const getDiscount = () => (promoApplied ? Math.round(getSubtotal() * 0.18) : 0);
+  const getFees = () => Math.round((getSubtotal() - getDiscount()) * 0.08);
+  const getTotalInUsd = () => getSubtotal() - getDiscount() + getFees();
 
-  const getDiscount = () => {
-    if (!promoApplied) return 0;
-    // JAZBA18 gives 18% off
-    return Math.round(getSubtotal() * 0.18);
-  };
-
-  const getFees = () => {
-    // 8% service fee on remaining subtotal
-    return Math.round((getSubtotal() - getDiscount()) * 0.08);
-  };
-
-  const getTotalInUsd = () => {
-    return getSubtotal() - getDiscount() + getFees();
-  };
-
-  const getConvertedPrice = (usdAmount: number) => {
-    if (paymentRegion === 'PK') {
-      return `Rs. ${Math.round(usdAmount * 280).toLocaleString()}`;
-    }
-    if (paymentRegion === 'UK') {
-      return `£${(usdAmount * 0.78).toFixed(2)}`;
-    }
+  // Local pricing follows the detected region
+  const formatMoney = (usdAmount: number) => {
+    if (paymentRegion === 'PK') return `Rs ${Math.round(usdAmount * 280).toLocaleString()}`;
+    if (paymentRegion === 'UK') return `£${(usdAmount * 0.78).toFixed(2)}`;
     return `$${usdAmount.toFixed(2)}`;
   };
 
-  const handleApplyPromo = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleApplyPromo = () => {
     const clean = promoCode.trim().toUpperCase();
     if (clean === 'JAZBA18' || clean === 'EVENT18' || clean === 'HAMILTON18') {
       setPromoApplied(true);
       setPromoError('');
     } else {
-      setPromoError('Invalid coupon. Try using JAZBA18');
+      setPromoError('That code isn\'t valid. Try JAZBA18 for 18% off.');
       setPromoApplied(false);
     }
   };
@@ -146,8 +153,7 @@ export default function CheckoutPage({
   const handleCreateBooking = async (e?: React.FormEvent, stripeTransactionId?: string) => {
     if (e) e.preventDefault();
     if (!fullName || !emailAddress) return;
-    
-    // Trigger loading spinner
+
     setStep('loading');
     window.scrollTo({ top: 0, behavior: 'instant' });
 
@@ -156,60 +162,39 @@ export default function CheckoutPage({
     const bPrice = getTotalInUsd();
     const barcodeVal = `8${Math.floor(10000000000 + Math.random() * 90000000000)}`;
 
+    const payload = {
+      eventId: event.id,
+      quantity: ticketCount,
+      tier: ticketTier,
+      bookingDate: bDate,
+      orderId: ticketCode,
+      seat: seatConfig,
+      barCode: barcodeVal,
+      pricePaid: bPrice,
+      createdAt: new Date().toISOString(),
+      paymentRegion,
+      paymentMethod,
+      paymentStatus: 'paid',
+      stripeTransactionId: stripeTransactionId || null,
+      billingName: fullName,
+      billingEmail: emailAddress,
+      promoApplied,
+      discountAmount: getDiscount(),
+    };
+
     if (user) {
-      const bRef = doc(db, 'bookings', ticketCode);
       try {
-        await setDoc(bRef, {
-          id: ticketCode,
-          eventId: event.id,
-          quantity: ticketCount,
-          tier: ticketTier,
-          bookingDate: bDate,
-          orderId: ticketCode,
-          seat: seatConfig,
-          barCode: barcodeVal,
-          pricePaid: bPrice,
-          userId: user.uid,
-          createdAt: new Date().toISOString(),
-          paymentRegion: paymentRegion,
-          paymentMethod: paymentMethod,
-          paymentStatus: "paid",
-          stripeTransactionId: stripeTransactionId || null,
-          billingName: fullName,
-          billingEmail: emailAddress,
-          promoApplied: promoApplied,
-          discountAmount: getDiscount()
-        });
-      } catch (err: any) {
-        console.error("Failed to write to Firestore:", err);
+        await setDoc(doc(db, 'bookings', ticketCode), { id: ticketCode, userId: user.uid, ...payload });
+      } catch (err) {
+        console.error('Failed to write booking to Firestore:', err);
       }
     } else {
-      // Save locally to localStorage for guests
       try {
-        const local = localStorage.getItem('jazbaticket_bookings') || '[]';
-        const list = JSON.parse(local);
-        list.push({
-          eventId: event.id,
-          quantity: ticketCount,
-          tier: ticketTier,
-          bookingDate: bDate,
-          orderId: ticketCode,
-          seat: seatConfig,
-          barCode: barcodeVal,
-          pricePaid: bPrice,
-          createdAt: new Date().toISOString(),
-          paymentRegion: paymentRegion,
-          paymentMethod: paymentMethod,
-          paymentStatus: "paid",
-          stripeTransactionId: stripeTransactionId || null,
-          billingName: fullName,
-          billingEmail: emailAddress,
-          promoApplied: promoApplied,
-          discountAmount: getDiscount()
-        });
+        const list = JSON.parse(localStorage.getItem('jazbaticket_bookings') || '[]');
+        list.push(payload);
         localStorage.setItem('jazbaticket_bookings', JSON.stringify(list));
       } catch (err) {
-        console.error("Failed to write local database:", err);
+        console.error('Failed to save local booking:', err);
       }
     }
 
@@ -219,799 +204,467 @@ export default function CheckoutPage({
     }, 1500);
   };
 
+  const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
+
   return (
-    <div className="bg-neutral-50/50 min-h-screen pb-24 pt-8" id="checkout-page-root">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        {/* NAVIGATION ROUTE BREADCRUMB */}
-        <div className="mb-8 flex items-center justify-between">
-          <button 
+    <div className="jz-page bg-white min-h-screen text-black pb-24" id="checkout-page-root">
+
+      {/* ── TOP STRIP ─────────────────────────────────────────── */}
+      <div className="border-b border-[#f2f2f2]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 h-14 flex items-center justify-between">
+          <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-full text-xs font-bold text-sentence tracking-wider transition-all shadow-md active:scale-95 cursor-pointer group"
+            className="flex items-center gap-2 text-black hover:opacity-60 text-sm font-bold transition-opacity cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
-            <span>Back to Event Details</span>
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to event</span>
           </button>
-
-          <span className="text-[10px] bg-neutral-100   text-neutral-500 font-bold text-sentence tracking-widest px-3.5 py-1.5 rounded-full">
-            Secure Checkout
+          <span className={`${overline} text-[#8a8a8a] flex items-center gap-1.5`}>
+            <ShieldCheck className="w-3.5 h-3.5" /> Secure checkout
           </span>
         </div>
+      </div>
 
-        {/* STEP 1: MAIN GRID LAYOUT FOR CHECKOUT DETAILS & CALCULATOR */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+
+        {/* ── STEP 1: DETAILS ─────────────────────────────────── */}
         {step === 'details' && (
-          <form onSubmit={handleCreateBooking} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            
-            {/* LEFT CONTENT COLUMN: 8 Columns of secure fields & payment methods */}
-            <div className="lg:col-span-8 space-y-6">
-              
-              {/* PAGE MAIN BANNER & HEADLINE */}
-              <div className="bg-white   rounded-2xl p-6 sm:p-8 shadow-2xs text-left">
-                <span className="bg-[#E34718] text-white text-[10px] text-sentence font-black tracking-widest px-3 py-1.5 rounded-full inline-block">
-                  Checkout System
-                </span>
-                <h1 className="text-2xl sm:text-3xl font-display font-medium text-neutral-950 mt-4 tracking-tight">
-                  Secure Ticket Checkout
-                </h1>
-                <p className="text-xs sm:text-sm text-neutral-500 font-medium mt-2 leading-relaxed">
-                  Review your tickets and billing details, then choose a payment method below to confirm your booking.
-                </p>
+          <form onSubmit={handleCreateBooking} className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start pt-10">
+
+            {/* LEFT — configurator column */}
+            <div className="lg:col-span-7">
+
+              <h1 className="font-display font-bold text-3xl sm:text-4xl leading-[0.95]">Checkout</h1>
+              <p className="text-[#666] text-sm mt-3 max-w-lg">
+                Confirm your details and pay — your tickets arrive by email the moment payment clears.
+              </p>
+
+              {/* Detected location banner */}
+              <div className="flex items-center gap-3 border border-[#e4e4e4] px-5 py-4 mt-8">
+                <Globe className="w-5 h-5 shrink-0" />
+                {isDetecting ? (
+                  <span className="text-sm text-[#666] flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Detecting your location…
+                  </span>
+                ) : (
+                  <div className="text-sm">
+                    <span className="font-bold">
+                      {detectedPlace || (paymentRegion === 'PK' ? 'Pakistan' : paymentRegion === 'UK' ? 'United Kingdom' : 'International')}
+                    </span>
+                    <span className="text-[#666]"> — prices shown in {profile.currencyLabel}, with local payment options below.</span>
+                  </div>
+                )}
               </div>
 
-              {/* CARD 1: PERSONAL INFORMATION BILLING DATA */}
-              <div className="bg-white   rounded-2xl p-6 sm:p-8 shadow-2xs text-left">
-                <div className="  pb-3 mb-6">
-                  <h3 className="text-xs font-black text-neutral-400 text-sentence tracking-widest flex items-center gap-2">
-                    <User className="w-4.5 h-4.5 text-[#E34718]" /> Personal Billing Details
-                  </h3>
+              {/* 1 · Your details */}
+              <div className="mt-10">
+                <div className="flex items-baseline gap-3 border-b border-black pb-3">
+                  <span className="font-display font-bold text-lg">1</span>
+                  <h2 className="font-display font-bold text-xl">Your details</h2>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 pt-6">
                   <div>
-                    <label className="block text-[11px] font-bold text-sentence tracking-wider text-neutral-400 mb-2 flex items-center gap-1.5">
-                      Full Name
-                    </label>
-                    <input 
-                      type="text" 
+                    <label className={`${overline} text-[#666] block mb-2`}>Full name</label>
+                    <input
+                      type="text"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      placeholder="e.g. John Doe"
+                      placeholder="Liam Hall"
                       required
-                      className="w-full bg-white   rounded-xl px-4 py-3 text-sm font-semibold text-neutral-800 placeholder-neutral-300  focus:ring-0 focus:outline-none transition-colors"
+                      className="w-full bg-white px-0 py-3 text-base text-black placeholder-[#8a8a8a]"
                       id="checkout-name-input"
                     />
                   </div>
-
                   <div>
-                    <label className="block text-[11px] font-bold text-sentence tracking-wider text-neutral-400 mb-2 flex items-center gap-1.5">
-                      Email Address
-                    </label>
-                    <input 
-                      type="email" 
+                    <label className={`${overline} text-[#666] block mb-2`}>Email address</label>
+                    <input
+                      type="email"
                       value={emailAddress}
                       onChange={(e) => setEmailAddress(e.target.value)}
-                      placeholder="e.g. john@example.com"
+                      placeholder="you@example.com"
                       required
-                      className="w-full bg-white   rounded-xl px-4 py-3 text-sm font-semibold text-neutral-800 placeholder-neutral-300  focus:ring-0 focus:outline-none transition-colors"
+                      className="w-full bg-white px-0 py-3 text-base text-black placeholder-[#8a8a8a]"
                       id="checkout-email-input"
                     />
-                    <p className="text-[10px] text-neutral-400 font-medium mt-1.5">
-                      Your tickets will be sent to this email address.
-                    </p>
+                    <p className="text-xs text-[#8a8a8a] mt-2">Tickets are delivered to this address.</p>
                   </div>
                 </div>
               </div>
 
-              {/* CARD 2: REGIONAL PAYMENT SYSTEM CONTAINER */}
-              <div className="bg-white   rounded-2xl p-6 sm:p-8 shadow-2xs text-left" id="payment-system-container">
-                
-                {/* Header with Country detection indicators */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4   mb-6">
-                  <div>
-                    <h3 className="text-xs font-black text-neutral-400 text-sentence tracking-widest flex items-center gap-2">
-                      <Globe className="w-4.5 h-4.5 text-[#E34718]" /> Payment Method
-                    </h3>
-                  </div>
-
-                  {/* Manual Bypass Selector */}
-                  <div className="flex items-center gap-1 bg-neutral-150 p-1.5 rounded-xl   font-semibold text-xs shrink-0 bg-neutral-100">
-                    <span className="text-[10px] text-neutral-400 text-sentence font-black px-2 tracking-wider">Zone:</span>
-                    <button
-                      type="button"
-                      onClick={() => handleRegionChange('PK')}
-                      className={`px-3 py-1.5 text-[10px] rounded-lg transition-all cursor-pointer font-bold ${paymentRegion === 'PK' ? 'bg-white shadow-xs font-black text-[#E34718]' : 'text-neutral-500 hover:text-black'}`}
-                    >
-                      PK 🇵🇰
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleRegionChange('UK')}
-                      className={`px-3 py-1.5 text-[10px] rounded-lg transition-all cursor-pointer font-bold ${paymentRegion === 'UK' ? 'bg-white shadow-xs font-black text-[#E34718]' : 'text-neutral-500 hover:text-black'}`}
-                    >
-                      UK 🇬🇧
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleRegionChange('US')}
-                      className={`px-3 py-1.5 text-[10px] rounded-lg transition-all cursor-pointer font-bold ${paymentRegion === 'US' ? 'bg-white shadow-xs font-black text-[#E34718]' : 'text-neutral-500 hover:text-black'}`}
-                    >
-                      US 🇺🇸
-                    </button>
-                  </div>
+              {/* 2 · Payment */}
+              <div className="mt-12" id="payment-system-container">
+                <div className="flex items-baseline gap-3 border-b border-black pb-3">
+                  <span className="font-display font-bold text-lg">2</span>
+                  <h2 className="font-display font-bold text-xl">Payment</h2>
                 </div>
 
-                <div className="space-y-6">
-                  <div>
-                    <span className="block text-[11px] font-bold text-sentence tracking-wider text-neutral-400 mb-3 block">
-                      Select Payment Method
-                    </span>
-
-                    {/* PAKISTAN ZONE */}
-                    {paymentRegion === 'PK' && (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div 
-                          onClick={() => setPaymentMethod('easypaisa')}
-                          className={`p-4 rounded-xl  cursor-pointer select-none transition-all flex flex-col justify-between h-20 text-left ${
-                            paymentMethod === 'easypaisa'
-                              ? ' bg-[#E34718]/5'
-                              : '  hover:bg-neutral-50 bg-white'
+                {/* Method rows — configurator style */}
+                <div className="border-b border-[#f2f2f2]">
+                  {profile.methods.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setPaymentMethod(m.id)}
+                      className="w-full flex items-center justify-between py-5 border-b border-[#f2f2f2] last:border-b-0 cursor-pointer text-left group"
+                    >
+                      <div className="flex items-center gap-4">
+                        <span
+                          className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
+                            paymentMethod === m.id ? 'border-black bg-black' : 'border-[#c4c4c4] group-hover:border-black'
                           }`}
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-extrabold text-emerald-600 block">easypaisa</span>
-                            <div className={`w-4 h-4 rounded-full  flex items-center justify-center ${paymentMethod === 'easypaisa' ? 'bg-[#E34718] text-[9px] text-white ' : 'bg-transparent '}`}>
-                              {paymentMethod === 'easypaisa' && '✓'}
-                            </div>
-                          </div>
-                          <span className="text-[10px] text-neutral-400 font-bold block">Mobile Wallet</span>
-                        </div>
-
-                        <div 
-                          onClick={() => setPaymentMethod('jazzcash')}
-                          className={`p-4 rounded-xl  cursor-pointer select-none transition-all flex flex-col justify-between h-20 text-left ${
-                            paymentMethod === 'jazzcash'
-                              ? ' bg-[#E34718]/5'
-                              : '  hover:bg-neutral-50 bg-white'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-extrabold text-red-600 block text-red-705 tracking-tight font-sans">JazzCash</span>
-                            <div className={`w-4 h-4 rounded-full  flex items-center justify-center ${paymentMethod === 'jazzcash' ? 'bg-[#E34718] text-[9px] text-white ' : 'bg-transparent '}`}>
-                              {paymentMethod === 'jazzcash' && '✓'}
-                            </div>
-                          </div>
-                          <span className="text-[10px] text-neutral-400 font-bold block">Mobile Wallet</span>
-                        </div>
-
-                        <div 
-                          onClick={() => setPaymentMethod('stripe')}
-                          className={`p-4 rounded-xl  cursor-pointer select-none transition-all flex flex-col justify-between h-20 text-left ${
-                            paymentMethod === 'stripe'
-                              ? ' bg-[#E34718]/5'
-                              : '  hover:bg-neutral-50 bg-white'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-violet-600 font-sans block leading-none">stripe card</span>
-                            <div className={`w-4 h-4 rounded-full  flex items-center justify-center ${paymentMethod === 'stripe' ? 'bg-[#E34718] text-[9px] text-white ' : 'bg-transparent '}`}>
-                              {paymentMethod === 'stripe' && '✓'}
-                            </div>
-                          </div>
-                          <span className="text-[10px] text-neutral-400 font-bold block">Credit/Debit</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* UNITED KINGDOM ZONE */}
-                    {paymentRegion === 'UK' && (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div 
-                          onClick={() => setPaymentMethod('paypal')}
-                          className={`p-4 rounded-xl  cursor-pointer select-none transition-all flex flex-col justify-between h-20 text-left ${
-                            paymentMethod === 'paypal'
-                              ? ' bg-[#E34718]/5'
-                              : '  hover:bg-neutral-50 bg-white'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-blue-700 font-sans block leading-none">PayPal</span>
-                            <div className={`w-4 h-4 rounded-full  flex items-center justify-center ${paymentMethod === 'paypal' ? 'bg-[#E34718] text-[9px] text-white ' : 'bg-transparent '}`}>
-                              {paymentMethod === 'paypal' && '✓'}
-                            </div>
-                          </div>
-                          <span className="text-[10px] text-neutral-400 font-bold">Express Secure</span>
-                        </div>
-
-                        <div 
-                          onClick={() => setPaymentMethod('stripe')}
-                          className={`p-4 rounded-xl  cursor-pointer select-none transition-all flex flex-col justify-between h-20 text-left col-span-2 ${
-                            paymentMethod === 'stripe'
-                              ? ' bg-[#E34718]/5'
-                              : '  hover:bg-neutral-50 bg-white'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-violet-650 text-violet-600 font-sans block leading-none">stripe checkout card</span>
-                            <div className={`w-4 h-4 rounded-full  flex items-center justify-center ${paymentMethod === 'stripe' ? 'bg-[#E34718] text-[9px] text-white ' : 'bg-transparent '}`}>
-                              {paymentMethod === 'stripe' && '✓'}
-                            </div>
-                          </div>
-                          <span className="text-[10px] text-neutral-400 font-bold">PCI-Compliant Credit/Debit Clearing</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* UNITED STATES ZONE */}
-                    {paymentRegion === 'US' && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div 
-                          onClick={() => setPaymentMethod('stripe')}
-                          className={`p-4 rounded-xl  cursor-pointer select-none transition-all flex flex-col justify-between h-20 text-left ${
-                            paymentMethod === 'stripe'
-                              ? ' bg-[#E34718]/5'
-                              : '  hover:bg-neutral-50 bg-white'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-violet-600 font-sans block leading-none">stripe card</span>
-                            <div className={`w-4 h-4 rounded-full  flex items-center justify-center ${paymentMethod === 'stripe' ? 'bg-[#E34718] text-[9px] text-white ' : 'bg-transparent '}`}>
-                              {paymentMethod === 'stripe' && '✓'}
-                            </div>
-                          </div>
-                          <span className="text-[10px] text-neutral-400 font-bold">Visa / Master / Amex</span>
-                        </div>
-
-                        <div 
-                          onClick={() => setPaymentMethod('paypal')}
-                          className={`p-4 rounded-xl  cursor-pointer select-none transition-all flex flex-col justify-between h-20 text-left ${
-                            paymentMethod === 'paypal'
-                              ? ' bg-[#E34718]/5'
-                              : '  hover:bg-neutral-50 bg-white'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-blue-700 font-sans block leading-none">PayPal</span>
-                            <div className={`w-4 h-4 rounded-full  flex items-center justify-center ${paymentMethod === 'paypal' ? 'bg-[#E34718] text-[9px] text-white ' : 'bg-transparent '}`}>
-                              {paymentMethod === 'paypal' && '✓'}
-                            </div>
-                          </div>
-                          <span className="text-[10px] text-neutral-400 font-bold font-sans">Express Secure</span>
-                        </div>
-
-                        <div 
-                          onClick={() => setPaymentMethod('applepay')}
-                          className={`p-4 rounded-xl  cursor-pointer select-none transition-all flex flex-col justify-between h-20 text-left ${
-                            paymentMethod === 'applepay'
-                              ? ' bg-neutral-900/5'
-                              : '  hover:bg-neutral-50 bg-white'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-neutral-900 font-sans block leading-none"> Pay</span>
-                            <div className={`w-4 h-4 rounded-full  flex items-center justify-center ${paymentMethod === 'applepay' ? 'bg-black text-[9px] text-white ' : 'bg-transparent '}`}>
-                              {paymentMethod === 'applepay' && '✓'}
-                            </div>
-                          </div>
-                          <span className="text-[10px] text-neutral-400 font-bold font-sans">Apple Accounts</span>
-                        </div>
-
-                        <div 
-                          onClick={() => setPaymentMethod('googlepay')}
-                          className={`p-4 rounded-xl  cursor-pointer select-none transition-all flex flex-col justify-between h-20 text-left ${
-                            paymentMethod === 'googlepay'
-                              ? ' bg-[#E34718]/5'
-                              : '  hover:bg-neutral-50 bg-white'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-neutral-800 font-sans block leading-none">Google Pay</span>
-                            <div className={`w-4 h-4 rounded-full  flex items-center justify-center ${paymentMethod === 'googlepay' ? 'bg-[#E34718] text-[9px] text-white ' : 'bg-transparent '}`}>
-                              {paymentMethod === 'googlepay' && '✓'}
-                            </div>
-                          </div>
-                          <span className="text-[10px] text-neutral-400 font-bold font-sans">Google Pay Wallet</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* DETAIL ENTRY SUBFORM BASED ON PAYMENT TYPE */}
-                  <div className="bg-neutral-50   rounded-2xl p-6">
-                    
-                    {/* Pakistan direct account details */}
-                    {paymentRegion === 'PK' && (paymentMethod === 'easypaisa' || paymentMethod === 'jazzcash') && (
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between gap-2   pb-2 mb-2">
-                          <span className="text-xs font-bold text-neutral-700 text-sentence tracking-wider flex items-center gap-1.5">
-                            <Smartphone className="w-4 h-4 text-[#E34718]" />
-                            {paymentMethod === 'easypaisa' ? 'Easypaisa Mobile Account' : 'JazzCash Wallet Account'}
-                          </span>
-                          <span className="text-[9px] text-[#E34718] bg-[#E34718]/10 text-[#E34718] font-bold text-sentence tracking-wider px-2.5 py-0.5 rounded-full">
-                            SMS PIN Required
-                          </span>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <label className="block text-[10px] font-bold text-sentence tracking-wider text-neutral-400">
-                            Mobile Handset Number (11 Digits)
-                          </label>
-                          <div className="relative">
-                            <span className="absolute left-4 top-3 text-sm font-black text-neutral-500">+92</span>
-                            <input 
-                              type="tel" 
-                              value={pkMobileNumber}
-                              onChange={(e) => {
-                                const val = e.target.value.replace(/\D/g, '').slice(0, 11);
-                                setPkMobileNumber(val);
-                              }}
-                              placeholder="300 0000000"
-                              required
-                              className="w-full bg-white   rounded-xl pl-14 pr-4 py-3 text-sm font-mono font-bold text-neutral-800  focus:ring-0 focus:outline-none placeholder-neutral-300"
-                            />
-                          </div>
-                        </div>
-
-                        <p className="text-[11px] text-neutral-500 leading-normal font-semibold">
-                          Enter the mobile number linked to your {paymentMethod === 'easypaisa' ? 'Easypaisa' : 'JazzCash'} account. You'll get a confirmation prompt on your phone to approve the payment.
-                        </p>
-                      </div>
-                    )}
-
-                    {/* United Kingdom or United States Cards / Stripe Card */}
-                    {paymentMethod === 'stripe' && (
-                      <StripeCheckoutForm
-                        amount={getTotalInUsd()}
-                        currency={paymentRegion === 'PK' ? 'PKR' : paymentRegion === 'UK' ? 'GBP' : 'USD'}
-                        billingName={fullName}
-                        billingEmail={emailAddress}
-                        onPaymentSuccess={(txId) => handleCreateBooking(undefined, txId)}
-                        onPaymentError={(err) => console.error("Stripe payment error:", err)}
-                      />
-                    )}
-
-                    {/* PayPal Checkout Form Integration */}
-                    {paymentMethod === 'paypal' && (
-                      <PayPalCheckoutForm
-                        amount={getTotalInUsd()}
-                        currency={paymentRegion === 'PK' ? 'PKR' : paymentRegion === 'UK' ? 'GBP' : 'USD'}
-                        billingName={fullName}
-                        billingEmail={emailAddress}
-                        onPaymentSuccess={(txId) => handleCreateBooking(undefined, txId)}
-                        onPaymentError={(err) => console.error("PayPal payment error:", err)}
-                      />
-                    )}
-
-                    {/* US Apple / Google pay express options */}
-                    {paymentRegion === 'US' && (paymentMethod === 'applepay' || paymentMethod === 'googlepay') && (
-                      <div className="text-center py-4 space-y-3">
-                        <span className="text-[10px] font-bold text-neutral-400 text-sentence tracking-widest block">
-                          Express Checkout
+                          {paymentMethod === m.id && <span className="w-2 h-2 rounded-full bg-[#ffed00]" />}
                         </span>
-                        <div className="inline-flex items-center gap-2 bg-black text-white rounded-xl py-2 px-6 text-xs font-bold shadow-md">
-                          <span>{paymentMethod === 'applepay' ? 'Apple Pay Enabled' : 'Google Pay Enabled'}</span>
+                        <div>
+                          <span className="font-bold text-base block">{m.name}</span>
+                          <span className="text-sm text-[#666]">{m.note}</span>
                         </div>
-                        <p className="text-[11px] text-neutral-500 leading-normal font-semibold">
-                          Confirm the payment in your wallet app to complete your booking.
-                        </p>
                       </div>
-                    )}
+                      {paymentMethod === m.id && <Check className="w-5 h-5" />}
+                    </button>
+                  ))}
+                </div>
 
-                    {/* Secure Lock Badge */}
-                    <div className="pt-4   mt-4 flex flex-col sm:flex-row gap-2 items-center justify-between text-[9px] font-bold text-neutral-450 font-mono text-sentence tracking-widest text-neutral-400 col-span-2">
-                      <span className="flex items-center gap-1.5">
-                        <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-                        256-Bit SSL Encryption
-                      </span>
-                      <span>PCI-DSS Compliant</span>
+                {/* Method detail panel */}
+                <div className="bg-[#f7f7f7] p-6 sm:p-8 mt-8">
+
+                  {paymentRegion === 'PK' && (paymentMethod === 'easypaisa' || paymentMethod === 'jazzcash') && (
+                    <div>
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <h3 className="font-display font-bold text-lg">
+                          {paymentMethod === 'easypaisa' ? 'Easypaisa account' : 'JazzCash account'}
+                        </h3>
+                        <span className={`${overline} bg-white border border-[#e4e4e4] px-3 py-1.5`}>SMS PIN confirmation</span>
+                      </div>
+
+                      <div className="mt-6 max-w-sm">
+                        <label className={`${overline} text-[#666] block mb-2`}>Mobile number</label>
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-base shrink-0">+92</span>
+                          <input
+                            type="tel"
+                            value={pkMobileNumber}
+                            onChange={(e) => setPkMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                            placeholder="300 0000000"
+                            required
+                            className="w-full bg-transparent px-0 py-3 text-base text-black placeholder-[#8a8a8a]"
+                          />
+                        </div>
+                      </div>
+
+                      <p className="text-sm text-[#666] mt-5 max-w-md">
+                        Use the number linked to your {paymentMethod === 'easypaisa' ? 'Easypaisa' : 'JazzCash'} wallet. A confirmation prompt lands on your phone — approve it and you're done.
+                      </p>
                     </div>
+                  )}
 
+                  {paymentMethod === 'stripe' && (
+                    <StripeCheckoutForm
+                      amount={getTotalInUsd()}
+                      currency={paymentRegion === 'PK' ? 'PKR' : paymentRegion === 'UK' ? 'GBP' : 'USD'}
+                      billingName={fullName}
+                      billingEmail={emailAddress}
+                      onPaymentSuccess={(txId) => handleCreateBooking(undefined, txId)}
+                      onPaymentError={(err) => console.error('Stripe payment error:', err)}
+                    />
+                  )}
+
+                  {paymentMethod === 'paypal' && (
+                    <PayPalCheckoutForm
+                      amount={getTotalInUsd()}
+                      currency={paymentRegion === 'PK' ? 'PKR' : paymentRegion === 'UK' ? 'GBP' : 'USD'}
+                      billingName={fullName}
+                      billingEmail={emailAddress}
+                      onPaymentSuccess={(txId) => handleCreateBooking(undefined, txId)}
+                      onPaymentError={(err) => console.error('PayPal payment error:', err)}
+                    />
+                  )}
+
+                  {(paymentMethod === 'applepay' || paymentMethod === 'googlepay') && (
+                    <div className="text-center py-6">
+                      <span className="inline-block bg-black text-white text-sm font-bold px-8 py-3.5">
+                        {paymentMethod === 'applepay' ? 'Pay with Apple Pay' : 'Pay with Google Pay'}
+                      </span>
+                      <p className="text-sm text-[#666] mt-4">
+                        Approve the payment in your wallet app to finish your booking.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#e4e4e4] mt-8 pt-5 text-xs text-[#8a8a8a]">
+                    <span className="flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4" /> 256-bit SSL encryption
+                    </span>
+                    <span>PCI-DSS compliant</span>
                   </div>
                 </div>
               </div>
-
             </div>
 
-            {/* RIGHT COLUMN: 4 Columns containing Sticky billing details, pricing summary & tier choice */}
-            <div className="lg:col-span-4 lg:sticky lg:top-24 lg:self-start h-fit space-y-6">
-              
-              {/* MICRO EVENT CARD SHAPE */}
-              <div className="bg-white   rounded-2xl p-5 shadow-2xs text-left">
-                <span className="bg-[#E34718]/10 text-[#C23A12]   text-[9px] font-black text-sentence tracking-widest px-2.5 py-1 rounded-full inline-block">
-                  Your Show Selection
-                </span>
-                
-                <div className="mt-4 flex gap-3.5">
-                  <div className="w-16 h-16 rounded-xl overflow-hidden bg-neutral-100 shrink-0  ">
-                    <img 
-                      src={event.image} 
-                      alt={event.title}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="font-display font-bold text-sm sm:text-base text-neutral-900 leading-tight truncate">
-                      {event.title}
-                    </h4>
-                    <p className="text-[10px] text-neutral-400 font-extrabold text-sentence tracking-wider mt-1.5 block">
-                      {event.category}
-                    </p>
+            {/* RIGHT — order summary rail */}
+            <div className="lg:col-span-5 lg:sticky lg:top-20 lg:self-start">
+              <div className="border border-black">
+
+                {/* Event strip */}
+                <div className="p-6 border-b border-[#f2f2f2]">
+                  <span className={`${overline} text-[#666]`}>Your order</span>
+                  <div className="flex gap-4 mt-4">
+                    <div className="w-20 h-20 overflow-hidden bg-[#f7f7f7] shrink-0">
+                      <img
+                        src={event.image}
+                        alt={event.title}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="font-display font-bold text-lg leading-tight truncate">{event.title}</h4>
+                      <div className="space-y-1 mt-2 text-sm text-[#666]">
+                        <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 shrink-0" /><span className="truncate">{event.location}</span></span>
+                        <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 shrink-0" />{event.fullDate || `${event.date}, ${event.year || '2026'}`}</span>
+                        <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 shrink-0" />{event.time}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="mt-4 pt-4   space-y-2.5 text-xs text-neutral-600 font-semibold">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-3.5 h-3.5 text-[#E34718] shrink-0" />
-                    <span className="truncate">{event.location}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-3.5 h-3.5 text-[#E34718] shrink-0" />
-                    <span>{event.time}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-3.5 h-3.5 text-[#E34718] shrink-0" />
-                    <span>{event.fullDate || `${event.date}, ${event.year || '2026'}`}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* ORDER SUMMARY & PRICING TICKETS CHANGER */}
-              <div className="bg-white   rounded-2xl p-5 shadow-2xs text-left relative overflow-hidden">
-                <div className="absolute top-0 inset-x-0 h-1 bg-[#E34718]"></div>
-                
-                <h3 className="text-[10px] font-black text-neutral-400 text-sentence tracking-widest mb-4">
-                  Pass Summary &amp; Admission
-                </h3>
-
-                {/* SELECT TICKET TIER IN RED/GRAY BORDERS */}
-                <div className="space-y-2 mb-5">
-                  <span className="block text-[10px] font-bold text-neutral-400 text-sentence tracking-widest mb-1">
-                    Choose Entry Section
-                  </span>
-                  
-                  {/* General Entrance */}
-                  <button 
-                    type="button"
-                    onClick={() => setTicketTier('general')}
-                    className={`w-full text-left p-3 rounded-xl  transition-all flex items-center justify-between cursor-pointer ${
-                      ticketTier === 'general' 
-                        ? ' bg-[#E34718]/5' 
-                        : '  bg-white'
-                    }`}
-                  >
-                    <div>
-                      <span className="font-bold text-xs text-neutral-850 block">General Entry</span>
-                      <span className="text-[9px] text-[#C23A12] font-semibold block mt-0.5 text-sentence tracking-wider">Unreserved Seating</span>
-                    </div>
-                    <span className="font-mono font-bold text-xs sm:text-sm text-neutral-900">${tierPricing.general}</span>
-                  </button>
-
-                  {/* VIP Club Entry */}
-                  <button 
-                    type="button"
-                    onClick={() => setTicketTier('vip')}
-                    className={`w-full text-left p-3 rounded-xl  transition-all flex items-center justify-between cursor-pointer ${
-                      ticketTier === 'vip' 
-                        ? ' bg-[#E34718]/5' 
-                        : '  bg-white'
-                    }`}
-                  >
-                    <div>
-                      <span className="font-bold text-xs text-neutral-850 block">VIP Seating</span>
-                      <span className="text-[9px] text-[#C23A12] font-semibold block mt-0.5 text-sentence tracking-wider">Premium Lounges</span>
-                    </div>
-                    <span className="font-mono font-bold text-xs sm:text-sm text-neutral-900">${tierPricing.vip}</span>
-                  </button>
-
-                  {/* Elite Max Entry */}
-                  <button 
-                    type="button"
-                    onClick={() => setTicketTier('elite')}
-                    className={`w-full text-left p-3 rounded-xl  transition-all flex items-center justify-between cursor-pointer ${
-                      ticketTier === 'elite' 
-                        ? ' bg-[#E34718]/5' 
-                        : '  bg-white'
-                    }`}
-                  >
-                    <div>
-                      <span className="font-bold text-xs text-neutral-850 block">Elite Max</span>
-                      <span className="text-[9px] text-[#C23A12] font-semibold block mt-0.5 text-sentence tracking-wider">Meet &amp; Gift Hampers</span>
-                    </div>
-                    <span className="font-mono font-bold text-xs sm:text-sm text-neutral-900">${tierPricing.elite}</span>
-                  </button>
+                {/* Tier rows */}
+                <div className="p-6 border-b border-[#f2f2f2]">
+                  <span className={`${overline} text-[#666] block mb-1`}>Ticket type</span>
+                  {(['general', 'vip', 'elite'] as const).map((tier) => (
+                    <button
+                      key={tier}
+                      type="button"
+                      onClick={() => setTicketTier(tier)}
+                      className="w-full flex items-center justify-between py-4 border-b border-[#f2f2f2] last:border-b-0 cursor-pointer text-left group"
+                    >
+                      <div className="flex items-center gap-3.5">
+                        <span
+                          className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
+                            ticketTier === tier ? 'border-black bg-black' : 'border-[#c4c4c4] group-hover:border-black'
+                          }`}
+                        >
+                          {ticketTier === tier && <span className="w-2 h-2 rounded-full bg-[#ffed00]" />}
+                        </span>
+                        <div>
+                          <span className="font-bold text-sm block">{TIER_META[tier].name}</span>
+                          <span className="text-xs text-[#666]">{TIER_META[tier].note}</span>
+                        </div>
+                      </div>
+                      <span className="font-display font-bold text-base">{formatMoney(tierPricing[tier])}</span>
+                    </button>
+                  ))}
                 </div>
 
-                {/* QUANTITY PICKER IN SAME STYLE CONTAINER */}
-                <div className="flex items-center justify-between bg-neutral-50/65   rounded-xl p-3.5 mb-5 select-none">
+                {/* Quantity */}
+                <div className="p-6 border-b border-[#f2f2f2] flex items-center justify-between">
                   <div>
-                    <span className="text-xs font-bold text-neutral-800 block">Total Attendees</span>
-                    <span className="text-[9px] text-neutral-400 font-semibold mt-0.5 block">Limit 10 tickets</span>
+                    <span className="font-bold text-sm block">Tickets</span>
+                    <span className="text-xs text-[#666]">Up to 10 per order</span>
                   </div>
-
-                  <div className="flex items-center gap-3">
-                    <button 
+                  <div className="flex items-center gap-4">
+                    <button
                       type="button"
                       onClick={() => setTicketCount(Math.max(1, ticketCount - 1))}
-                      className="w-7 h-7 rounded-full   bg-white flex items-center justify-center font-bold text-neutral-800 hover:bg-neutral-100 cursor-pointer shadow-3xs text-xs"
+                      className="w-10 h-10 border border-black flex items-center justify-center cursor-pointer hover:bg-[#f7f7f7] transition-colors"
                     >
-                      -
+                      <Minus className="w-4 h-4" />
                     </button>
-                    <span className="font-display font-extrabold text-sm text-neutral-900 min-w-[20px] text-center">
-                      {ticketCount}
-                    </span>
-                    <button 
+                    <span className="font-display font-bold text-xl min-w-[24px] text-center">{ticketCount}</span>
+                    <button
                       type="button"
                       onClick={() => setTicketCount(Math.min(10, ticketCount + 1))}
-                      className="w-7 h-7 rounded-full   bg-white flex items-center justify-center font-bold text-neutral-800 hover:bg-neutral-100 cursor-pointer shadow-3xs text-xs"
+                      className="w-10 h-10 border border-black flex items-center justify-center cursor-pointer hover:bg-[#f7f7f7] transition-colors"
                     >
-                      +
+                      <Plus className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
 
-                {/* PROMO CODE GATE */}
-                <div className="  rounded-xl p-3.5 mb-5 bg-neutral-50/30 text-left">
-                  <span className="text-[9px] font-black text-neutral-400 text-sentence tracking-widest block mb-1.5">Apply Event Coupon</span>
-                  
-                  <div className="flex gap-2">
-                    <input 
-                      type="text" 
+                {/* Promo */}
+                <div className="p-6 border-b border-[#f2f2f2]">
+                  <label className={`${overline} text-[#666] block mb-2`}>Promo code</label>
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
                       value={promoCode}
                       onChange={(e) => setPromoCode(e.target.value)}
-                      placeholder="e.g. JAZBA18 (18% OFF)"
-                      className="flex-1 bg-white   rounded-lg px-2.5 py-1.5 text-xs font-bold text-sentence placeholder-neutral-300  focus:outline-none focus:ring-0"
+                      placeholder="JAZBA18"
+                      className="flex-1 bg-white px-0 py-2.5 text-sm text-black placeholder-[#8a8a8a]"
                     />
-                    <button 
+                    <button
                       type="button"
                       onClick={handleApplyPromo}
-                      className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white text-[10px] font-black text-sentence tracking-wider rounded-lg transition-colors cursor-pointer"
+                      className="bg-black text-white text-sm font-bold px-5 cursor-pointer hover:bg-neutral-800 transition-colors"
                     >
                       Apply
                     </button>
                   </div>
-
                   {promoApplied && (
-                    <span className="text-[10px] text-emerald-600 font-bold block mt-1.5 flex items-center gap-1 animate-fadeIn">
-                      ✓ Promo Applied: 18% Off!
+                    <span className="flex items-center gap-1.5 text-sm font-bold mt-3">
+                      <Check className="w-4 h-4" /> 18% discount applied
                     </span>
                   )}
                   {promoError && (
-                    <span className="text-[10px] text-[#E34718] font-bold block mt-1.5">
-                      {promoError}
-                    </span>
+                    <span className="block text-sm text-[#be6464] mt-3">{promoError}</span>
                   )}
                 </div>
 
-                {/* FINAL FINANCIAL CALCULATIONS BREAKDOWN */}
-                <div className="bg-neutral-50/80   rounded-2xl p-4.5 space-y-2 text-xs font-bold text-neutral-500 mb-5">
-                  <div className="flex justify-between">
-                    <span>Subtotal</span>
-                    <span>{getConvertedPrice(getSubtotal())}</span>
-                  </div>
-
-                  {promoApplied && (
-                    <div className="flex justify-between text-emerald-600">
-                      <span>Discount (18% Off)</span>
-                      <span>-{getConvertedPrice(getDiscount())}</span>
+                {/* Totals */}
+                <div className="p-6">
+                  <div className="space-y-2.5 text-sm">
+                    <div className="flex justify-between text-[#666]">
+                      <span>Subtotal</span>
+                      <span>{formatMoney(getSubtotal())}</span>
                     </div>
+                    {promoApplied && (
+                      <div className="flex justify-between text-[#666]">
+                        <span>Discount (18%)</span>
+                        <span>−{formatMoney(getDiscount())}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-[#666]">
+                      <span>Service fee (8%)</span>
+                      <span>{formatMoney(getFees())}</span>
+                    </div>
+                    <div className="flex justify-between items-baseline border-t border-black mt-4 pt-4">
+                      <span className="font-display font-bold text-lg">Total</span>
+                      <span className="font-display font-bold text-2xl">{formatMoney(getTotalInUsd())}</span>
+                    </div>
+                  </div>
+
+                  {/* Primary CTA — the page's single yellow moment */}
+                  {paymentMethod === 'stripe' || paymentMethod === 'paypal' ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!fullName || !emailAddress) {
+                          const nameEl = document.getElementById('checkout-name-input');
+                          nameEl?.focus();
+                          nameEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        } else {
+                          const gate = document.getElementById(paymentMethod === 'stripe' ? 'stripe-checkout-gate' : 'paypal-checkout-gate');
+                          gate?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                      }}
+                      className="w-full bg-[#ffed00] text-black py-4 mt-6 font-bold text-sm cursor-pointer hover:bg-[#e6d200] transition-colors"
+                    >
+                      Continue to {paymentMethod === 'stripe' ? 'card' : 'PayPal'} payment
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      className="w-full bg-[#ffed00] text-black py-4 mt-6 font-bold text-sm cursor-pointer hover:bg-[#e6d200] transition-colors"
+                    >
+                      Pay {formatMoney(getTotalInUsd())}
+                    </button>
                   )}
 
-                  <div className="flex justify-between">
-                    <span>Service Fee (8%)</span>
-                    <span>{getConvertedPrice(getFees())}</span>
-                  </div>
-
-                  <div className="flex justify-between text-neutral-900 text-sm font-display font-black pt-3    mt-3">
-                    <span>Total Due</span>
-                    <span className="text-base text-neutral-950 font-mono tracking-tight text-[#E34718]">
-                      {getConvertedPrice(getTotalInUsd())}
-                    </span>
-                  </div>
+                  <p className="text-xs text-[#8a8a8a] text-center mt-4 leading-relaxed">
+                    Every order is covered by our refund guarantee. By paying you accept the terms of use.
+                  </p>
                 </div>
-
-                {/* PRIMARY SUBMIT ACTION */}
-                {paymentMethod === 'stripe' ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!fullName || !emailAddress) {
-                        const nameEl = document.getElementById('checkout-name-input');
-                        nameEl?.focus();
-                        nameEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      } else {
-                        const stripeEl = document.getElementById('stripe-checkout-gate');
-                        stripeEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        stripeEl?.classList.add('ring-2', 'ring-violet-500', 'ring-offset-2');
-                        setTimeout(() => {
-                          stripeEl?.classList.remove('ring-2', 'ring-violet-500', 'ring-offset-2');
-                        }, 2000);
-                      }
-                    }}
-                    className="w-full bg-neutral-950 hover:bg-neutral-900 text-white py-4 rounded-full font-bold text-xs text-sentence tracking-wider transition-all shadow-md active:scale-97 cursor-pointer text-center flex items-center justify-center gap-1.5"
-                  >
-                    <CreditCard className="w-4 h-4 text-violet-400 animate-pulse" />
-                    <span>Pay via Stripe form</span>
-                  </button>
-                ) : paymentMethod === 'paypal' ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!fullName || !emailAddress) {
-                        const nameEl = document.getElementById('checkout-name-input');
-                        nameEl?.focus();
-                        nameEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      } else {
-                        const paypalEl = document.getElementById('paypal-checkout-gate');
-                        paypalEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        paypalEl?.classList.add('ring-2', 'ring-amber-500', 'ring-offset-2');
-                        setTimeout(() => {
-                          paypalEl?.classList.remove('ring-2', 'ring-amber-500', 'ring-offset-2');
-                        }, 2000);
-                      }
-                    }}
-                    className="w-full bg-[#0070ba] hover:bg-[#005ea6] text-white py-4 rounded-full font-bold text-xs text-sentence tracking-wider transition-all shadow-md active:scale-97 cursor-pointer text-center flex items-center justify-center gap-1.5"
-                  >
-                    <Wallet className="w-4 h-4 text-amber-300 animate-pulse" />
-                    <span>Pay via PayPal Checkout</span>
-                  </button>
-                ) : (
-                  <button
-                    type="submit"
-                    className="w-full bg-[#E34718] hover:bg-neutral-900 text-white py-4 rounded-full font-bold text-xs text-sentence tracking-wider transition-all shadow-md active:scale-97 cursor-pointer text-center"
-                  >
-                    Complete Reservation &amp; Pay
-                  </button>
-                )}
-
-                <p className="text-[10px] text-neutral-400 text-center font-bold mt-3 leading-snug">
-                  By completing this purchase, you agree to Jazba Ticket's terms of service.
-                </p>
-
               </div>
             </div>
-
           </form>
         )}
 
-        {/* STEP 2: PROCESSING TRANSACTION LOADER SCREEN */}
+        {/* ── STEP 2: PROCESSING ──────────────────────────────── */}
         {step === 'loading' && (
-          <div className="py-24 flex flex-col items-center justify-center text-center gap-5 min-h-[50vh]">
-            <Loader2 className="w-16 h-16 text-[#E34718] animate-spin" />
-            <div className="space-y-1.5 mt-2">
-              <h3 className="font-display font-black text-xl text-neutral-950 tracking-tight">Processing Secure Booking</h3>
-              <p className="text-xs text-neutral-400 font-bold tracking-wide text-sentence">Securing entrance seats and compiling ticketing barcode...</p>
+          <div className="py-32 flex flex-col items-center justify-center text-center gap-6 min-h-[50vh]">
+            <Loader2 className="w-12 h-12 animate-spin" />
+            <div>
+              <h3 className="font-display font-bold text-2xl leading-[0.95]">Confirming your booking</h3>
+              <p className="text-sm text-[#666] mt-2">Reserving seats and issuing your tickets…</p>
             </div>
           </div>
         )}
 
-        {/* STEP 3: VOUCHER TICKET CERTIFICATE COMPLETED STATE */}
+        {/* ── STEP 3: TICKET ISSUED ───────────────────────────── */}
         {step === 'ticket' && (
-          <div className="max-w-3xl mx-auto space-y-8 animate-fadeIn text-left">
-            
-            {/* Completion metrics */}
-            <div className="bg-white   rounded-2xl p-6 sm:p-8 shadow-2xs text-center space-y-4">
-              <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto   shadow-3xs">
-                <Check className="w-7 h-7 stroke-[3.5]" />
+          <div className="max-w-3xl mx-auto pt-14">
+
+            <div className="text-center">
+              <div className="w-14 h-14 bg-[#ffed00] flex items-center justify-center mx-auto">
+                <Check className="w-7 h-7 text-black stroke-[3]" />
               </div>
-              <h2 className="font-display font-black text-2xl sm:text-3xl text-neutral-900 tracking-tight leading-none">
-                Admission Passes Issued Successfully!
+              <h2 className="font-display font-bold text-3xl sm:text-4xl leading-[0.95] mt-6">
+                You're going to {event.title}.
               </h2>
-              <p className="text-xs sm:text-sm text-neutral-500 font-medium max-w-xl mx-auto leading-relaxed">
-                Your payment was successful and your seats are booked. Print this ticket or simply show the QR code on your phone at the venue entrance.
+              <p className="text-[#666] text-sm mt-4 max-w-md mx-auto">
+                Payment confirmed and tickets sent to {emailAddress || 'your email'}. Show the barcode below at the entrance — printed or on your phone.
               </p>
             </div>
 
-            {/* THE PREMIUM TICKET PASSPORT LAYOUT */}
-            <div className="relative bg-[#E34718]   rounded-3xl overflow-hidden shadow-lg text-white flex flex-col p-6 sm:p-8">
-              
-              {/* Backplate geometric points */}
-              <div className="absolute inset-0 opacity-[0.06] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:8px_8px] pointer-events-none"></div>
-
-              {/* Punch holes styling left and right */}
-              <div className="absolute top-[52%] -left-4 w-8 h-8 bg-neutral-50/50   rounded-full z-10"></div>
-              <div className="absolute top-[52%] -right-4 w-8 h-8 bg-neutral-50/50   rounded-full z-10"></div>
-
-              {/* Title logo space */}
-              <div className="flex items-center justify-between pb-4   mb-6 relative z-10 flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <Ticket className="w-5 h-5 text-white" />
-                  <span className="font-display font-black text-sm text-sentence tracking-widest text-white leading-none">
-                    JAZBATICKET PASS
-                  </span>
-                </div>
-                <span className="font-mono text-[9px] font-black tracking-widest text-sentence bg-neutral-900 text-[#E34718] px-3.5 py-1 rounded-full  ">
-                  {ticketTier === 'elite' ? 'ELITE ACCESS' : ticketTier === 'vip' ? 'VIP GUEST' : 'GENERAL ENTRY'}
+            {/* Ticket — black storytelling tile */}
+            <div className="bg-black text-white mt-10">
+              <div className="flex items-center justify-between px-8 py-5 border-b border-white/15">
+                <span className="flex items-center gap-2 font-display font-bold text-sm tracking-wide">
+                  <Ticket className="w-4 h-4 text-[#ffed00]" /> JAZBATICKET
+                </span>
+                <span className={`${overline} bg-[#ffed00] text-black px-3 py-1.5`}>
+                  {ticketTier === 'elite' ? 'Elite' : ticketTier === 'vip' ? 'VIP' : 'General admission'}
                 </span>
               </div>
 
-              {/* Main voucher fields */}
-              <div className="relative z-10 space-y-6 text-white text-left">
-                <div>
-                  <span className="text-[10px] text-sentence tracking-widest font-bold opacity-60">Production Title</span>
-                  <h3 className="font-display font-black text-xl sm:text-2xl text-white tracking-tight leading-tight text-sentence mt-1 truncate">
-                    {event.title}
-                  </h3>
-                </div>
+              <div className="px-8 py-8">
+                <span className={`${overline} text-white/50`}>Event</span>
+                <h3 className="font-display font-bold text-2xl sm:text-3xl leading-[0.95] mt-2">
+                  {event.title}
+                </h3>
 
-                {/* Metrics detail row */}
-                <div className="grid grid-cols-2 gap-4   pt-4 text-xs font-bold text-white/90">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 border-t border-white/15 mt-8 pt-6">
                   <div>
-                    <span className="block text-[8px] text-sentence tracking-widest opacity-60 mb-0.5">Attendee / Holder</span>
-                    <span className="text-white text-sm font-extrabold truncate block">{fullName || 'Jane Doe'}</span>
+                    <span className={`${overline} text-white/50`}>Ticket holder</span>
+                    <span className="block font-bold text-sm mt-1.5 truncate">{fullName || 'Guest'}</span>
                   </div>
                   <div>
-                    <span className="block text-[8px] text-sentence tracking-widest opacity-60 mb-0.5">Entry Location</span>
-                    <span className="text-white text-sm font-extrabold block truncate">{event.location}</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4   pt-4 text-xs font-bold text-white/90">
-                  <div>
-                    <span className="block text-[8px] text-sentence tracking-widest opacity-60 mb-0.5">Performance Time</span>
-                    <span className="text-white font-mono text-sm font-extrabold block">{event.time}</span>
+                    <span className={`${overline} text-white/50`}>Venue</span>
+                    <span className="block font-bold text-sm mt-1.5 truncate">{event.location}</span>
                   </div>
                   <div>
-                    <span className="block text-[8px] text-sentence tracking-widest opacity-60 mb-0.5">Seating Block</span>
-                    <span className="text-white text-sm font-extrabold block font-mono">Row {seatConfig} ({ticketCount} Pass{ticketCount > 1 ? 'es' : ''})</span>
+                    <span className={`${overline} text-white/50`}>Time</span>
+                    <span className="block font-bold text-sm mt-1.5">{event.time}</span>
+                  </div>
+                  <div>
+                    <span className={`${overline} text-white/50`}>Seats</span>
+                    <span className="block font-bold text-sm mt-1.5">Row {seatConfig} · {ticketCount}×</span>
                   </div>
                 </div>
 
-                {/* Barcode representation block */}
-                <div className="pt-6    flex flex-col items-center gap-3.5 mt-4">
-                  <div className="w-full max-w-sm h-12 flex items-center justify-center gap-[2px] bg-white py-2 px-5   rounded-xl">
-                    <div className="w-[1px] h-full bg-neutral-900"></div>
-                    <div className="w-[3px] h-full bg-neutral-900"></div>
-                    <div className="w-[1.5px] h-full bg-neutral-900"></div>
-                    <div className="w-[4px] h-full bg-neutral-900"></div>
-                    <div className="w-[1px] h-full bg-neutral-900"></div>
-                    <div className="w-[2px] h-full bg-neutral-900"></div>
-                    <div className="w-[3.5px] h-full bg-neutral-900"></div>
-                    <div className="w-[1px] h-full bg-neutral-900"></div>
-                    <div className="w-[4px] h-full bg-neutral-900"></div>
-                    <div className="w-[1.5px] h-full bg-neutral-900"></div>
-                    <div className="w-[3px] h-full bg-neutral-900"></div>
-                    <div className="w-[1px] h-full bg-neutral-900"></div>
-                    <div className="w-[2px] h-full bg-neutral-900"></div>
-                    <div className="w-[4px] h-full bg-neutral-900"></div>
-                    <div className="w-[1.5px] h-full bg-neutral-900"></div>
-                    <div className="w-[1px] h-full bg-neutral-900"></div>
-                    <div className="w-[3px] h-full bg-neutral-900"></div>
-                    <div className="w-[2.5px] h-full bg-neutral-900"></div>
-                    <div className="w-[1px] h-full bg-neutral-900"></div>
-                    <div className="w-[3.5px] h-full bg-neutral-900"></div>
+                {/* Barcode */}
+                <div className="flex flex-col items-center border-t border-white/15 mt-8 pt-8">
+                  <div className="bg-white h-14 w-full max-w-sm px-6 py-2 flex items-center justify-center gap-[2px]">
+                    {[1, 3, 1.5, 4, 1, 2, 3.5, 1, 4, 1.5, 3, 1, 2, 4, 1.5, 1, 3, 2.5, 1, 3.5].map((w, i) => (
+                      <span key={i} className="h-full bg-black" style={{ width: `${w}px` }} />
+                    ))}
                   </div>
-                  <div className="text-center font-mono text-[11px] font-black text-sentence tracking-widest text-white">
-                    {ticketCode}
-                  </div>
+                  <span className="font-bold text-xs tracking-[0.25em] mt-4">{ticketCode}</span>
                 </div>
-
               </div>
             </div>
 
-            {/* ACTION DIRECTIVE BUTTONS */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+            {/* Actions */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="flex items-center justify-center gap-2 bg-neutral-950 hover:bg-neutral-850 text-white py-3.5 rounded-full font-bold text-xs text-sentence tracking-wider transition-all shadow-md active:scale-95 cursor-pointer"
+                className="flex items-center justify-center gap-2 bg-black text-white py-4 font-bold text-sm cursor-pointer hover:bg-neutral-800 transition-colors"
               >
-                <Printer className="w-4 h-4 text-[#E34718]" />
-                Print Ticket
+                <Printer className="w-4 h-4" /> Print tickets
               </button>
-
               <button
                 type="button"
                 onClick={onGoToDashboard}
-                className="flex items-center justify-center bg-white   hover:bg-neutral-50 text-neutral-800 py-3.5 rounded-full font-bold text-xs text-sentence tracking-wider transition-all shadow-3xs cursor-pointer"
+                className="flex items-center justify-center gap-2 bg-white text-black border border-black py-4 font-bold text-sm cursor-pointer hover:bg-[#f7f7f7] transition-colors"
               >
-                View in Your Dashboard ↗
+                View in your dashboard
               </button>
             </div>
-
           </div>
         )}
-
       </div>
     </div>
   );
