@@ -50,7 +50,7 @@ export default function Navbar({ onScrollToSection, onOpenAuth, currentUser, onG
   // TEXTS AND LINKS Color Theme inside Navbar
   const navLinkClass = `font-semibold transition-colors cursor-pointer text-sm tracking-wide ${
     isHome && !isScrolled 
-      ? 'text-white/85 hover:text-[#E34718]' 
+      ? 'text-white/85 hover:text-[#ffed00]' 
       : 'text-neutral-700 hover:text-[#C23A12] hover:text-opacity-100 font-semibold'
   }`;
 
@@ -65,7 +65,7 @@ export default function Navbar({ onScrollToSection, onOpenAuth, currentUser, onG
   }`;
 
   const signupBtnClass = `font-semibold text-sm transition-colors cursor-pointer ${
-    isHome && !isScrolled ? 'text-white/85 hover:text-[#E34718]' : 'text-neutral-600 hover:text-black'
+    isHome && !isScrolled ? 'text-white/85 hover:text-[#ffed00]' : 'text-neutral-600 hover:text-black'
   }`;
 
   // Mobile drawer trigger bubble action buttons
@@ -84,7 +84,7 @@ export default function Navbar({ onScrollToSection, onOpenAuth, currentUser, onG
 
   const drawerLinkClass = `font-bold text-left py-2  transition-colors cursor-pointer text-sm ${
     isHome && !isScrolled 
-      ? 'text-white/90 hover:text-[#E34718] ' 
+      ? 'text-white/90 hover:text-[#ffed00] '
       : 'text-neutral-900 hover:text-[#E34718] '
   }`;
 
@@ -102,7 +102,7 @@ export default function Navbar({ onScrollToSection, onOpenAuth, currentUser, onG
             <Ticket className="w-4.5 h-4.5 text-black rotate-[15deg] group-hover:rotate-0 transition-transform duration-300" />
           </div>
           <span className={logoTextClass}>
-            Jazba<span className={isHome && !isScrolled ? 'text-[#E34718] font-black' : 'text-neutral-900 font-extrabold'}>ticket</span>
+            Jazba<span className={isHome && !isScrolled ? 'text-[#ffed00] font-black' : 'text-black font-extrabold'}>ticket</span>
           </span>
         </div>
 

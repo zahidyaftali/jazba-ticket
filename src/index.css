@@ -1,76 +1,81 @@
-@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600;1,700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Hanken Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Hanken Grotesk", "Plus Jakarta Sans", "Outfit", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  /* NouvelR substitute — one monolithic geometric family across the whole system */
+  --font-sans: "Inter Tight", "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Inter Tight", "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Inter Tight", "Manrope", ui-sans-serif, system-ui, sans-serif;
 
-  /* Specific color palette overrides */
-  --color-surface: #f9f9ff;
-  --color-surface-dim: #cfdaf2;
-  --color-surface-bright: #f9f9ff;
+  /* ---- Renault two-tone surface system ---- */
+  --color-canvas: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-soft: #f7f7f7;
+  --color-surface-dark: #000000;
+  --color-surface-deep: #111111;
+  --color-hairline: #f2f2f2;
+  --color-hairline-strong: #000000;
+
   --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #f0f3ff;
-  --color-surface-container: #e7eeff;
-  --color-surface-container-high: #dee8ff;
-  --color-surface-container-highest: #d8e3fb;
-  --color-on-surface: #111c2d;
-  --color-on-surface-variant: #5b4039;
-  --color-inverse-surface: #263143;
-  --color-inverse-on-surface: #ecf1ff;
-  --color-outline: #8f7068;
-  --color-outline-variant: #e4beb5;
-  --color-surface-tint: #b12d00;
-  
-  --color-primary: #E34718;
-  --color-primary-orange: #E34718;
-  --color-primary-deep: #ad2b00;
-  --color-on-primary: #ffffff;
-  --color-primary-container: #d53d0d;
-  --color-on-primary-container: #fffbff;
-  --color-inverse-primary: #ffb5a1;
+  --color-surface-container-low: #f7f7f7;
+  --color-surface-container: #f2f2f2;
+  --color-surface-container-high: #ededed;
+  --color-surface-container-highest: #e5e5e5;
+  --color-on-surface: #000000;
+  --color-on-surface-variant: #333333;
+  --color-inverse-surface: #000000;
+  --color-inverse-on-surface: #ffffff;
+  --color-outline: #000000;
+  --color-outline-variant: #f2f2f2;
+  --color-surface-tint: #ffed00;
 
-  --color-secondary: #0F172A;
+  /* ---- Single brand accent: Sunlight Yellow (pairs only with black) ---- */
+  --color-primary: #ffed00;
+  --color-primary-orange: #ffed00;
+  --color-primary-deep: #e6d200;
+  --color-on-primary: #000000;
+  --color-primary-container: #ffed00;
+  --color-on-primary-container: #000000;
+  --color-inverse-primary: #ffed00;
+
+  --color-secondary: #000000;
   --color-on-secondary: #ffffff;
-  --color-secondary-container: #dae2fd;
-  --color-on-secondary-container: #5c647a;
+  --color-secondary-container: #111111;
+  --color-on-secondary-container: #ffffff;
 
-  --color-tertiary: #F8FAFC;
-  --color-on-tertiary: #ffffff;
-  --color-tertiary-container: #727577;
-  --color-on-tertiary-container: #fbfdff;
+  --color-tertiary: #f7f7f7;
+  --color-on-tertiary: #000000;
+  --color-tertiary-container: #f2f2f2;
+  --color-on-tertiary-container: #000000;
 
-  --color-error: #ba1a1a;
+  /* ---- Ink / text ramp ---- */
+  --color-ink: #000000;
+  --color-body: #222222;
+  --color-charcoal: #333333;
+  --color-mute: #666666;
+  --color-ash: #8a8a8a;
+  --color-stone: #c4c4c4;
+  --color-on-dark: #ffffff;
+
+  /* ---- Semantic (functional, never decorative) ---- */
+  --color-error: #be6464;
   --color-on-error: #ffffff;
-  --color-error-container: #ffdad6;
-  --color-on-error-container: #93000a;
+  --color-error-container: #f7ecec;
+  --color-on-error-container: #7a2f2f;
+  --color-warning: #f0ad4e;
+  --color-success: #8dc572;
+  --color-info: #337ab7;
 
-  --color-primary-fixed: #ffdbd1;
-  --color-primary-fixed-dim: #ffb5a1;
-  --color-on-primary-fixed: #3b0900;
-  --color-on-primary-fixed-variant: #882000;
+  --color-background: #ffffff;
+  --color-on-background: #000000;
+  --color-surface-variant: #f7f7f7;
 
-  --color-secondary-fixed: #dae2fd;
-  --color-secondary-fixed-dim: #bec6e0;
-  --color-on-secondary-fixed: #131b2e;
-  --color-on-secondary-fixed-variant: #3f465c;
-
-  --color-tertiary-fixed: #e0e3e5;
-  --color-tertiary-fixed-dim: #c4c7c9;
-  --color-on-tertiary-fixed: #191c1e;
-  --color-on-tertiary-fixed-variant: #444749;
-
-  --color-background: #f9f9ff;
-  --color-on-background: #111c2d;
-  --color-surface-variant: #d8e3fb;
-
-  /* Border radius specification */
-  --radius-sm: 0.25rem;
-  --radius-DEFAULT: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.5rem;
+  /* ---- Square geometry ---- */
+  --radius-sm: 3px;
+  --radius-DEFAULT: 2px;
+  --radius-md: 4px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
   --radius-full: 9999px;
 }
 
@@ -83,12 +88,10 @@
   }
 }
 
-/* Sentence case: only the first letter is capitalized, replacing uppercase styling */
+/* Text is shown exactly as authored — no forced lower/upper casing.
+   (The old lowercase transform produced a robotic all-lowercase look.) */
 .text-sentence {
-  text-transform: lowercase;
-}
-.text-sentence::first-letter {
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 /* Default body copy font family, except numeric/mono data displays */
@@ -106,7 +109,7 @@ div:not(.font-mono) {
 }
 
 @utility headline-xl {
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: "Inter Tight", "Manrope", sans-serif;
   font-size: 64px;
   font-weight: 800;
   line-height: 72px;
@@ -114,7 +117,7 @@ div:not(.font-mono) {
 }
 
 @utility headline-lg {
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: "Inter Tight", "Manrope", sans-serif;
   font-size: 40px;
   font-weight: 700;
   line-height: 48px;
@@ -122,43 +125,239 @@ div:not(.font-mono) {
 }
 
 @utility headline-lg-mobile {
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: "Inter Tight", "Manrope", sans-serif;
   font-size: 32px;
   font-weight: 700;
   line-height: 38px;
 }
 
 @utility display-md {
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: "Inter Tight", "Manrope", sans-serif;
   font-size: 24px;
   font-weight: 600;
   line-height: 32px;
 }
 
 @utility body-lg {
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: "Inter Tight", "Manrope", sans-serif;
   font-size: 18px;
   font-weight: 400;
   line-height: 28px;
 }
 
 @utility body-md {
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: "Inter Tight", "Manrope", sans-serif;
   font-size: 16px;
   font-weight: 400;
   line-height: 24px;
 }
 
 @utility label-md {
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: "Inter Tight", "Manrope", sans-serif;
   font-size: 14px;
   font-weight: 600;
   line-height: 20px;
 }
 
 @utility label-sm {
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: "Inter Tight", "Manrope", sans-serif;
   font-size: 12px;
   font-weight: 500;
   line-height: 16px;
+}
+
+/* ================================================================
+   RENAULT-INSPIRED BRAND LAYER  (site-wide)
+   Transforms the whole platform to the two-tone canvas system:
+   white browsing / black storytelling / a single Sunlight-Yellow
+   accent, NouvelR-substitute type, square geometry, hairline
+   borders and a shadow-free catalogue feel. Applied globally so
+   every page inherits the brand — none are lost.
+   ================================================================ */
+
+:root {
+  --jz-yellow: #ffed00;
+  --jz-yellow-deep: #e6d200;
+  --jz-line: #e4e4e4;         /* catalogue hairline on white */
+  --jz-line-strong: #000000;  /* structural black outline */
+  --jz-line-dark: rgba(255, 255, 255, 0.16);
+  --jz-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@keyframes jzFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes jzFadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+
+/* Crisp rendering + one family everywhere */
+body, input, select, textarea, button {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+}
+
+/* ---------------------------------------------------------------
+   1. PALETTE REMAP — legacy orange → Sunlight Yellow / black ink
+   Yellow ALWAYS pairs with black text (never white).
+   --------------------------------------------------------------- */
+.bg-\[\#E34718\],
+.bg-\[\#C23A12\],
+.bg-\[\#ad2b00\],
+.bg-\[\#d53d0d\],
+.hover\:bg-\[\#C23A12\]:hover,
+.hover\:bg-\[\#E34718\]:hover {
+  background-color: var(--jz-yellow) !important;
+  color: #000 !important;
+}
+/* Force labels + icons on yellow surfaces to black */
+.bg-\[\#E34718\] *,
+.bg-\[\#C23A12\] * {
+  color: #000 !important;
+  border-color: rgba(0,0,0,0.14) !important;
+}
+/* Soft orange tints → soft yellow wash (keep their dark text) */
+.bg-\[\#E34718\]\/4,
+.bg-\[\#E34718\]\/5,
+.bg-\[\#E34718\]\/8,
+.bg-\[\#E34718\]\/10,
+.bg-\[\#E34718\]\/15,
+.bg-orange-50 {
+  background-color: rgba(255, 237, 0, 0.16) !important;
+}
+
+/* Orange accent text — including hover / group-hover variants — becomes black
+   ink on light surfaces (yellow is never used as text on white). */
+[class*="text-[#E34718]"],
+[class*="text-[#C23A12]"] {
+  color: #000 !important;
+}
+/* …but yellow when it sits inside a dark storytelling band */
+.bg-\[\#121212\] [class*="text-[#E34718]"],
+.bg-\[\#121212\] [class*="text-[#C23A12]"],
+.bg-neutral-900 [class*="text-[#E34718]"],
+.bg-neutral-900 [class*="text-[#C23A12]"],
+.bg-neutral-950 [class*="text-[#E34718]"],
+.bg-neutral-950 [class*="text-[#C23A12]"],
+.bg-black [class*="text-[#E34718]"],
+.bg-black [class*="text-[#C23A12]"] {
+  color: var(--jz-yellow) !important;
+}
+.fill-\[\#E34718\] { fill: #000 !important; }
+
+/* Solid orange gradient stops → yellow / deep-yellow brand stops
+   (exact classes only, so faint /8 /10 opacity accents keep their softness) */
+.from-\[\#E34718\] { --tw-gradient-from: var(--jz-yellow) !important; }
+.via-\[\#E34718\] { --tw-gradient-via: var(--jz-yellow) !important; }
+.to-\[\#E34718\] { --tw-gradient-to: var(--jz-yellow) !important; }
+.from-\[\#C23A12\] { --tw-gradient-from: var(--jz-yellow-deep) !important; }
+.to-\[\#C23A12\] { --tw-gradient-to: var(--jz-yellow-deep) !important; }
+
+/* Yellow indicator dots / bars stay yellow even inside dark bands */
+.bg-neutral-900 .bg-\[\#E34718\],
+.bg-neutral-950 .bg-\[\#E34718\],
+.bg-\[\#121212\] .bg-\[\#E34718\] {
+  background-color: var(--jz-yellow) !important;
+}
+
+/* ---------------------------------------------------------------
+   2. SQUARE GEOMETRY — tiles/cards flat (0), small chips 2px.
+   rounded-full is preserved for avatars & indicator dots; icon /
+   pill BUTTONS square off to the brand's near-flat corner.
+   --------------------------------------------------------------- */
+.rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl,
+.rounded-\[2rem\], .rounded-\[28px\], .rounded-\[2\.5rem\] {
+  border-radius: 0 !important;
+}
+.rounded, .rounded-sm, .rounded-md, .rounded-xs {
+  border-radius: 2px !important;
+}
+button.rounded-full, a.rounded-full {
+  border-radius: 2px !important;
+}
+
+/* ---------------------------------------------------------------
+   3. SHADOW-FREE CATALOGUE — depth comes from colour + hairlines
+   --------------------------------------------------------------- */
+[class*="shadow-"] { box-shadow: none !important; }
+
+/* ---------------------------------------------------------------
+   4. CARD OUTLINES — hairline precision on white, faint on dark
+   --------------------------------------------------------------- */
+div.bg-white[class*="rounded"],
+section.bg-white[class*="rounded"],
+main.bg-white[class*="rounded"],
+aside.bg-white[class*="rounded"],
+form.bg-white[class*="rounded"],
+div.bg-neutral-50[class*="rounded"],
+div.bg-neutral-55[class*="rounded"] {
+  border: 1px solid var(--jz-line);
+  transition: border-color 0.2s var(--jz-ease), transform 0.25s var(--jz-ease);
+}
+div.bg-neutral-900[class*="rounded"],
+div.bg-neutral-950[class*="rounded"],
+div.bg-\[\#121212\][class*="rounded"] {
+  border: 1px solid var(--jz-line-dark);
+}
+/* Clickable cards firm up to a black outline + tiny lift on hover */
+div.cursor-pointer.bg-white[class*="rounded"]:hover,
+a.bg-white[class*="rounded"]:hover {
+  border-color: var(--jz-line-strong) !important;
+  transform: translateY(-2px);
+}
+
+/* ---------------------------------------------------------------
+   5. OUTLINE BUTTONS — white buttons become black-outlined CTAs
+   --------------------------------------------------------------- */
+button.bg-white[class*="rounded"],
+a.bg-white[class*="rounded"] {
+  border: 1px solid var(--jz-line-strong);
+}
+button.bg-white[class*="rounded"]:hover {
+  background-color: #f7f7f7 !important;
+}
+
+/* ---------------------------------------------------------------
+   6. FORM FIELDS — minimal catalogue inputs: single black baseline
+   --------------------------------------------------------------- */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  border: 0 !important;
+  border-bottom: 1px solid var(--jz-line-strong) !important;
+  border-radius: 0 !important;
+  transition: border-color 0.18s var(--jz-ease);
+}
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus {
+  border-bottom-width: 2px !important;
+  box-shadow: none !important;
+  outline: none;
+}
+input[type="checkbox"], input[type="radio"] { accent-color: #000; }
+
+/* Inputs that sit on dark bands need a light baseline + light text */
+footer input,
+footer textarea,
+.bg-black input, .bg-black textarea,
+.bg-neutral-950 input, .bg-neutral-900 input,
+.bg-\[\#121212\] input, .bg-\[\#121212\] textarea,
+.bg-\[\#0d0d0e\] input, .bg-\[\#0d0d0e\] textarea {
+  border-bottom-color: rgba(255, 255, 255, 0.4) !important;
+  color: #ffffff;
+}
+
+/* ---------------------------------------------------------------
+   7. MOTION — a touch of life, never soft or decorative
+   --------------------------------------------------------------- */
+button { transition: background-color 0.18s var(--jz-ease), color 0.18s var(--jz-ease), transform 0.12s var(--jz-ease); }
+button:active { transform: scale(0.985); }
+
+.jz-page { animation: jzFadeIn 0.4s var(--jz-ease) both; }
+#login-page-root .bg-white,
+#signup-page-root .bg-white { animation: jzFadeUp 0.5s var(--jz-ease) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  div.cursor-pointer.bg-white[class*="rounded"]:hover,
+  a.bg-white[class*="rounded"]:hover { transform: none; }
 }

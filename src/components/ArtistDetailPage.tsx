@@ -155,7 +155,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
   };
 
   return (
-    <div className="bg-[#FAFBFD] min-h-screen text-neutral-900 font-sans pb-24" id={`artist-detail-${artist.id}`}>
+    <div className="jz-page bg-[#FAFBFD] min-h-screen text-neutral-900 font-sans pb-24" id={`artist-detail-${artist.id}`}>
       
       {/* 1. HEADER NAVIGATION */}
       <div className="bg-white   sticky top-0 z-30 shadow-xs" id="artist-navigator-header">
@@ -211,28 +211,28 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-6 gap-y-2 text-xs font-sans">
                 
                 <div className="flex flex-col items-center md:items-start min-w-[70px]">
-                  <span className="text-[10px] text-neutral-400 font-medium text-sentence tracking-wider">followers</span>
+                  <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Followers</span>
                   <span className="font-bold text-neutral-800 text-sm mt-0.5">{followerCount}</span>
                 </div>
 
                 <div className="w-px h-6 bg-neutral-200 hidden md:block" />
 
                 <div className="flex flex-col items-center md:items-start min-w-[70px]">
-                  <span className="text-[10px] text-neutral-400 font-medium text-sentence tracking-wider">hosting</span>
+                  <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Hosting</span>
                   <span className="font-bold text-neutral-800 text-sm mt-0.5">{stats.hosting}</span>
                 </div>
 
                 <div className="w-px h-6 bg-neutral-200 hidden md:block" />
 
                 <div className="flex flex-col items-center md:items-start min-w-[70px]">
-                  <span className="text-[10px] text-neutral-400 font-medium text-sentence tracking-wider">total events</span>
+                  <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Total events</span>
                   <span className="font-bold text-neutral-800 text-sm mt-0.5">{stats.totalEvents}</span>
                 </div>
 
                 <div className="w-px h-6 bg-neutral-200 hidden md:block" />
 
                 <div className="flex flex-col items-center md:items-start min-w-[70px]">
-                  <span className="text-[10px] text-neutral-400 font-medium text-sentence tracking-wider">total attendees</span>
+                  <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Total attendees</span>
                   <span className="font-bold text-neutral-800 text-sm mt-0.5">{stats.totalAttendees}</span>
                 </div>
 
@@ -307,7 +307,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
         </div>
 
         {/* 4. TABS COMPONENT ROW - Upcoming, Past, Collections */}
-        <div className="flex   mt-10" id="artist-tabs-row">
+        <div className="flex border-b border-neutral-200/80 mt-10" id="artist-tabs-row">
           {(['upcoming', 'past', 'collections'] as const).map((tab) => (
             <button
               key={tab}
@@ -428,8 +428,8 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                     {/* Rates & Specifications card */}
                     <div className="bg-white   rounded-3xl p-6 sm:p-8 grid grid-cols-2 sm:grid-cols-3 gap-4 shadow-xs">
                       <div>
-                        <span className="text-[10px] text-neutral-400 font-bold text-sentence tracking-widest block">Booking rate</span>
-                        <span className="text-base font-bold text-neutral-800 mt-1 block">${artist.hourlyRate}/Hr</span>
+                        <span className="text-[10px] text-neutral-400 font-bold text-sentence tracking-widest block">Fee per event</span>
+                        <span className="text-base font-bold text-neutral-800 mt-1 block">${artist.hourlyRate}<span className="text-xs font-medium text-neutral-400"> / event</span></span>
                       </div>
                       <div>
                         <span className="text-[10px] text-neutral-400 font-bold text-sentence tracking-widest block">experience</span>

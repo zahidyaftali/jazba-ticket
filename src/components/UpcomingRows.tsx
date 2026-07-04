@@ -27,7 +27,7 @@ export default function UpcomingRows({ events, onBook, onViewAll, onViewDetail }
               Upcoming Shows
             </h2>
             <p className="text-[17px] text-neutral-500 mt-2 font-normal">
-              Don't miss these upcoming high-demand ticket releases.
+              New shows going on sale soon.
             </p>
           </div>
           <button 

@@ -54,7 +54,7 @@ interface ArtistsPageProps {
 
 // Maps a Firestore artist profile (managed via the Admin Hub) onto the richer
 // display shape this marketplace page renders.
-function mapArtistProfileToItem(p: ArtistProfile): ArtistItem {
+export function mapArtistProfileToItem(p: ArtistProfile): ArtistItem {
   return {
     id: p.id || p.userId,
     name: p.stageName,
@@ -217,7 +217,7 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
   ];
 
   return (
-    <div className="bg-neutral-50 min-h-screen pb-24" id="artists-marketplace-root">
+    <div className="jz-page bg-neutral-50 min-h-screen pb-24" id="artists-marketplace-root">
       
       {/* 1. GORGEOUS HERO SECTION - FULL WIDTH (60vh left-aligned, matching the Home Page style) */}
       <section 
@@ -246,12 +246,12 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
             <span className="text-white">Performers Marketplace</span>
           </div>
 
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-display font-black tracking-tight leading-[1.1] max-w-3xl text-white">
-            Book Creative <span className="text-[#E34718] drop-shadow-[0_2px_10px_rgba(227,71,24,0.15)]">Industry Masters</span>
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-display font-black tracking-tight leading-[0.95] max-w-3xl text-white">
+            Book the artist. <span className="text-[#E34718]">Own the night.</span>
           </h1>
 
           <p className="text-neutral-300 font-medium text-xs sm:text-sm md:text-base max-w-2xl leading-relaxed">
-            Discover and book talented musicians, performers, and speakers for your next event.
+            Browse verified musicians, bands, DJs, comedians and speakers — request a date, agree one flat fee per event, and let us handle the contract and payout. No hourly meters, no surprises.
           </p>
         </div>
       </section>
@@ -289,7 +289,7 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search for vocalists, instrumentalists, speakers, performers..."
+              placeholder="Search artists, bands, DJs, comedians, speakers…"
               className="w-full bg-neutral-50     rounded-2xl pl-11 pr-5 py-3 text-sm font-semibold text-neutral-850 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-400 transition-all shadow-inner"
             />
             {searchQuery && (
@@ -393,12 +393,12 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
 
               {/* Price Tier Select */}
               <div>
-                <label className="text-xs font-black text-sentence tracking-widest text-neutral-400 mb-2.5 block">Booking Rate Tier</label>
+                <label className="text-xs font-black text-sentence tracking-widest text-neutral-400 mb-2.5 block">Fee per event</label>
                 <div className="grid grid-cols-2 gap-1.5">
                   {(['all', 'under-150', '150-250', 'over-250'] as const).map(tier => {
-                    const label = tier === 'all' ? 'All' :
-                                  tier === 'under-150' ? '< $150/hr' :
-                                  tier === '150-250' ? '$150-$250' : '> $250/hr';
+                    const label = tier === 'all' ? 'Any budget' :
+                                  tier === 'under-150' ? 'Under $150' :
+                                  tier === '150-250' ? '$150–$250' : '$250+';
                     const active = hourlyRateTier === tier;
                     return (
                       <button
@@ -449,9 +449,9 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
             {/* DYNAMIC METRIC CALLOUT BOX */}
             <div className="bg-[#E34718]/5    rounded-2xl p-5.5 text-center">
               <Sparkles className="w-5 h-5 text-[#C23A12] mx-auto mb-2" />
-              <h4 className="text-xs font-black text-sentence text-neutral-800">Booking Made Easy</h4>
+              <h4 className="text-xs font-black text-sentence text-neutral-800">One fee, per event</h4>
               <p className="text-[11px] text-neutral-500 font-semibold mt-1.5 leading-relaxed">
-                We handle contracts and payment securely, so you can focus on planning a great show.
+                Every artist quotes a single flat fee per event — never per hour. We hold contracts and payment in escrow and release payout only after the show.
               </p>
             </div>
 
@@ -673,7 +673,7 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-neutral-400 text-sentence block">Hourly Estimation</span>
+                    <span className="text-[10px] font-bold text-neutral-400 text-sentence block">Fee / event</span>
                     <span className="text-base font-black text-neutral-900 block mt-1">
                       ${activeArtistDetail.hourlyRate}
                     </span>
@@ -721,7 +721,7 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
 
                 {/* Dynamic Inline proposal Inquiry Hire form */}
                 <div className="  pt-5 mt-4">
-                  <h3 className="text-sm font-black text-[#E34718] flex items-center gap-1.5 lowercase text-sentence mb-4 tracking-wider">
+                  <h3 className="text-sm font-black text-[#E34718] flex items-center gap-1.5 mb-4 tracking-wider">
                     <Send className="w-4.5 h-4.5 text-[#E34718]" />
                     <span>Send a Booking Inquiry</span>
                   </h3>
@@ -745,12 +745,12 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                             />
                           </div>
                           <div>
-                            <label className="text-[10px] font-bold text-neutral-450 text-sentence mb-1.5 block">Estimated Hours</label>
-                            <input 
-                              type="number" 
+                            <label className="text-[10px] font-bold text-neutral-450 text-sentence mb-1.5 block">No. of performances</label>
+                            <input
+                              type="number"
                               required
                               min="1"
-                              max="24"
+                              max="10"
                               value={inquiryFormData.hours}
                               onChange={(e) => setInquiryFormData(prev => ({ ...prev, hours: e.target.value }))}
                               className="w-full bg-neutral-50   rounded-xl px-3 py-2 text-xs font-bold"
@@ -792,9 +792,11 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                         </div>
 
                         <div className="bg-neutral-50   rounded-xl p-3 flex justify-between items-center text-xs">
-                          <span className="font-bold text-neutral-500">Estimate Guarantee:</span>
+                          <span className="font-bold text-neutral-500">
+                            Fee estimate ({Number(inquiryFormData.hours || 1)} × ${activeArtistDetail.hourlyRate}/event):
+                          </span>
                           <span className="font-black text-neutral-950">
-                            ${(activeArtistDetail.hourlyRate * Number(inquiryFormData.hours || 1)).toLocaleString()} USD Max
+                            ${(activeArtistDetail.hourlyRate * Number(inquiryFormData.hours || 1)).toLocaleString()} USD
                           </span>
                         </div>
 

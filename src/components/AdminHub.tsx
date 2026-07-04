@@ -1003,7 +1003,7 @@ export default function AdminHub() {
                         </select>
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-neutral-500 text-sentence tracking-wider block">Hourly Rate (USD)</label>
+                        <label className="text-neutral-500 text-sentence tracking-wider block">Fee per event (USD)</label>
                         <input
                           type="number"
                           className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
@@ -1181,7 +1181,7 @@ export default function AdminHub() {
                             </td>
                             <td className="py-3.5 px-4 text-sentence text-neutral-550">{artist.category || 'music'}</td>
                             <td className="py-3.5 px-4 text-neutral-550 font-bold">{artist.location || '—'}</td>
-                            <td className="py-3.5 px-4 font-mono">${artist.hourlyRate || 0}/hr</td>
+                            <td className="py-3.5 px-4 font-mono">${artist.hourlyRate || 0}/event</td>
                             <td className="py-3.5 px-4 text-right">
                               <div className="flex items-center justify-end gap-1.5">
                                 <button

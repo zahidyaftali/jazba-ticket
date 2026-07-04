@@ -145,7 +145,7 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
   };
 
   return (
-    <div className="min-h-screen bg-[#FAFBFD] text-neutral-900 font-sans relative flex items-center justify-center p-4 sm:p-6 overflow-hidden" id="signup-page-root">
+    <div className="jz-page min-h-[85vh] bg-[#FAFBFD] text-neutral-900 font-sans relative flex items-center justify-center py-16 px-4 sm:px-6 overflow-hidden" id="signup-page-root">
       
       {/* Background radial accent - matching home page colors but subtle and light */}
       <div className="absolute inset-0 z-0 pointer-events-none select-none">
@@ -284,7 +284,7 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
           <div className="space-y-4 pt-2">
             <div className="relative flex items-center justify-center">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full  "></div>
+                <div className="w-full border-t border-neutral-200/80"></div>
               </div>
               <div className="relative bg-white px-3 text-[9px] text-sentence font-bold text-neutral-400 tracking-widest font-sans">
                 Or Continue With Google

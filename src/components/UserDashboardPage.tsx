@@ -316,7 +316,7 @@ export default function UserDashboardPage({
   const totalAmountSpent = userBookings.reduce((sum, item) => sum + item.pricePaid, 0);
 
   return (
-    <div className="bg-neutral-50/50 min-h-screen pb-20" id="user-dashboard-wrapper">
+    <div className="jz-page bg-neutral-50/50 min-h-screen pb-20" id="user-dashboard-wrapper">
       
       {/* 0. GORGEOUS STYLISH HERO SECTION - FULL WIDTH (60vh left-aligned, matching the Home Page style) */}
       <section 
@@ -391,7 +391,7 @@ export default function UserDashboardPage({
         {/* 1. HERO PROFILE OVERVIEW CARD */}
         <div className="bg-white   rounded-2xl p-6 sm:p-8 mb-8 relative overflow-hidden shadow-2xs text-left">
           {/* Accent decoration overlay */}
-          <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-[#E34718]/8 via-[#E34718]/4 to-transparent pointer-events-none"></div>
+          <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-[#ffed00]/15 via-[#ffed00]/6 to-transparent pointer-events-none"></div>
           
           <div className="flex flex-col sm:flex-row items-center gap-6 relative z-10">
             {/* Elegant luxury circular profile avatar badge with initials */}

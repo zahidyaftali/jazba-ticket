@@ -519,7 +519,7 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
 
           {/* Graphical Support Visual elements */}
           <div className="lg:col-span-6 bg-[#0d0d0e] rounded-3xl p-6 sm:p-8 text-white text-left relative overflow-hidden   shadow-xl">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-[#E34718]/10 via-transparent to-transparent opacity-85 pointer-events-none" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-[#ffed00]/12 via-transparent to-transparent opacity-85 pointer-events-none" />
 
             <div className="flex items-center gap-2   pb-4 mb-6">
               <LifeBuoy className="w-4.5 h-4.5 text-[#E34718]" />

@@ -113,37 +113,37 @@ export default function HeroSection({ onSearch, onSelectDateFilter, onSearchSubm
           {/* SMALL FLOATING BADGE */}
           <div className="inline-flex items-center gap-1.5 bg-neutral-900/80 backdrop-blur-md   text-neutral-200 px-4 py-1.5 rounded-full text-[11px] font-semibold tracking-widest text-sentence transition-colors shadow-sm">
             <Sparkles className="w-3.5 h-3.5 text-[#E34718] fill-[#E34718]" />
-            Matchmaker Tour Live
+            10,000+ live events on sale now
           </div>
 
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-display font-bold tracking-tight leading-[1.1] max-w-2xl text-white">
-            Your Ultimate Event Destination to <span className="text-[#E34718] drop-shadow-[0_2px_10px_rgba(227,71,24,0.15)]">Find, Book &amp; Enjoy!</span>
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-display font-bold tracking-tight leading-[0.95] max-w-2xl text-white">
+            Live music, theatre &amp; sport — <span className="text-[#E34718] drop-shadow-[0_2px_10px_rgba(227,71,24,0.15)]">booked in seconds.</span>
           </h1>
 
           <p className="text-neutral-300/90 font-medium text-sm sm:text-base md:text-lg max-w-xl leading-relaxed">
-            Discover thousands of handpicked events, from live concerts to theatre and festivals. Book your tickets quickly and securely.
+            Real tickets to the shows you love, and the artists to headline your own. Secure checkout, instant digital passes, and full refund protection on every booking.
           </p>
 
           {/* TWO CTAs/BUTTONS */}
           <div className="flex flex-wrap gap-4 pt-2">
-            <button 
+            <button
               onClick={() => {
                 const el = document.getElementById('discover');
                 el?.scrollIntoView({ behavior: 'smooth' });
               }}
               className="bg-[#E34718] hover:bg-[#C23A12] text-white font-semibold text-sm px-6 py-3.5 rounded-full transition-all active:scale-95 shadow-lg shadow-[#E34718]/15 flex items-center gap-2 cursor-pointer  "
             >
-              <span>Explore Live Concerts</span>
+              <span>Find events</span>
               <TicketIcon className="w-4 h-4" />
             </button>
-            <button 
+            <button
               onClick={() => {
                 const el = document.getElementById('artists');
                 el?.scrollIntoView({ behavior: 'smooth' });
               }}
               className="bg-neutral-900/80 hover:bg-neutral-900 text-white   backdrop-blur-sm font-semibold text-sm px-6 py-3.5 rounded-full transition-all active:scale-95 shadow-lg cursor-pointer"
             >
-              Browse Musicians
+              Book an artist
             </button>
           </div>
         </div>
