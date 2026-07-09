@@ -18,10 +18,18 @@ import {
   createArtistProfile,
   updateArtistProfile,
   deleteArtistProfile,
+  getAllOrganizers,
+  getAllPayments,
+  getTickets,
+  updateTicketStatus,
+  updateBookingStatus,
   UserProfile,
   Booking,
   PlatformAnalytics,
-  ArtistProfile
+  ArtistProfile,
+  OrganizerProfile,
+  PaymentDetails,
+  TicketPass
 } from '../services/backendService';
 import { categories } from '../data';
 import { auth } from '../firebase';
@@ -69,12 +77,15 @@ export default function AdminHub() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [artists, setArtists] = useState<ArtistProfile[]>([]);
+  const [organizers, setOrganizers] = useState<OrganizerProfile[]>([]);
+  const [payments, setPayments] = useState<PaymentDetails[]>([]);
+  const [tickets, setTickets] = useState<TicketPass[]>([]);
   const [analytics, setAnalytics] = useState<PlatformAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const [activeSubTab, setActiveSubTab] = useState<'analytics' | 'users' | 'bookings' | 'events' | 'artists'>('analytics');
+  const [activeSubTab, setActiveSubTab] = useState<'analytics' | 'users' | 'bookings' | 'events' | 'artists' | 'organizers' | 'payments' | 'tickets'>('analytics');
 
   // Event create/edit form state
   const [isEventFormOpen, setIsEventFormOpen] = useState(false);
@@ -91,17 +102,23 @@ export default function AdminHub() {
     setLoading(true);
     setErrorMessage('');
     try {
-      const [allUsers, allBookings, allEvents, allArtists, stats] = await Promise.all([
+      const [allUsers, allBookings, allEvents, allArtists, allOrganizers, allPayments, allTickets, stats] = await Promise.all([
         getAllUsers(),
         getBookings(),
         getEvents(),
         getAllArtists(),
+        getAllOrganizers(),
+        getAllPayments(),
+        getTickets(),
         getPlatformAnalytics()
       ]);
       setUsers(allUsers);
       setBookings(allBookings);
       setEvents(allEvents);
       setArtists(allArtists);
+      setOrganizers(allOrganizers);
+      setPayments(allPayments);
+      setTickets(allTickets);
       setAnalytics(stats);
     } catch (err: any) {
       console.error(err);
@@ -222,6 +239,27 @@ export default function AdminHub() {
       setTimeout(() => setSuccessMessage(''), 4000);
     } catch (err) {
       setErrorMessage('Failed to delete event listing.');
+    }
+  };
+
+  // --- Booking / ticket management handlers ---
+  const handleBookingStatusChange = async (id: string, update: { paymentStatus?: any; bookingStatus?: any }) => {
+    try {
+      await updateBookingStatus(id, update);
+      flashSuccess('Booking updated.');
+      loadData();
+    } catch (err) {
+      setErrorMessage('Failed to update booking.');
+    }
+  };
+
+  const handleTicketStatusChange = async (id: string, status: 'active' | 'cancelled' | 'scanned') => {
+    try {
+      await updateTicketStatus(id, status);
+      flashSuccess(`Ticket marked ${status}.`);
+      loadData();
+    } catch (err) {
+      setErrorMessage('Failed to update ticket status.');
     }
   };
 
@@ -385,6 +423,9 @@ export default function AdminHub() {
           { id: 'bookings', label: `Orders (${bookings.length})` },
           { id: 'events', label: `Events (${events.length})` },
           { id: 'artists', label: `Artists (${artists.length})` },
+          { id: 'organizers', label: `Organisers (${organizers.length})` },
+          { id: 'payments', label: `Payments (${payments.length})` },
+          { id: 'tickets', label: `Tickets (${tickets.length})` },
         ] as const).map((tab) => (
           <button
             key={tab.id}
@@ -611,6 +652,7 @@ export default function AdminHub() {
                       <th className="py-3 px-4">Transaction ID</th>
                       <th className="py-3 px-4">Amount</th>
                       <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4">Manage</th>
                     </tr>
                   </thead>
                   <tbody className="  font-semibold text-neutral-800">
@@ -634,11 +676,174 @@ export default function AdminHub() {
                             {bk.paymentStatus === 'paid' ? 'Paid' : 'Pending'}
                           </span>
                         </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={bk.paymentStatus || 'pending'}
+                              onChange={(e) => handleBookingStatusChange(bk.id!, { paymentStatus: e.target.value })}
+                              className="bg-neutral-50 border border-neutral-200 rounded-lg px-2 py-1 text-[10px] font-bold cursor-pointer"
+                            >
+                              <option value="pending">Payment: pending</option>
+                              <option value="paid">Payment: paid</option>
+                              <option value="failed">Payment: failed</option>
+                            </select>
+                            <select
+                              value={bk.bookingStatus || 'active'}
+                              onChange={(e) => handleBookingStatusChange(bk.id!, { bookingStatus: e.target.value })}
+                              className="bg-neutral-50 border border-neutral-200 rounded-lg px-2 py-1 text-[10px] font-bold cursor-pointer"
+                            >
+                              <option value="active">Active</option>
+                              <option value="cancelled">Cancelled</option>
+                              <option value="completed">Completed</option>
+                            </select>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                     {bookings.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="py-10 text-center text-neutral-400 font-bold">No bookings found.</td>
+                        <td colSpan={8} className="py-10 text-center text-neutral-400 font-bold">No bookings found.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* 3b. Organisers tab */}
+          {activeSubTab === 'organizers' && (
+            <div className="bg-white   rounded-2xl overflow-hidden shadow-3xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-neutral-50 text-neutral-500 font-bold text-sentence tracking-wider  ">
+                    <tr>
+                      <th className="py-3 px-4">Company</th>
+                      <th className="py-3 px-4">Contact Email</th>
+                      <th className="py-3 px-4">Phone</th>
+                      <th className="py-3 px-4">Website</th>
+                      <th className="py-3 px-4">Linked User</th>
+                    </tr>
+                  </thead>
+                  <tbody className="  font-semibold text-neutral-800">
+                    {organizers.map((org) => (
+                      <tr key={org.id || org.userId} className="hover:bg-neutral-50/40">
+                        <td className="py-3.5 px-4 font-bold text-neutral-900">{org.companyName || '—'}</td>
+                        <td className="py-3.5 px-4">{org.email || '—'}</td>
+                        <td className="py-3.5 px-4">{org.phone || '—'}</td>
+                        <td className="py-3.5 px-4">{org.website || '—'}</td>
+                        <td className="py-3.5 px-4 font-mono text-[10px] text-neutral-500">{(org.userId || '').substring(0, 8)}...</td>
+                      </tr>
+                    ))}
+                    {organizers.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="py-10 text-center text-neutral-400 font-bold">No organiser profiles yet. Organisers appear here after they complete their profile in the Organizer Hub.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* 3c. Payments tab */}
+          {activeSubTab === 'payments' && (
+            <div className="bg-white   rounded-2xl overflow-hidden shadow-3xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-neutral-50 text-neutral-500 font-bold text-sentence tracking-wider  ">
+                    <tr>
+                      <th className="py-3 px-4">Date</th>
+                      <th className="py-3 px-4">Booking</th>
+                      <th className="py-3 px-4">Customer</th>
+                      <th className="py-3 px-4">Provider</th>
+                      <th className="py-3 px-4">Transaction ID</th>
+                      <th className="py-3 px-4">Amount</th>
+                      <th className="py-3 px-4">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="  font-semibold text-neutral-800">
+                    {payments.map((p) => (
+                      <tr key={p.id} className="hover:bg-neutral-50/40">
+                        <td className="py-3.5 px-4 text-neutral-500">{(p.createdAt || '').substring(0, 10)}</td>
+                        <td className="py-3.5 px-4 font-mono font-bold text-neutral-900">{p.bookingId || '—'}</td>
+                        <td className="py-3.5 px-4 font-mono">{(p.userId || '').substring(0, 8)}...</td>
+                        <td className="py-3.5 px-4 text-sentence font-bold">{p.provider}</td>
+                        <td className="py-3.5 px-4 font-mono text-[10px] text-neutral-500">{p.transactionId || '—'}</td>
+                        <td className="py-3.5 px-4 font-mono text-neutral-900 font-bold">{p.currency} {p.amount}</td>
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-block px-2.5 py-0.5 text-[9px] font-black text-sentence rounded-full ${
+                            p.status === 'success'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : p.status === 'failed'
+                                ? 'bg-red-50 text-red-700'
+                                : 'bg-amber-50 text-amber-600'
+                          }`}>
+                            {p.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                    {payments.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-10 text-center text-neutral-400 font-bold">No payments recorded yet.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* 3d. Tickets tab (issue tracking + gate scanning) */}
+          {activeSubTab === 'tickets' && (
+            <div className="bg-white   rounded-2xl overflow-hidden shadow-3xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-neutral-50 text-neutral-500 font-bold text-sentence tracking-wider  ">
+                    <tr>
+                      <th className="py-3 px-4">Ticket No.</th>
+                      <th className="py-3 px-4">Booking</th>
+                      <th className="py-3 px-4">Event</th>
+                      <th className="py-3 px-4">Holder</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4">Manage</th>
+                    </tr>
+                  </thead>
+                  <tbody className="  font-semibold text-neutral-800">
+                    {tickets.map((t) => (
+                      <tr key={t.id} className="hover:bg-neutral-50/40">
+                        <td className="py-3.5 px-4 font-mono font-bold text-neutral-900">{t.ticketNumber}</td>
+                        <td className="py-3.5 px-4 font-mono text-[10px] text-neutral-500">{t.bookingId || '—'}</td>
+                        <td className="py-3.5 px-4">{t.eventId || '—'}</td>
+                        <td className="py-3.5 px-4 font-mono">{(t.userId || '').substring(0, 8)}...</td>
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-block px-2.5 py-0.5 text-[9px] font-black text-sentence rounded-full ${
+                            t.status === 'active'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : t.status === 'scanned'
+                                ? 'bg-blue-50 text-blue-700'
+                                : 'bg-red-50 text-red-700'
+                          }`}>
+                            {t.status}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <select
+                            value={t.status}
+                            onChange={(e) => handleTicketStatusChange(t.id!, e.target.value as any)}
+                            className="bg-neutral-50 border border-neutral-200 rounded-lg px-2 py-1 text-[10px] font-bold cursor-pointer"
+                          >
+                            <option value="active">Active</option>
+                            <option value="scanned">Scanned (entered)</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                    {tickets.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-10 text-center text-neutral-400 font-bold">No tickets issued yet.</td>
                       </tr>
                     )}
                   </tbody>

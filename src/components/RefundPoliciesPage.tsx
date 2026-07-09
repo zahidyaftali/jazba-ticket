@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Mail, PhoneCall, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, Mail, PhoneCall, AlertTriangle, Clock, Zap } from 'lucide-react';
 
 interface RefundPoliciesPageProps {
   onBackToHome: () => void;
@@ -8,9 +8,21 @@ interface RefundPoliciesPageProps {
 const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
 
 const GUARANTEE = [
-  '100% refund if an event is cancelled by the organiser',
-  '24-hour grace period — cancel or amend free of charge within 24 hours of booking, provided the event is still at least 72 hours away',
-  'Automatic processing if the fault is on our side (e.g. a platform error)',
+  {
+    icon: ShieldCheck,
+    title: '100% refund',
+    body: 'If an event is cancelled by the organiser, the full ticket price goes back to your original payment method.',
+  },
+  {
+    icon: Clock,
+    title: '24-hour grace period',
+    body: 'Cancel or amend free of charge within 24 hours of booking, provided the event is still at least 72 hours away.',
+  },
+  {
+    icon: Zap,
+    title: 'Automatic processing',
+    body: 'If the fault is on our side (e.g. a platform error), your refund is processed automatically — no need to ask.',
+  },
 ];
 
 const SECTIONS: Array<{ id: string; title: string; body: React.ReactNode }> = [
@@ -144,20 +156,24 @@ export default function RefundPoliciesPage({ onBackToHome }: RefundPoliciesPageP
         </div>
       </section>
 
-      {/* ── GUARANTEE — yellow band ───────────────────────────── */}
-      <section className="bg-[#ffed00] text-black px-4 sm:px-6 md:px-8 py-12">
+      {/* ── GUARANTEE — yellow tile band ──────────────────────── */}
+      <section className="bg-[#ffed00] text-black px-4 sm:px-6 md:px-8 py-14">
         <div className="max-w-4xl mx-auto">
-          <span className={`${overline} text-black/60 flex items-center gap-2`}>
-            <ShieldCheck className="w-4 h-4" /> 3.1 — Our guarantee
-          </span>
-          <ul className="mt-5 space-y-3">
+          <span className={`${overline} text-black/60`}>3.1 — Our guarantee</span>
+          <h2 className="font-display font-bold text-2xl sm:text-3xl leading-[0.95] mt-3">
+            Three things you can always count on.
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-black/15 border border-black/15 mt-8">
             {GUARANTEE.map((g) => (
-              <li key={g} className="flex items-start gap-3 text-base font-medium">
-                <span className="w-1.5 h-1.5 bg-black mt-2.5 shrink-0" />
-                {g}
-              </li>
+              <div key={g.title} className="bg-[#ffed00] p-6">
+                <span className="w-10 h-10 bg-black flex items-center justify-center">
+                  <g.icon className="w-5 h-5 text-[#ffed00]" />
+                </span>
+                <h3 className="font-display font-bold text-lg mt-4">{g.title}</h3>
+                <p className="text-sm text-black/70 leading-relaxed mt-2">{g.body}</p>
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
       </section>
 

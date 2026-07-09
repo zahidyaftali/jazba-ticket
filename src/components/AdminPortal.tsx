@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Lock, Mail, LogOut, ExternalLink, AlertCircle, Loader2 } from 'lucide-react';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase';
-import { isUserBootstrappedAdmin } from '../services/backendService';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, auth, User } from '../firebase';
+import { isUserBootstrappedAdmin, getUserProfile } from '../services/backendService';
 import AdminHub from './AdminHub';
 
 type AuthStage = 'checking' | 'signed-out' | 'denied' | 'granted';
@@ -25,11 +23,10 @@ export default function AdminPortal() {
       try {
         let role = '';
         let name = user.displayName || user.email || 'Admin';
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          role = data.role || '';
-          name = data.name || name;
+        const profile = await getUserProfile(user.uid);
+        if (profile) {
+          role = profile.role || '';
+          name = profile.name || name;
         }
         const isAdmin = isUserBootstrappedAdmin(user.email) || role === 'admin';
         if (isAdmin) {

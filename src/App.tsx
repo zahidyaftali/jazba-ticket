@@ -15,8 +15,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import { Info } from 'lucide-react';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth } from './firebase';
+import { onAuthStateChanged, signOut, auth } from './firebase';
 import Navbar from './components/Navbar';
 import HeroSection from './components/HeroSection';
 import CategoryCircles from './components/CategoryCircles';
@@ -45,7 +44,7 @@ import { categories, faqs } from './data';
 import { EventItem } from './types';
 import { getPublishedEvents, getAllArtists } from './services/backendService';
 
-type AuthUser = { email: string; name: string } | null;
+type AuthUser = { email: string; name: string; profileImage?: string } | null;
 
 // ---------------------------------------------------------------------------
 // Small shared building blocks
@@ -376,6 +375,7 @@ function DashboardView({
   onLogout: () => void;
 }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   return (
     <UserDashboardPage
       currentUser={currentUser}
@@ -384,6 +384,7 @@ function DashboardView({
       onBackToHome={() => navigate('/')}
       onViewShowDetail={(evt) => navigate(`/events/${evt.id}`)}
       onExploreEvents={() => navigate('/events')}
+      initialTab={searchParams.get('tab') || undefined}
     />
   );
 }
@@ -437,6 +438,7 @@ function AppShell() {
         setCurrentUser({
           email: user.email || '',
           name: user.displayName || user.email?.split('@')[0] || 'Concert Fan',
+          profileImage: user.photoURL || '',
         });
       } else {
         setCurrentUser(null);
@@ -491,7 +493,7 @@ function AppShell() {
         onScrollToSection={handleSection}
         onOpenAuth={(type) => navigate(`/${type}`)}
         currentUser={currentUser}
-        onGoToDashboard={() => navigate('/dashboard')}
+        onGoToDashboard={(tab?: string) => navigate(tab ? `/dashboard?tab=${tab}` : '/dashboard')}
         onLogout={handleLogout}
         isHome={isHome}
       />

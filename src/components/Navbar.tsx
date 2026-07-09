@@ -1,13 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { Ticket, Menu, X, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Ticket, Menu, X, ChevronRight, LayoutDashboard, Settings, LogOut } from 'lucide-react';
 
 interface NavbarProps {
   onScrollToSection: (id: string) => void;
   onOpenAuth: (type: 'signup' | 'login') => void;
-  currentUser: { email: string; name: string } | null;
-  onGoToDashboard: () => void;
+  currentUser: { email: string; name: string; profileImage?: string } | null;
+  onGoToDashboard: (tab?: string) => void;
   onLogout?: () => void;
   isHome: boolean;
+}
+
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 }
 
 const NAV_LINKS = [
@@ -19,12 +26,38 @@ const NAV_LINKS = [
 
 export default function Navbar({ onScrollToSection, onOpenAuth, currentUser, onGoToDashboard, onLogout }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
 
   // Lock body scroll while the mobile drawer is open
   useEffect(() => {
     document.body.style.overflow = isOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
+
+  // Close the profile dropdown on outside click or Escape
+  useEffect(() => {
+    if (!profileOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setProfileOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [profileOpen]);
+
+  const goDashboardTab = (tab?: string) => {
+    setProfileOpen(false);
+    onGoToDashboard(tab);
+  };
 
   const go = (id: string) => {
     onScrollToSection(id);
@@ -67,28 +100,85 @@ export default function Navbar({ onScrollToSection, onOpenAuth, currentUser, onG
         {/* RIGHT — account (desktop) */}
         <div className="hidden md:flex items-center gap-3 shrink-0">
           {currentUser ? (
-            <>
-              <span className="text-sm text-[#666]" id="nav-user-greeting">
-                Hi, <span className="font-bold text-black">{currentUser.name.split(' ')[0]}</span>
-              </span>
+            <div className="relative" ref={profileRef} id="nav-profile-menu">
+              {/* Avatar trigger */}
               <button
-                onClick={onGoToDashboard}
-                className="h-10 px-5 bg-black text-white text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors flex items-center gap-2"
-                id="btn-nav-dashboard"
+                onClick={() => setProfileOpen((v) => !v)}
+                className="w-10 h-10 bg-[#ffed00] border border-black flex items-center justify-center cursor-pointer overflow-hidden hover:opacity-85 transition-opacity"
+                id="btn-nav-profile"
+                aria-label="Account menu"
+                aria-expanded={profileOpen}
               >
-                My account
-                <span className="w-1.5 h-1.5 rounded-full bg-[#ffed00]" />
+                {currentUser.profileImage ? (
+                  <img
+                    src={currentUser.profileImage}
+                    alt={currentUser.name}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span className="text-sm font-bold text-black select-none">{initialsOf(currentUser.name)}</span>
+                )}
               </button>
-              {onLogout && (
-                <button
-                  onClick={onLogout}
-                  className="text-sm font-bold text-[#666] hover:text-black cursor-pointer transition-colors"
-                  id="btn-nav-logout"
-                >
-                  Sign out
-                </button>
+
+              {/* Dropdown panel */}
+              {profileOpen && (
+                <div className="absolute right-0 top-[calc(100%+10px)] w-64 bg-white border border-black z-50" id="nav-profile-dropdown">
+                  {/* Identity header */}
+                  <div className="flex items-center gap-3 p-4 border-b border-[#f2f2f2]">
+                    <span className="w-10 h-10 bg-[#ffed00] flex items-center justify-center overflow-hidden shrink-0">
+                      {currentUser.profileImage ? (
+                        <img
+                          src={currentUser.profileImage}
+                          alt={currentUser.name}
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <span className="text-sm font-bold text-black select-none">{initialsOf(currentUser.name)}</span>
+                      )}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="font-bold text-sm truncate">{currentUser.name}</div>
+                      <div className="text-xs text-[#8a8a8a] truncate">{currentUser.email}</div>
+                    </div>
+                  </div>
+
+                  {/* Menu items */}
+                  <button
+                    onClick={() => goDashboardTab()}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-black hover:bg-[#f7f7f7] cursor-pointer transition-colors text-left"
+                    id="btn-profile-dashboard"
+                  >
+                    <LayoutDashboard className="w-4 h-4 text-[#666]" /> My account
+                  </button>
+                  <button
+                    onClick={() => goDashboardTab('passes')}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-black hover:bg-[#f7f7f7] cursor-pointer transition-colors text-left"
+                    id="btn-profile-tickets"
+                  >
+                    <Ticket className="w-4 h-4 text-[#666]" /> My tickets
+                  </button>
+                  <button
+                    onClick={() => goDashboardTab('settings')}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-black hover:bg-[#f7f7f7] cursor-pointer transition-colors text-left"
+                    id="btn-profile-settings"
+                  >
+                    <Settings className="w-4 h-4 text-[#666]" /> Settings
+                  </button>
+
+                  {onLogout && (
+                    <button
+                      onClick={() => { setProfileOpen(false); onLogout(); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-black hover:bg-[#f7f7f7] cursor-pointer transition-colors text-left border-t border-[#f2f2f2]"
+                      id="btn-nav-logout"
+                    >
+                      <LogOut className="w-4 h-4 text-[#666]" /> Sign out
+                    </button>
+                  )}
+                </div>
               )}
-            </>
+            </div>
           ) : (
             <>
               <button

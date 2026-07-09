@@ -10,9 +10,8 @@ import {
   ArrowRight,
   AlertCircle
 } from 'lucide-react';
-import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { setDoc, doc } from 'firebase/firestore';
-import { auth, db, handleFirestoreError, OperationType } from '../firebase';
+import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, FacebookAuthProvider, signInWithPopup, auth } from '../firebase';
+import { createUserProfile } from '../services/backendService';
 
 interface SignupPageProps {
   onBack: () => void;
@@ -65,26 +64,12 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
       
       // Update display name
       await updateProfile(user, { displayName: name.trim() });
-      
-      // Store in users collection on Firestore
-      const userDocPath = `users/${user.uid}`;
+
+      // Complete the profile on the backend (role/status are handled server-side)
       try {
-        const isBootAdmin = email.toLowerCase() === 'zahidyaftali999@gmail.com';
-        await setDoc(doc(db, 'users', user.uid), {
-          uid: user.uid,
-          email: email,
-          name: name.trim(),
-          phone: '',
-          role: isBootAdmin ? 'admin' : 'user',
-          profileImage: '',
-          createdAt: new Date().toISOString(),
-          status: 'active',
-          city: 'London',
-          updatedAt: new Date().toISOString()
-        });
+        await createUserProfile(user.uid, { name: name.trim(), city: 'London' });
       } catch (dbErr) {
-        console.error("Failed to write profile doc:", dbErr);
-        handleFirestoreError(dbErr, OperationType.CREATE, userDocPath);
+        console.error("Failed to write profile:", dbErr);
       }
       
       setLoading(false);
@@ -112,23 +97,14 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
       
-      // Auto register to users doc if needed
+      // Complete the profile on the backend if needed
       try {
-        const isBootAdmin = (user.email || '').toLowerCase() === 'zahidyaftali999@gmail.com';
-        await setDoc(doc(db, 'users', user.uid), {
-          uid: user.uid,
-          email: user.email || '',
+        await createUserProfile(user.uid, {
           name: user.displayName || user.email?.split('@')[0] || 'Google Guest',
-          phone: '',
-          role: isBootAdmin ? 'admin' : 'user',
-          profileImage: user.photoURL || '',
-          createdAt: new Date().toISOString(),
-          status: 'active',
           city: 'London',
-          updatedAt: new Date().toISOString()
         });
       } catch (dbErr) {
-        console.error("Failed to save google profile to users doc:", dbErr);
+        console.error("Failed to save google profile:", dbErr);
       }
       
       setLoading(false);
@@ -140,6 +116,37 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
       setLoading(false);
       if (err.code !== 'auth/popup-closed-by-user') {
         setErrorMessage(err.message || 'Google sign up failed.');
+      }
+    }
+  };
+
+  const handleFacebookSignIn = async () => {
+    setErrorMessage('');
+    setLoading(true);
+    try {
+      const provider = new FacebookAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Complete the profile on the backend if needed
+      try {
+        await createUserProfile(user.uid, {
+          name: user.displayName || user.email?.split('@')[0] || 'Facebook Guest',
+          city: 'London',
+        });
+      } catch (dbErr) {
+        console.error("Failed to save facebook profile:", dbErr);
+      }
+
+      setLoading(false);
+      onSuccess({
+        email: user.email || '',
+        name: user.displayName || 'Facebook Guest'
+      });
+    } catch (err: any) {
+      setLoading(false);
+      if (err.code !== 'auth/popup-closed-by-user') {
+        setErrorMessage(err.message || 'Facebook sign up failed.');
       }
     }
   };
@@ -287,7 +294,7 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
                 <div className="w-full border-t border-neutral-200/80"></div>
               </div>
               <div className="relative bg-white px-3 text-[9px] text-sentence font-bold text-neutral-400 tracking-widest font-sans">
-                Or Continue With Google
+                Or Continue With
               </div>
             </div>
 
@@ -301,6 +308,18 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
                 <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114A5.73 5.73 0 0 1 8.24 12.8a5.73 5.73 0 0 1 5.751-5.714c1.47 0 2.805.534 3.84 1.412l3.14-3.14c-1.954-1.762-4.52-2.842-6.98-2.842a9.9 9.9 0 0 0-9.9 9.9 9.9 9.9 0 0 0 9.9 9.9c5.44 0 9.06-3.824 9.06-9.106 0-.584-.055-1.155-.156-1.706H12.24z"/>
               </svg>
               <span>Google Account</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleFacebookSignIn}
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 mt-2   hover:bg-neutral-50 bg-white rounded-2xl transition-all cursor-pointer shadow-xs font-semibold text-xs text-neutral-750"
+              title="Continue with Facebook"
+            >
+              <svg className="w-4.5 h-4.5 shrink-0" viewBox="0 0 24 24">
+                <path fill="#1877F2" d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047v-2.66c0-3.026 1.792-4.697 4.533-4.697 1.313 0 2.686.236 2.686.236v2.971H15.83c-1.491 0-1.956.931-1.956 1.886v2.264h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/>
+              </svg>
+              <span>Facebook Account</span>
             </button>
           </div>
 

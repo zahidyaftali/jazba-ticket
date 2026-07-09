@@ -6,9 +6,8 @@ import {
 } from 'lucide-react';
 import { EventItem } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType } from '../firebase';
-import { isUserBootstrappedAdmin } from '../services/backendService';
+import { auth } from '../firebase';
+import { isUserBootstrappedAdmin, getUserProfile, createUserProfile, updateUserProfile, getBookings } from '../services/backendService';
 import AdminHub from './AdminHub';
 import OrganizerHub from './OrganizerHub';
 import ArtistHub from './ArtistHub';
@@ -26,12 +25,14 @@ const PLACEHOLDER_EVENT: EventItem = {
 };
 
 interface UserDashboardPageProps {
-  currentUser: { email: string; name: string } | null;
+  currentUser: { email: string; name: string; profileImage?: string } | null;
   allEvents: EventItem[];
   onLogout: () => void;
   onBackToHome: () => void;
   onViewShowDetail: (event: EventItem) => void;
   onExploreEvents: () => void;
+  /** Optional deep link into a specific tab (e.g. "passes", "settings") */
+  initialTab?: string;
 }
 
 interface PersonalBooking {
@@ -50,6 +51,8 @@ type TabId = 'overview' | 'passes' | 'watchlist' | 'billing' | 'settings' | 'adm
 
 const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
 
+const VALID_TABS: TabId[] = ['overview', 'passes', 'watchlist', 'billing', 'settings', 'admin', 'organizer', 'artist'];
+
 export default function UserDashboardPage({
   currentUser,
   allEvents,
@@ -57,8 +60,18 @@ export default function UserDashboardPage({
   onBackToHome,
   onViewShowDetail,
   onExploreEvents,
+  initialTab,
 }: UserDashboardPageProps) {
-  const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [activeTab, setActiveTab] = useState<TabId>(
+    initialTab && VALID_TABS.includes(initialTab as TabId) ? (initialTab as TabId) : 'overview'
+  );
+
+  // Follow header-dropdown deep links while already on the dashboard
+  useEffect(() => {
+    if (initialTab && VALID_TABS.includes(initialTab as TabId)) {
+      setActiveTab(initialTab as TabId);
+    }
+  }, [initialTab]);
   const [userRole, setUserRole] = useState<'admin' | 'organizer' | 'artist' | 'user'>('user');
   const [userStatus, setUserStatus] = useState<'active' | 'suspended'>('active');
 
@@ -97,12 +110,10 @@ export default function UserDashboardPage({
         return;
       }
 
-      // 1. Profile from users/{uid}
+      // 1. Profile from the backend
       try {
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-          const udata = userDocSnap.data();
+        const udata = await getUserProfile(user.uid);
+        if (udata) {
           if (udata.name) setProfileName(udata.name);
           if (udata.email) setProfileEmail(udata.email);
           if (udata.phone) setProfilePhone(udata.phone);
@@ -112,45 +123,35 @@ export default function UserDashboardPage({
         } else {
           const isBootAdmin = isUserBootstrappedAdmin(user.email);
           const defaultRole = isBootAdmin ? 'admin' : 'user';
-          await setDoc(userDocRef, {
-            uid: user.uid,
-            email: user.email || '',
+          await createUserProfile(user.uid, {
             name: user.displayName || user.email?.split('@')[0] || 'Member',
-            phone: '',
-            role: defaultRole,
             profileImage: user.photoURL || '',
-            createdAt: new Date().toISOString(),
-            status: 'active',
             city: 'London',
-            updatedAt: new Date().toISOString(),
           });
           setUserRole(defaultRole);
           setUserStatus('active');
         }
       } catch (err) {
-        console.error('Failed to load user document:', err);
-        handleFirestoreError(err, OperationType.GET, `users/${user.uid}`);
+        console.error('Failed to load user profile:', err);
       }
 
-      // 2. Bookings where userId == uid, with localStorage fallback
+      // 2. Bookings for this user (the API scopes results by session), with localStorage fallback
       try {
-        const bookingsQuery = query(collection(db, 'bookings'), where('userId', '==', user.uid));
-        const bookingsSnap = await getDocs(bookingsQuery);
+        const bookingRows = await getBookings(user.uid);
 
         const loaded: PersonalBooking[] = [];
-        bookingsSnap.forEach((bookingDoc) => {
-          const item = bookingDoc.data();
+        bookingRows.forEach((item: any) => {
           const evt = allEvents.find((e) => e.id === item.eventId) || allEvents[0] || PLACEHOLDER_EVENT;
           loaded.push({
-            id: bookingDoc.id,
+            id: item.id,
             event: evt,
             quantity: item.quantity || 1,
-            tier: item.tier || 'general',
+            tier: item.tier || item.ticketType || 'general',
             bookingDate: item.bookingDate || 'Just now',
-            orderId: item.orderId || `JXB-${bookingDoc.id.substring(0, 4).toUpperCase()}`,
+            orderId: item.orderId || item.bookingNumber || `JXB-${String(item.id).substring(0, 4).toUpperCase()}`,
             seat: item.seat || 'F-12',
-            barCode: item.barCode || '937284918231',
-            pricePaid: item.pricePaid || evt.price,
+            barCode: item.barCode || item.qrCode || '937284918231',
+            pricePaid: item.pricePaid || item.amount || evt.price,
           });
         });
 
@@ -186,7 +187,6 @@ export default function UserDashboardPage({
         }
       } catch (err: any) {
         console.error('Failed to load user bookings:', err);
-        handleFirestoreError(err, OperationType.LIST, 'bookings');
         setUserBookings([]);
       }
     };
@@ -208,21 +208,17 @@ export default function UserDashboardPage({
     }
     setSaveError('');
     try {
-      await setDoc(doc(db, 'users', user.uid), {
-        uid: user.uid,
-        email: profileEmail,
+      await updateUserProfile(user.uid, {
         name: profileName,
         phone: profilePhone,
         city: profileCity,
-        updatedAt: new Date().toISOString(),
-      }, { merge: true });
+      });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 4000);
     } catch (err: any) {
       console.error('Save profile error:', err);
       setSaveError(err.message || 'Could not save your changes. Please try again.');
       setSaveSuccess(false);
-      handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`);
     }
   };
 

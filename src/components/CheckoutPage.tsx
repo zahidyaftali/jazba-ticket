@@ -4,8 +4,8 @@ import {
   Printer, ShieldCheck, Globe, Calendar, Loader2, Minus, Plus,
 } from 'lucide-react';
 import { EventItem } from '../types';
-import { doc, setDoc } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { auth } from '../firebase';
+import { createBooking } from '../services/backendService';
 import StripeCheckoutForm from './StripeCheckoutForm';
 import PayPalCheckoutForm from './PayPalCheckoutForm';
 
@@ -184,9 +184,21 @@ export default function CheckoutPage({
 
     if (user) {
       try {
-        await setDoc(doc(db, 'bookings', ticketCode), { id: ticketCode, userId: user.uid, ...payload });
+        await createBooking({
+          id: ticketCode,
+          bookingNumber: ticketCode,
+          userId: user.uid,
+          ticketType: ticketTier,
+          amount: bPrice,
+          bookingStatus: 'active',
+          qrCode: barcodeVal,
+          eventTitle: event.title,
+          eventImage: (event as any).bannerImage || (event as any).image || '',
+          eventDate: (event as any).date || '',
+          ...payload,
+        } as any);
       } catch (err) {
-        console.error('Failed to write booking to Firestore:', err);
+        console.error('Failed to write booking to backend:', err);
       }
     } else {
       try {

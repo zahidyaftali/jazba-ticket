@@ -1,17 +1,7 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  addDoc,
-  getCountFromServer
-} from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType } from '../firebase';
+// Data service for the custom /api backend (Neon Postgres + Express on Vercel).
+// Function names, parameters, and return shapes are kept identical to the old
+// Firestore implementation so no page component needed to change.
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from './apiClient';
 import { EventItem } from '../types';
 
 export interface UserProfile {
@@ -119,11 +109,10 @@ export interface PlatformAnalytics {
   totalRevenue: number;
 }
 
-// Global bootstrapped admin helper
 export const BOOTSTRAP_ADMIN_EMAIL = 'zahidyaftali999@gmail.com';
 
 export function isUserBootstrappedAdmin(email: string | null): boolean {
-  return email?.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase();
+  return !!email && email.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase();
 }
 
 /**
@@ -133,56 +122,21 @@ export function isUserBootstrappedAdmin(email: string | null): boolean {
  */
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
-  const path = `users/${uid}`;
   try {
-    const userDocRef = doc(db, 'users', uid);
-    const userSnap = await getDoc(userDocRef);
-    if (userSnap.exists()) {
-      return userSnap.data() as UserProfile;
-    }
-    return null;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
+    const { user } = await apiGet(`/api/users/${uid}`);
+    return user as UserProfile;
+  } catch {
     return null;
   }
 }
 
 export async function createUserProfile(uid: string, profile: Partial<UserProfile>): Promise<UserProfile> {
-  const path = `users/${uid}`;
-  const isBootAdmin = isUserBootstrappedAdmin(profile.email || null);
-  const userProfile: UserProfile = {
-    uid,
-    name: profile.name || 'Anonymous User',
-    email: profile.email || '',
-    phone: profile.phone || '',
-    role: isBootAdmin ? 'admin' : (profile.role as any || 'user'),
-    profileImage: profile.profileImage || '',
-    createdAt: profile.createdAt || new Date().toISOString(),
-    status: profile.status || 'active',
-    city: profile.city || 'London',
-  };
-
-  try {
-    await setDoc(doc(db, 'users', uid), userProfile);
-    return userProfile;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, path);
-    throw error;
-  }
+  const { user } = await apiPut(`/api/users/${uid}`, profile);
+  return user as UserProfile;
 }
 
 export async function updateUserProfile(uid: string, update: Partial<UserProfile>): Promise<void> {
-  const path = `users/${uid}`;
-  try {
-    const userDocRef = doc(db, 'users', uid);
-    await setDoc(userDocRef, {
-      ...update,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
-    throw error;
-  }
+  await apiPut(`/api/users/${uid}`, update);
 }
 
 /**
@@ -192,42 +146,21 @@ export async function updateUserProfile(uid: string, update: Partial<UserProfile
  */
 
 export async function getOrganizerProfile(userId: string): Promise<OrganizerProfile | null> {
-  const path = `organizers`;
   try {
-    const q = query(collection(db, 'organizers'), where('userId', '==', userId));
-    const snap = await getDocs(q);
-    if (!snap.empty) {
-      const docData = snap.docs[0].data();
-      return { id: snap.docs[0].id, ...docData } as OrganizerProfile;
-    }
-    return null;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
+    const { organizer } = await apiGet(`/api/organizers/by-user/${userId}`);
+    return (organizer as OrganizerProfile) || null;
+  } catch {
     return null;
   }
 }
 
 export async function createOrganizerProfile(profile: OrganizerProfile): Promise<OrganizerProfile> {
-  const path = `organizers`;
-  try {
-    const docRef = doc(collection(db, 'organizers'));
-    const cleanProfile = { ...profile, id: docRef.id };
-    await setDoc(docRef, cleanProfile);
-    return cleanProfile;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, path);
-    throw error;
-  }
+  const { organizer } = await apiPost('/api/organizers', profile);
+  return organizer as OrganizerProfile;
 }
 
 export async function updateOrganizerProfile(id: string, update: Partial<OrganizerProfile>): Promise<void> {
-  const path = `organizers/${id}`;
-  try {
-    await updateDoc(doc(db, 'organizers', id), update);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
-    throw error;
-  }
+  await apiPatch(`/api/organizers/${id}`, update);
 }
 
 /**
@@ -237,52 +170,25 @@ export async function updateOrganizerProfile(id: string, update: Partial<Organiz
  */
 
 export async function getArtistProfile(userId: string): Promise<ArtistProfile | null> {
-  const path = `artists`;
   try {
-    const q = query(collection(db, 'artists'), where('userId', '==', userId));
-    const snap = await getDocs(q);
-    if (!snap.empty) {
-      const docData = snap.docs[0].data();
-      return { id: snap.docs[0].id, ...docData } as ArtistProfile;
-    }
-    return null;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
+    const { artist } = await apiGet(`/api/artists/by-user/${userId}`);
+    return (artist as ArtistProfile) || null;
+  } catch {
     return null;
   }
 }
 
 export async function createArtistProfile(profile: ArtistProfile): Promise<ArtistProfile> {
-  const path = `artists`;
-  try {
-    const docRef = doc(collection(db, 'artists'));
-    const cleanProfile = { ...profile, id: docRef.id };
-    await setDoc(docRef, cleanProfile);
-    return cleanProfile;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, path);
-    throw error;
-  }
+  const { artist } = await apiPost('/api/artists', profile);
+  return artist as ArtistProfile;
 }
 
 export async function updateArtistProfile(id: string, update: Partial<ArtistProfile>): Promise<void> {
-  const path = `artists/${id}`;
-  try {
-    await updateDoc(doc(db, 'artists', id), update);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
-    throw error;
-  }
+  await apiPatch(`/api/artists/${id}`, update);
 }
 
 export async function deleteArtistProfile(id: string): Promise<void> {
-  const path = `artists/${id}`;
-  try {
-    await deleteDoc(doc(db, 'artists', id));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
-    throw error;
-  }
+  await apiDelete(`/api/artists/${id}`);
 }
 
 /**
@@ -300,476 +206,239 @@ export interface FollowRecord {
   createdAt: string;
 }
 
-// Deterministic doc id keeps a user's follow of a given target a single document,
-// so re-following after an unfollow can't create duplicate rows that inflate counts.
-function followDocId(followerId: string, targetType: FollowTargetType, targetId: string): string {
-  return `${followerId}_${targetType}_${targetId}`;
+export async function followTarget(_followerId: string, targetType: FollowTargetType, targetId: string): Promise<void> {
+  await apiPost('/api/follows', { targetType, targetId });
 }
 
-export async function followTarget(followerId: string, targetType: FollowTargetType, targetId: string): Promise<void> {
-  const id = followDocId(followerId, targetType, targetId);
-  const path = `follows/${id}`;
-  try {
-    const record: FollowRecord = {
-      followerId,
-      targetType,
-      targetId,
-      createdAt: new Date().toISOString()
-    };
-    await setDoc(doc(db, 'follows', id), record);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, path);
-    throw error;
-  }
+export async function unfollowTarget(_followerId: string, targetType: FollowTargetType, targetId: string): Promise<void> {
+  await apiDelete(`/api/follows/${targetType}/${targetId}`);
 }
 
-export async function unfollowTarget(followerId: string, targetType: FollowTargetType, targetId: string): Promise<void> {
-  const id = followDocId(followerId, targetType, targetId);
-  const path = `follows/${id}`;
+export async function isFollowingTarget(_followerId: string, targetType: FollowTargetType, targetId: string): Promise<boolean> {
   try {
-    await deleteDoc(doc(db, 'follows', id));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
-    throw error;
-  }
-}
-
-export async function isFollowingTarget(followerId: string, targetType: FollowTargetType, targetId: string): Promise<boolean> {
-  const id = followDocId(followerId, targetType, targetId);
-  const path = `follows/${id}`;
-  try {
-    const snap = await getDoc(doc(db, 'follows', id));
-    return snap.exists();
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
+    const { following } = await apiGet(`/api/follows/status?targetType=${encodeURIComponent(targetType)}&targetId=${encodeURIComponent(targetId)}`);
+    return !!following;
+  } catch {
     return false;
   }
 }
 
 export async function getFollowerCount(targetType: FollowTargetType, targetId: string): Promise<number> {
-  const path = `follows`;
   try {
-    const q = query(collection(db, 'follows'), where('targetType', '==', targetType), where('targetId', '==', targetId));
-    const snap = await getCountFromServer(q);
-    return snap.data().count;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
+    const { count } = await apiGet(`/api/follows/count?targetType=${encodeURIComponent(targetType)}&targetId=${encodeURIComponent(targetId)}`);
+    return count ?? 0;
+  } catch {
     return 0;
   }
 }
 
-// Returns the set of targetIds a given user already follows for a target type,
-// so a listing page can resolve "following" state for many items in one query.
-export async function getFollowingIds(followerId: string, targetType: FollowTargetType): Promise<Set<string>> {
-  const path = `follows`;
+export async function getFollowingIds(_followerId: string, targetType: FollowTargetType): Promise<Set<string>> {
   try {
-    const q = query(collection(db, 'follows'), where('followerId', '==', followerId), where('targetType', '==', targetType));
-    const snap = await getDocs(q);
-    const ids = new Set<string>();
-    snap.forEach((d) => ids.add((d.data() as FollowRecord).targetId));
-    return ids;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
-    return new Set();
+    const { ids } = await apiGet(`/api/follows/mine?targetType=${encodeURIComponent(targetType)}`);
+    return new Set<string>(ids || []);
+  } catch {
+    return new Set<string>();
   }
 }
 
 /**
  * ----------------------------------------------------
- * BOOKING & SEATING FUNCTIONS
+ * BOOKING FUNCTIONS
  * ----------------------------------------------------
  */
 
-export async function getBookings(userId?: string): Promise<Booking[]> {
-  const path = `bookings`;
+export async function getBookings(_userId?: string): Promise<Booking[]> {
+  // The server scopes results by token: admins get all bookings, users get their own.
   try {
-    let q = query(collection(db, 'bookings'));
-    if (userId) {
-      q = query(collection(db, 'bookings'), where('userId', '==', userId));
-    }
-    const snap = await getDocs(q);
-    const bookingsList: Booking[] = [];
-    snap.forEach((d) => {
-      bookingsList.push({ id: d.id, ...d.data() } as Booking);
-    });
-    return bookingsList;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
+    const { bookings } = await apiGet('/api/bookings');
+    return bookings as Booking[];
+  } catch {
     return [];
   }
 }
 
 export async function createBooking(booking: Booking): Promise<Booking> {
-  const path = `bookings`;
-  try {
-    const docRef = doc(collection(db, 'bookings'));
-    const cleanBooking = { ...booking, id: docRef.id };
-    await setDoc(docRef, cleanBooking);
+  const { booking: created } = await apiPost('/api/bookings', booking);
+  return created as Booking;
+}
 
-    // Create a dynamic notification upon booking registration
-    await createNotification({
-      userId: booking.userId,
-      title: 'Booking Confirmed!',
-      message: `Your booking ${booking.bookingNumber} for event has processed successfully. View your scan-ready passes under Digital Passes.`,
-      read: false,
-      createdAt: new Date().toISOString()
-    });
-
-    // Generate specific ticketing entries depending on quantity
-    for (let i = 0; i < booking.quantity; i++) {
-      await createTicket({
-        ticketNumber: `${booking.bookingNumber}-T${i+1}`,
-        bookingId: docRef.id,
-        userId: booking.userId,
-        eventId: booking.eventId,
-        qrCode: `TICKET-${booking.bookingNumber}-${i+1}-${Math.floor(100000 + Math.random() * 900000)}`,
-        status: 'active'
-      });
-    }
-
-    // Trigger platform analytics update safely
-    await updateAnalyticsAfterSale(booking.quantity, booking.amount);
-
-    return cleanBooking;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, path);
-    throw error;
-  }
+export async function updateBookingStatus(
+  id: string,
+  update: { paymentStatus?: Booking['paymentStatus']; bookingStatus?: Booking['bookingStatus'] },
+): Promise<void> {
+  await apiPatch(`/api/bookings/${id}`, update);
 }
 
 /**
  * ----------------------------------------------------
- * TICKET MANAGES FUNCTIONS
+ * TICKET FUNCTIONS
  * ----------------------------------------------------
  */
 
 export async function createTicket(ticket: TicketPass): Promise<TicketPass> {
-  const path = `tickets`;
-  try {
-    const docRef = doc(collection(db, 'tickets'));
-    const cleanTicket = { ...ticket, id: docRef.id };
-    await setDoc(docRef, cleanTicket);
-    return cleanTicket;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, path);
-    throw error;
-  }
+  const { ticket: created } = await apiPost('/api/tickets', ticket);
+  return created as TicketPass;
 }
 
-export async function getTickets(userId?: string): Promise<TicketPass[]> {
-  const path = `tickets`;
+export async function getTickets(_userId?: string): Promise<TicketPass[]> {
   try {
-    let q = query(collection(db, 'tickets'));
-    if (userId) {
-      q = query(collection(db, 'tickets'), where('userId', '==', userId));
-    }
-    const snap = await getDocs(q);
-    const list: TicketPass[] = [];
-    snap.forEach((d) => {
-      list.push({ id: d.id, ...d.data() } as TicketPass);
-    });
-    return list;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
+    const { tickets } = await apiGet('/api/tickets');
+    return tickets as TicketPass[];
+  } catch {
     return [];
   }
 }
 
 export async function updateTicketStatus(id: string, status: 'active' | 'cancelled' | 'scanned'): Promise<void> {
-  const path = `tickets/${id}`;
-  try {
-    await updateDoc(doc(db, 'tickets', id), { status });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
-    throw error;
-  }
+  await apiPatch(`/api/tickets/${id}/status`, { status });
 }
 
 /**
  * ----------------------------------------------------
- * PAYMENT TRANSACTION LEDGER FUNCTIONS
+ * PAYMENT FUNCTIONS
  * ----------------------------------------------------
  */
 
 export async function createPayment(payment: PaymentDetails): Promise<PaymentDetails> {
-  const path = `payments`;
+  const { payment: created } = await apiPost('/api/payments', payment);
+  return created as PaymentDetails;
+}
+
+export async function getAllPayments(): Promise<PaymentDetails[]> {
   try {
-    const docRef = doc(collection(db, 'payments'));
-    const cleanPayment = { ...payment, id: docRef.id };
-    await setDoc(docRef, cleanPayment);
-    return cleanPayment;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, path);
-    throw error;
+    const { payments } = await apiGet('/api/payments');
+    return payments as PaymentDetails[];
+  } catch {
+    return [];
   }
+}
+
+/** Creates a real Stripe PaymentIntent server-side and returns its client secret. */
+export async function createStripePaymentIntent(amount: number, currency: string): Promise<string> {
+  const { clientSecret } = await apiPost('/api/payments/create-intent', { amount, currency });
+  return clientSecret as string;
 }
 
 /**
  * ----------------------------------------------------
- * NOTIFICATION BULLETINS FUNCTIONS
+ * NOTIFICATION FUNCTIONS
  * ----------------------------------------------------
  */
 
 export async function createNotification(notification: SystemNotification): Promise<SystemNotification> {
-  const path = `notifications`;
-  try {
-    const docRef = doc(collection(db, 'notifications'));
-    const cleanNotification = { ...notification, id: docRef.id };
-    await setDoc(docRef, cleanNotification);
-    return cleanNotification;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, path);
-    throw error;
-  }
+  const { notification: created } = await apiPost('/api/notifications', notification);
+  return created as SystemNotification;
 }
 
-export async function getNotifications(userId: string): Promise<SystemNotification[]> {
-  const path = `notifications`;
+export async function getNotifications(_userId: string): Promise<SystemNotification[]> {
   try {
-    const q = query(collection(db, 'notifications'), where('userId', '==', userId));
-    const snap = await getDocs(q);
-    const res: SystemNotification[] = [];
-    snap.forEach((d) => {
-      res.push({ id: d.id, ...d.data() } as SystemNotification);
-    });
-    return res;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
+    const { notifications } = await apiGet('/api/notifications');
+    return notifications as SystemNotification[];
+  } catch {
     return [];
   }
 }
 
 export async function markNotificationRead(id: string): Promise<void> {
-  const path = `notifications/${id}`;
-  try {
-    await updateDoc(doc(db, 'notifications', id), { read: true });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
-    throw error;
-  }
+  await apiPatch(`/api/notifications/${id}/read`);
 }
 
 /**
  * ----------------------------------------------------
- * EVENT MANAGEMENT FUNCTIONS (ORGANIZERS & ADMINS)
+ * EVENT FUNCTIONS
  * ----------------------------------------------------
  */
 
-// Fills in display fields (location, time, image, etc.) that the public-facing
-// pages expect from EventItem, derived from the raw venue/city/startTime/bannerImage
-// fields that the admin event form actually collects.
-function normalizeEvent(raw: any): EventItem & Record<string, any> {
-  const location = raw.location || [raw.venue, raw.city].filter(Boolean).join(', ') || 'Venue TBA';
-  const time = raw.time || (raw.startTime && raw.endTime ? `${raw.startTime} to ${raw.endTime}` : (raw.startTime || 'Time TBA'));
-  return {
-    ...raw,
-    location,
-    time,
-    image: raw.image || raw.bannerImage || 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=800&auto=crop',
-    price: typeof raw.price === 'number' ? raw.price : 0,
-    type: raw.type || 'upcoming',
-    date: raw.date || 'TBA',
-    fullDate: raw.fullDate || raw.date,
-  };
-}
-
 export async function getEvents(): Promise<EventItem[]> {
-  const path = `events`;
   try {
-    const snap = await getDocs(collection(db, 'events'));
-    const list: EventItem[] = [];
-    snap.forEach((d) => {
-      list.push(normalizeEvent({ id: d.id, ...d.data() }));
-    });
-    return list;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
+    const { events } = await apiGet('/api/events');
+    return events as EventItem[];
+  } catch {
     return [];
   }
 }
 
 // Public-facing pages should only ever show events the organizer/admin marked published.
 export async function getPublishedEvents(): Promise<EventItem[]> {
-  const all = await getEvents();
-  return all.filter((e: any) => e.status === 'published');
+  const events = await getEvents();
+  return events.filter((e: any) => e.status === 'published');
 }
 
 export async function createEvent(event: any): Promise<any> {
-  const path = `events`;
-  try {
-    const docRef = doc(collection(db, 'events'));
-    const cleanEvent = { ...event, id: docRef.id };
-    await setDoc(docRef, cleanEvent);
-    
-    // Safely refresh analytics counters
-    await updateAnalyticsCounter('totalEvents', 1);
-
-    return cleanEvent;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, path);
-    throw error;
-  }
+  const { event: created } = await apiPost('/api/events', event);
+  return created;
 }
 
 export async function updateEvent(id: string, update: any): Promise<void> {
-  const path = `events/${id}`;
-  try {
-    await updateDoc(doc(db, 'events', id), update);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
-    throw error;
-  }
+  await apiPatch(`/api/events/${id}`, update);
 }
 
 export async function deleteEvent(id: string): Promise<void> {
-  const path = `events/${id}`;
-  try {
-    await deleteDoc(doc(db, 'events', id));
-    await updateAnalyticsCounter('totalEvents', -1);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
-    throw error;
-  }
+  await apiDelete(`/api/events/${id}`);
 }
 
 /**
  * ----------------------------------------------------
- * ADMIN MANAGEMENT PANEL FUNCTIONS
+ * ADMIN FUNCTIONS
  * ----------------------------------------------------
  */
 
 export async function getAllUsers(): Promise<UserProfile[]> {
-  const path = `users`;
   try {
-    const snap = await getDocs(collection(db, 'users'));
-    const list: UserProfile[] = [];
-    snap.forEach((d) => {
-      list.push(d.data() as UserProfile);
-    });
-    return list;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
+    const { users } = await apiGet('/api/users');
+    return users as UserProfile[];
+  } catch {
     return [];
   }
 }
 
 export async function updateUserRoleAndStatus(uid: string, role: string, status: string): Promise<void> {
-  const path = `users/${uid}`;
-  try {
-    await updateDoc(doc(db, 'users', uid), { role, status });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
-    throw error;
-  }
+  await apiPatch(`/api/users/${uid}/role-status`, { role, status });
 }
 
 export async function deleteUserAccount(uid: string): Promise<void> {
-  const path = `users/${uid}`;
-  try {
-    await deleteDoc(doc(db, 'users', uid));
-    await updateAnalyticsCounter('totalUsers', -1);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
-    throw error;
-  }
+  await apiDelete(`/api/users/${uid}`);
 }
 
 export async function getAllOrganizers(): Promise<OrganizerProfile[]> {
-  const path = `organizers`;
   try {
-    const snap = await getDocs(collection(db, 'organizers'));
-    const list: OrganizerProfile[] = [];
-    snap.forEach((d) => {
-      list.push({ id: d.id, ...d.data() } as OrganizerProfile);
-    });
-    return list;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
+    const { organizers } = await apiGet('/api/organizers');
+    return organizers as OrganizerProfile[];
+  } catch {
     return [];
   }
 }
 
 export async function getAllArtists(): Promise<ArtistProfile[]> {
-  const path = `artists`;
   try {
-    const snap = await getDocs(collection(db, 'artists'));
-    const list: ArtistProfile[] = [];
-    snap.forEach((d) => {
-      list.push({ id: d.id, ...d.data() } as ArtistProfile);
-    });
-    return list;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
+    const { artists } = await apiGet('/api/artists');
+    return artists as ArtistProfile[];
+  } catch {
     return [];
   }
 }
 
 /**
  * ----------------------------------------------------
- * PLATFORM ANALYTICS AGGREGATIONS
+ * ANALYTICS FUNCTIONS
  * ----------------------------------------------------
  */
 
 export async function getPlatformAnalytics(): Promise<PlatformAnalytics> {
-  const path = `analytics/overall`;
   try {
-    const docRef = doc(db, 'analytics', 'overall');
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      return snap.data() as PlatformAnalytics;
-    } else {
-      const defaultAnalytics: PlatformAnalytics = {
-        totalUsers: 154,
-        totalOrganizers: 12,
-        totalArtists: 28,
-        totalEvents: 6,
-        totalTicketsSold: 284,
-        totalRevenue: 24850
-      };
-      await setDoc(docRef, defaultAnalytics);
-      return defaultAnalytics;
-    }
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
-    return {
-      totalUsers: 154,
-      totalOrganizers: 12,
-      totalArtists: 28,
-      totalEvents: 6,
-      totalTicketsSold: 284,
-      totalRevenue: 24850
-    };
+    const { analytics } = await apiGet('/api/analytics');
+    return analytics as PlatformAnalytics;
+  } catch {
+    return { totalUsers: 0, totalOrganizers: 0, totalArtists: 0, totalEvents: 0, totalTicketsSold: 0, totalRevenue: 0 };
   }
 }
 
-export async function updateAnalyticsCounter(field: keyof PlatformAnalytics, incrementValue: number): Promise<void> {
-  const path = `analytics/overall`;
-  try {
-    const docRef = doc(db, 'analytics', 'overall');
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      const current = snap.data() as PlatformAnalytics;
-      const updatedValue = (current[field] || 0) + incrementValue;
-      await updateDoc(docRef, { [field]: updatedValue });
-    }
-  } catch (error) {
-    console.error("Failed to update analytics counter field:", field, error);
-  }
+// Analytics are now computed live from the database on the server,
+// so the old Firestore counter writes are intentionally no-ops.
+export async function updateAnalyticsCounter(_field: keyof PlatformAnalytics, _incrementValue: number): Promise<void> {
+  return;
 }
 
-export async function updateAnalyticsAfterSale(quantitySold: number, revenue: number): Promise<void> {
-  const path = `analytics/overall`;
-  try {
-    const docRef = doc(db, 'analytics', 'overall');
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      const current = snap.data() as PlatformAnalytics;
-      await updateDoc(docRef, {
-        totalTicketsSold: (current.totalTicketsSold || 0) + quantitySold,
-        totalRevenue: (current.totalRevenue || 0) + revenue
-      });
-    }
-  } catch (error) {
-    console.error("Failed to update analytics after sale:", error);
-  }
+export async function updateAnalyticsAfterSale(_quantitySold: number, _revenue: number): Promise<void> {
+  return;
 }

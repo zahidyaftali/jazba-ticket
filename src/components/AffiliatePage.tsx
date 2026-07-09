@@ -141,28 +141,28 @@ export default function AffiliatePage() {
         </div>
       </section>
 
-      {/* ── CTA — black closing band ──────────────────────────── */}
-      <section className="bg-black text-white px-4 sm:px-6 md:px-8 py-20">
+      {/* ── CTA — yellow closing band ─────────────────────────── */}
+      <section className="bg-[#ffed00] text-black px-4 sm:px-6 md:px-8 py-20">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-8">
           <div>
-            <Link2 className="w-6 h-6 text-[#ffed00]" />
+            <Link2 className="w-6 h-6 text-black" />
             <h2 className="font-display font-bold text-3xl sm:text-4xl leading-[0.95] mt-5 max-w-md">
               Ready to start earning?
             </h2>
-            <p className="text-white/70 text-sm mt-4 max-w-md">
+            <p className="text-black/70 text-sm mt-4 max-w-md">
               Email us and we'll set up your affiliate account and referral link.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
             <a
               href="mailto:affiliates@jazbaentertainment.net"
-              className="bg-[#ffed00] text-black font-bold text-sm px-6 py-3.5 flex items-center gap-2 hover:bg-[#e6d200] transition-colors"
+              className="bg-black text-white font-bold text-sm px-6 py-3.5 flex items-center gap-2 hover:bg-neutral-800 transition-colors"
             >
               <Mail className="w-4 h-4" /> affiliates@jazbaentertainment.net
             </a>
             <button
               onClick={() => navigate('/events')}
-              className="bg-black text-white border border-white font-bold text-sm px-6 py-3.5 cursor-pointer hover:bg-white/10 transition-colors flex items-center gap-2"
+              className="bg-transparent text-black border border-black font-bold text-sm px-6 py-3.5 cursor-pointer hover:bg-black/5 transition-colors flex items-center gap-2"
             >
               Browse events <ArrowRight className="w-4 h-4" />
             </button>

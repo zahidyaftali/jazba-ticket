@@ -50,7 +50,7 @@ export default function Footer({ onScrollToSection, onSubscribe, onViewRefundPol
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
                   required
-                  className="flex-1 bg-black text-white placeholder-white/40 text-sm px-0 py-3"
+                  className="flex-1 bg-black text-white placeholder-white/40 text-sm px-4 py-3 border border-white"
                   id="newsletter-email-input"
                 />
                 <button
