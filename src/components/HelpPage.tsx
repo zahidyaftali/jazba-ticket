@@ -28,7 +28,7 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
 
   // Knowledgebase
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'safety' | 'refunds' | 'tech' | 'booking'>('safety');
+  const [activeTab, setActiveTab] = useState<'tickets' | 'organisers' | 'artists' | 'tech'>('tickets');
 
   // Troubleshooter
   const [troubleTopic, setTroubleTopic] = useState<string>('');
@@ -39,7 +39,7 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
   const [chatOpen, setChatOpen] = useState<boolean>(false);
   const [chatMessage, setChatMessage] = useState<string>('');
   const [chatLog, setChatLog] = useState<Array<{ sender: 'user' | 'agent'; text: string; time: string }>>([
-    { sender: 'agent', text: 'Hi! You\'re through to Jazbaticket support. How can I help?', time: 'Just now' },
+    { sender: 'agent', text: 'Hi! You\'re through to Jazbatickets support. How can I help?', time: 'Just now' },
   ]);
   const [isTyping, setIsTyping] = useState<boolean>(false);
 
@@ -53,25 +53,26 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
   const [formSubmitted, setFormSubmitted] = useState(false);
 
   const knowledgebaseArticles = {
-    safety: [
-      { id: 1, title: 'How do I know my ticket is genuine?', desc: 'Every ticket booked through Jazbaticket carries a unique barcode that we issue and verify at the gate. Book through us and your ticket is guaranteed real.' },
-      { id: 2, title: 'Can I resell my tickets elsewhere?', desc: 'We don\'t support third-party resale — it\'s where most ticket fraud happens. If you can\'t attend, contact us and we\'ll transfer or refund your ticket instead.' },
-      { id: 3, title: 'How does scanning work at the door?', desc: 'Your barcode is checked live against our system at entry, so copies and duplicates are rejected automatically.' },
+    tickets: [
+      { id: 1, title: 'How do I book an event ticket online?', desc: 'Browse events on Jazbatickets, choose your date, ticket type, and quantity, then check out securely by card or Apple Pay / Google Pay. You\'ll get a confirmation on screen straight away, and a confirmation email with your digital ticket (QR/barcode) follows immediately after.' },
+      { id: 2, title: 'Can I cancel or reschedule my ticket after booking?', desc: 'Yes, within limits — see our full Refund Policy. In short: you can cancel free of charge within 24 hours of booking (as long as the event is still 72+ hours away), or up to 7 days before the event for a refund minus a 10% admin fee. Bookings made within 7 days of the event are final sale.' },
+      { id: 3, title: 'How do I know if my ticket is confirmed?', desc: 'As soon as payment goes through, you\'ll see an on-screen confirmation with a reference ID, followed by an email containing your digital ticket, receipt, and QR/barcode.' },
+      { id: 4, title: 'Are group discounts available for bulk ticket purchases?', desc: 'Yes, for most concerts, theatre shows, and conferences. For bookings of 10 or more tickets, look for a Group Discount option at checkout, or contact support@jazbaentertainment.net directly.' },
+      { id: 5, title: 'What should I do if I don\'t receive my ticket after booking?', desc: 'First check your spam/junk folder. If it\'s still not there, log in to your Jazbatickets account and go to My Passes, or contact support@jazbaentertainment.net with your order reference and we\'ll resend it.' },
     ],
-    refunds: [
-      { id: 4, title: 'What\'s the refund policy?', desc: 'Cancel at least 48 hours before the show and the full amount goes back to your original payment method — automatically.' },
-      { id: 5, title: 'What does "wait list" mean on my booking?', desc: 'The show sold out, so you\'re in the queue. If a spot opens, we email you and hold it for a short window before it goes to the next person.' },
-      { id: 6, title: 'Are fees refunded when an event is cancelled?', desc: 'Yes. If the venue or organiser cancels, you get everything back — ticket price and service fees, no deductions.' },
+    organisers: [
+      { id: 6, title: 'How do I list an event?', desc: 'Create a free account, select Create Event, and follow the guided setup — event details, ticket types, pricing, and capacity. Most events go live shortly after submission; some categories are manually reviewed first.' },
+      { id: 7, title: 'What does it cost to sell tickets?', desc: 'Jazbatickets charges a service fee per ticket sold, deducted automatically from each sale. Free events stay free to list.' },
+      { id: 8, title: 'When do I get paid?', desc: 'Payouts are processed a few business days after your event date, direct to your registered bank account.' },
+    ],
+    artists: [
+      { id: 9, title: 'How does artist booking work?', desc: 'Go to Book an artist, view an artist\'s profile and availability, and submit an enquiry with your event date, venue, and budget. You\'ll get a formal quote and booking agreement back, usually within 2–3 working days.' },
+      { id: 10, title: 'Is payment required upfront to book an artist?', desc: 'A non-refundable deposit confirms a hold on the artist\'s date, with the balance due before the performance, per the artist\'s booking terms.' },
     ],
     tech: [
-      { id: 7, title: 'How do I reset my password?', desc: 'Use "Forgot password" on the sign-in page, or change it anytime from Account settings in your dashboard.' },
-      { id: 8, title: 'My ticket barcode won\'t load', desc: 'Tickets are saved for offline access automatically, and you can download a PDF copy from your dashboard in case there\'s no signal at the venue.' },
-      { id: 9, title: 'Can I add extra security to my account?', desc: 'Two-factor authentication is on the way. Until then, a strong unique password keeps your account safe.' },
-    ],
-    booking: [
-      { id: 10, title: 'Can I mix ticket types in one order?', desc: 'Yes — combine General, VIP and Elite tickets for the same event in a single checkout.' },
-      { id: 11, title: 'Do I get a physical ticket?', desc: 'We\'re fully digital. Your ticket and barcode appear in your dashboard the moment payment clears.' },
-      { id: 12, title: 'Does the name on the ticket matter?', desc: 'Yes, it\'s checked at the door. You can reassign a ticket to someone else from your dashboard any time before the event.' },
+      { id: 11, title: 'How do I reset my password?', desc: 'Use "Forgot password" on the sign-in page, or change it anytime from Account settings in your dashboard.' },
+      { id: 12, title: 'My ticket barcode won\'t load', desc: 'Tickets are saved for offline access automatically, and you can download a PDF copy from your dashboard in case there\'s no signal at the venue.' },
+      { id: 13, title: 'Can I add extra security to my account?', desc: 'Two-factor authentication is on the way. Until then, a strong unique password keeps your account safe.' },
     ],
   };
 
@@ -87,7 +88,7 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
       } else if (topic === 'login') {
         setDiagnosticResult('Sign-in is running normally. Clear your browser cache and try again, or reset your password from the login page.');
       } else if (topic === 'refund') {
-        setDiagnosticResult('Refunds are processing normally. If your event was cancelled or you\'re inside the 48-hour window, open your dashboard and choose "Request refund".');
+        setDiagnosticResult('Refunds are processing normally. You can cancel free within 24 hours of booking, or up to 7 days before the event (minus a 10% admin fee) — open your dashboard and choose "Request refund".');
       } else {
         setDiagnosticResult('All systems are running normally.');
       }
@@ -109,7 +110,7 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
       setIsTyping(false);
       let reply = 'Thanks for the message — a member of the team will reply shortly. You can check your tickets anytime from your dashboard.';
       if (userMsg.toLowerCase().includes('refund') || userMsg.toLowerCase().includes('cancel')) {
-        reply = 'Refunds are free up to 48 hours before the show. I\'ve flagged this for our refunds team.';
+        reply = 'You can cancel free within 24 hours of booking, or up to 7 days before the event for a refund minus a 10% admin fee. I\'ve flagged this for our refunds team.';
       } else if (userMsg.toLowerCase().includes('hello') || userMsg.toLowerCase().includes('hi')) {
         reply = 'Hi there! How can I help you today?';
       } else if (userMsg.toLowerCase().includes('ticket') || userMsg.toLowerCase().includes('code') || userMsg.toLowerCase().includes('qr')) {
@@ -134,10 +135,10 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
   );
 
   const TAB_LABELS = {
-    safety: 'Ticket safety',
-    refunds: 'Refunds',
+    tickets: 'Buying tickets',
+    organisers: 'Event organisers',
+    artists: 'Artists & booking',
     tech: 'Account & tech',
-    booking: 'Booking',
   } as const;
 
   const articles = searchQuery.trim() ? filteredArticles : knowledgebaseArticles[activeTab];
@@ -169,7 +170,7 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
           </h1>
 
           <p className="text-white/70 text-base sm:text-lg mt-6 max-w-2xl leading-relaxed">
-            Search the help articles, run a quick status check, or talk to a real person — we answer within 2 hours, every day.
+            Whether you're buying a ticket, listing an event, or booking an artist, this is where to find answers fast. Can't find what you need? Contact us at support@jazbaentertainment.net or 0333 5777 014 (Mon–Fri, 9am–5:30pm UK time).
           </p>
 
           {/* Hero search */}
@@ -311,10 +312,10 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
                   <Mail className="w-4 h-4 text-[#ffed00] shrink-0" />
                   <span>
                     <span className="font-bold block">Email</span>
-                    <span className="text-white/60">Replies within 2 hours</span>
+                    <span className="text-white/60">Tickets, events & bookings</span>
                   </span>
                 </span>
-                <span className="font-bold text-sm">support@jazbaticket.com</span>
+                <span className="font-bold text-sm">support@jazbaentertainment.net</span>
               </div>
               <div className="flex items-center justify-between py-5 border-b border-white/15">
                 <span className="flex items-center gap-3 text-sm">
@@ -324,17 +325,17 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
                     <span className="text-white/60">Billing & urgent queries</span>
                   </span>
                 </span>
-                <span className="font-bold text-sm">+44 20 7946 0192</span>
+                <span className="font-bold text-sm">0333 5777 014</span>
               </div>
               <div className="flex items-center justify-between py-5">
                 <span className="flex items-center gap-3 text-sm">
                   <Clock className="w-4 h-4 text-[#ffed00] shrink-0" />
                   <span>
                     <span className="font-bold block">Hours</span>
-                    <span className="text-white/60">London & Hamilton desks</span>
+                    <span className="text-white/60">Mon–Fri, UK time</span>
                   </span>
                 </span>
-                <span className="font-bold text-sm">08:00 – 22:00 GMT</span>
+                <span className="font-bold text-sm">9am – 5:30pm</span>
               </div>
             </div>
 
@@ -355,7 +356,7 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
           <div className="lg:col-span-5">
             <h2 className="font-display font-bold text-3xl leading-[0.95]">Still need help?</h2>
             <p className="text-sm text-[#666] mt-4 leading-relaxed max-w-sm">
-              Send us the details and a support agent will reply to your email — usually within 2 hours.
+              Send us the details and a support agent will reply to your email during support hours — Mon–Fri, 9am–5:30pm UK time.
             </p>
 
             <div className="border-t border-[#f2f2f2] mt-8">
@@ -476,7 +477,7 @@ export default function HelpPage({ onBackToHome, onExploreEvents }: HelpPageProp
               <div className="flex items-center gap-2.5">
                 <span className="w-2 h-2 rounded-full bg-[#ffed00]" />
                 <div>
-                  <span className="font-bold text-sm block leading-tight">Jazbaticket support</span>
+                  <span className="font-bold text-sm block leading-tight">Jazbatickets support</span>
                   <span className="text-[11px] text-white/60">Typically replies in under a minute</span>
                 </div>
               </div>

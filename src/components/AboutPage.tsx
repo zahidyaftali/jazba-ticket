@@ -2,9 +2,10 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Ticket,
-  Shield,
-  Users,
-  Globe,
+  Music2,
+  Disc3,
+  Clapperboard,
+  Megaphone,
   Sparkles,
   ArrowRight,
   Check,
@@ -14,27 +15,32 @@ import {
 const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
 
 const STATS = [
-  { value: '10,000+', label: 'Live events on sale' },
-  { value: '2.4M', label: 'Tickets delivered' },
-  { value: '1,800+', label: 'Verified artists' },
-  { value: '40+', label: 'Cities covered' },
+  { value: '2005', label: 'Established in Birmingham, UK' },
+  { value: '20+', label: 'Years in music & film production' },
+  { value: '2', label: 'Recording studios — Birmingham & Lahore' },
+  { value: '3', label: 'Production bases — Birmingham, Lahore, Islamabad' },
 ];
 
-const VALUES = [
+const SERVICES = [
   {
-    icon: Shield,
-    title: 'Every ticket is real',
-    body: 'Barcodes are issued and validated by us at the gate. If an event is cancelled, refunds are automatic — no queues, no arguments.',
+    icon: Music2,
+    title: 'Live events & festivals',
+    body: 'We produce and promote live music events and festivals — and Jazbatickets is where you find and book tickets to them, securely and simply.',
   },
   {
-    icon: Users,
-    title: 'Fair for artists',
-    body: 'Performers set one flat fee per event, keep the majority, and get paid on time. We hold funds in escrow until the show is done.',
+    icon: Disc3,
+    title: 'Artist management, publishing & distribution',
+    body: 'We manage artists, publish their music and distribute it worldwide — which is why, uniquely, you can book the artists behind our events directly for your own.',
   },
   {
-    icon: Globe,
-    title: 'Built for organisers',
-    body: 'List a show in minutes, price every tier, and watch sales in real time — from a single seat to a sold-out arena.',
+    icon: Clapperboard,
+    title: 'Studios & film production',
+    body: 'Recording studios in Birmingham and Lahore, plus film production equipment available for hire in Islamabad.',
+  },
+  {
+    icon: Megaphone,
+    title: 'Design & marketing',
+    body: 'Graphics and web design, and social media marketing and management — all built around music.',
   },
 ];
 
@@ -67,14 +73,14 @@ const HOW_IT_WORKS = [
 
 const GUARANTEES = [
   'Full refund if an event is cancelled — including all fees',
-  'Free cancellation up to 48 hours before any show',
+  'Free cancellation within 24 hours of booking (event 72+ hours away)',
+  'Cancel up to 7 days before the event for a refund minus a 10% admin fee',
   'Every barcode verified live at the venue gate',
   'Card details never stored on our servers',
-  'Artist payments protected in escrow until the show is done',
-  'Support that answers within 2 hours, every day of the week',
+  'UK-based support — Mon–Fri, 9am–5:30pm on 0333 5777 014',
 ];
 
-const CITIES = ['London', 'Hamilton', 'Bristol', 'Manchester', 'Birmingham', 'Leeds', 'Glasgow', 'Karachi', 'Lahore', 'Islamabad', 'Toronto', 'New York'];
+const CITIES = ['Birmingham', 'London', 'Manchester', 'Leeds', 'Bristol', 'Glasgow', 'Lahore', 'Islamabad', 'Karachi'];
 
 export default function AboutPage() {
   const navigate = useNavigate();
@@ -103,7 +109,7 @@ export default function AboutPage() {
             We put live experiences <span className="text-[#ffed00]">within reach.</span>
           </h1>
           <p className="text-neutral-300 font-normal text-sm sm:text-base md:text-lg max-w-2xl leading-relaxed">
-            Jazbaticket is a ticketing and artist-booking platform for concerts, theatre, comedy, sport and conferences. Fans find the shows they love; organisers and artists reach the audiences they deserve — on one honest, secure marketplace.
+            Jazbatickets is the ticketing and artist booking platform from Jazba Entertainment Ltd — a music and video/film production company based in Birmingham, UK, established in 2005. A straightforward way to find and book tickets to great live events, and — uniquely — to book the artists behind them directly for your own event.
           </p>
         </div>
       </section>
@@ -126,21 +132,18 @@ export default function AboutPage() {
           <div className="lg:col-span-5">
             <span className={`${overline} text-[#666]`}>Our story</span>
             <h2 className="font-display font-bold text-3xl sm:text-4xl leading-[0.95] mt-3">
-              It started with a fake ticket.
+              Two decades of music, from studio to stage.
             </h2>
           </div>
           <div className="lg:col-span-7 text-base text-[#222] leading-relaxed space-y-5">
             <p>
-              In 2019, one of our founders queued for two hours outside a sold-out show in London — only to be turned away at the gate with a ticket that scanned as a duplicate. The reseller had vanished. The night was gone. The money too.
+              Jazbatickets is the ticketing and artist booking platform from <strong className="font-bold">Jazba Entertainment Ltd</strong> — a music and video/film production company based in Birmingham, UK, established in 2005.
             </p>
             <p>
-              Jazbaticket was built so that never happens again. We issue every barcode ourselves, verify it live at the door, and put a refund guarantee behind every order. No grey market, no "sold as seen", no small print designed to lose you.
+              We work across live music events and festivals, artist management, music publishing, and music distribution, with recording studios in Birmingham and Lahore, and film production equipment available for hire in Islamabad. Alongside our production and management work, we also provide graphics and web design, and social media marketing and management — all built around music.
             </p>
             <p>
-              Then we looked at the other side of the stage. Artists were being paid late, by the hour, with deductions they never agreed to. So we flipped it: <strong className="font-bold">one flat fee per event, agreed upfront, held in escrow, released after the show.</strong> Today more than 1,800 verified performers are booked through the platform — from wedding singers to arena headliners.
-            </p>
-            <p>
-              We're a team of engineers, promoters and former touring musicians working across London, Hamilton and Lahore. What unites us is simple: the belief that a great night out should start long before the doors open.
+              Jazbatickets brings that experience together in one place: a straightforward way to find and book tickets to great live events, and — uniquely — <strong className="font-bold">to book the artists behind them directly for your own event.</strong>
             </p>
           </div>
         </div>
@@ -149,12 +152,12 @@ export default function AboutPage() {
       {/* ── VALUES — hairline tile grid ───────────────────────── */}
       <section className="px-4 sm:px-6 md:px-8 pb-20">
         <div className="max-w-7xl mx-auto">
-          <span className={`${overline} text-[#666]`}>What we stand for</span>
+          <span className={`${overline} text-[#666]`}>What we do</span>
           <h2 className="font-display font-bold text-3xl sm:text-4xl leading-[0.95] max-w-xl mt-3">
-            Three promises we don't break.
+            Everything we do is built around music.
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-[#e4e4e4] mt-10 border border-[#e4e4e4]">
-            {VALUES.map((v) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-[#e4e4e4] mt-10 border border-[#e4e4e4]">
+            {SERVICES.map((v) => (
               <div key={v.title} className="bg-white p-8">
                 <v.icon className="w-6 h-6 text-black" />
                 <h3 className="font-display font-bold text-lg mt-5">{v.title}</h3>
@@ -200,7 +203,7 @@ export default function AboutPage() {
       <section className="px-4 sm:px-6 md:px-8 py-20">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
           <div className="lg:col-span-5">
-            <span className={`${overline} text-[#666]`}>The Jazbaticket guarantee</span>
+            <span className={`${overline} text-[#666]`}>The Jazbatickets guarantee</span>
             <h2 className="font-display font-bold text-3xl sm:text-4xl leading-[0.95] mt-3">
               In writing, not in spirit.
             </h2>
@@ -229,7 +232,7 @@ export default function AboutPage() {
             <span className={`${overline} text-[#666]`}>Where we operate</span>
           </div>
           <h2 className="font-display font-bold text-2xl sm:text-3xl leading-[0.95] mt-3 max-w-lg">
-            From London basements to Lahore stadiums.
+            From Birmingham to Lahore — wherever live music happens.
           </h2>
           <div className="flex flex-wrap gap-px bg-[#e4e4e4] border border-[#e4e4e4] mt-8 w-fit">
             {CITIES.map((city) => (
@@ -256,7 +259,7 @@ export default function AboutPage() {
               Ready when you are.
             </h2>
             <p className="text-white/70 text-sm mt-4 max-w-md">
-              Browse tonight's shows, book the artist for your own event, or get in touch — a real person replies within 2 hours.
+              Browse tonight's shows, book the artist for your own event, or get in touch at support@jazbaentertainment.net or 0333 5777 014 — Mon–Fri, 9am–5:30pm UK time.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">

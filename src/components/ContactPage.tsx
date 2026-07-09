@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Mail, MessageSquare, MapPin, Phone, Check } from 'lucide-react';
 
 const CHANNELS = [
-  { icon: Mail, label: 'Email us', value: 'support@jazbaticket.com', note: 'Replies within 2 hours' },
-  { icon: Phone, label: 'Call the box office', value: '+44 20 7946 0958', note: 'Mon–Sun, 9am–9pm BST' },
-  { icon: MapPin, label: 'Head office', value: 'Westminster, London, UK', note: 'By appointment only' },
+  { icon: Mail, label: 'General enquiries', value: 'info@jazbaentertainment.net', note: 'Anything else — we\'ll point you right' },
+  { icon: Mail, label: 'Ticket support', value: 'support@jazbaentertainment.net', note: 'Orders, refunds & event queries' },
+  { icon: Mail, label: 'Artist bookings', value: 'bookings@jazbaentertainment.net', note: 'Quotes & booking agreements' },
+  { icon: Phone, label: 'Phone', value: '0333 5777 014', note: 'Mon–Fri, 9am–5:30pm UK time' },
+  { icon: MapPin, label: 'Registered office', value: 'Jazba Entertainment Ltd', note: '339 Dudley Road, Birmingham B18 4HB, United Kingdom' },
 ];
 
 const TOPICS = ['A ticket order', 'Listing an event', 'Booking an artist', 'Press & partnerships', 'Something else'];
@@ -51,7 +53,7 @@ export default function ContactPage() {
             Talk to a <span className="text-[#ffed00]">real person.</span>
           </h1>
           <p className="text-neutral-300 font-normal text-sm sm:text-base md:text-lg max-w-2xl leading-relaxed">
-            A ticket question, an event to list, or an artist to book — our team is here every day of the week.
+            A ticket question, an event to list, or an artist to book — our team is here Mon–Fri, 9am–5:30pm UK time.
           </p>
         </div>
       </section>
@@ -90,7 +92,7 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <div className="font-display font-bold text-base">Message sent</div>
-                    <p className="text-sm text-[#666] mt-1">Thanks for reaching out — we'll reply to your email within 2 hours.</p>
+                    <p className="text-sm text-[#666] mt-1">Thanks for reaching out — we'll reply to your email during support hours, Mon–Fri 9am–5:30pm.</p>
                   </div>
                 </div>
               ) : (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   User, Ticket, Calendar, MapPin, Clock, CreditCard, Settings,
   ShieldCheck, LogOut, Heart, Compass, Sparkles,
@@ -85,7 +85,7 @@ export default function UserDashboardPage({
   const [watchlist, setWatchlist] = useState<EventItem[]>([]);
   const [userBookings, setUserBookings] = useState<PersonalBooking[]>([]);
 
-  // ── DATA LOADING (unchanged behaviour) ─────────────────────────
+  // â”€â”€ DATA LOADING (unchanged behaviour) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     setWatchlist(allEvents.slice(0, 3));
@@ -255,7 +255,7 @@ export default function UserDashboardPage({
     setWatchlist((prev) => prev.filter((item) => item.id !== eventId));
   };
 
-  // ── SUSPENDED ACCOUNT ──────────────────────────────────────────
+  // â”€â”€ SUSPENDED ACCOUNT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (userStatus === 'suspended') {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-6">
@@ -272,7 +272,7 @@ export default function UserDashboardPage({
             </div>
             <div>
               <span className={`${overline} text-white/50 block`}>Support</span>
-              <span className="text-white/90">support@jazbaticket.com</span>
+              <span className="text-white/90">support@jazbaentertainment.net</span>
             </div>
           </div>
           <button
@@ -311,7 +311,7 @@ export default function UserDashboardPage({
   return (
     <div className="jz-page bg-white min-h-screen text-black pb-24" id="user-dashboard-wrapper">
 
-      {/* ── HEADER — black band ───────────────────────────────── */}
+      {/* â”€â”€ HEADER â€” black band â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="bg-black text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-14">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
@@ -326,7 +326,7 @@ export default function UserDashboardPage({
                 <h1 className="font-display font-bold text-3xl sm:text-4xl md:text-5xl leading-[0.95] mt-2">
                   {profileName}
                 </h1>
-                <p className="text-white/60 text-sm mt-3">{profileEmail} · {profileCity}</p>
+                <p className="text-white/60 text-sm mt-3">{profileEmail} Â· {profileCity}</p>
               </div>
             </div>
 
@@ -346,7 +346,7 @@ export default function UserDashboardPage({
             </div>
           </div>
 
-          {/* Stats row — breathing room so values never touch the dividers */}
+          {/* Stats row â€” breathing room so values never touch the dividers */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-6 border-t border-white/15 mt-10 pt-8">
             {[
               { label: 'Tickets held', value: totalPassesCount },
@@ -363,7 +363,7 @@ export default function UserDashboardPage({
         </div>
       </section>
 
-      {/* ── BODY — sidebar + content ──────────────────────────── */}
+      {/* â”€â”€ BODY â€” sidebar + content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 pt-12">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
 
@@ -396,7 +396,7 @@ export default function UserDashboardPage({
             <div className="border border-[#e4e4e4] mt-6 p-5">
               <span className={`${overline} text-[#666]`}>Need help?</span>
               <p className="text-sm text-[#222] mt-2 leading-relaxed">
-                Our support team answers within 2 hours, every day. <strong className="font-bold">support@jazbaticket.com</strong>
+                Our support team is here Mon–Fri, 9am–5:30pm UK time. <strong className="font-bold">support@jazbaentertainment.net</strong>
               </p>
             </div>
           </aside>
@@ -412,7 +412,7 @@ export default function UserDashboardPage({
                 transition={{ duration: 0.18 }}
               >
 
-                {/* ── OVERVIEW ─────────────────────────────────── */}
+                {/* â”€â”€ OVERVIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                 {activeTab === 'overview' && (
                   <div className="space-y-12">
 
@@ -452,7 +452,7 @@ export default function UserDashboardPage({
                         <Compass className="w-8 h-8 mx-auto" />
                         <h3 className="font-display font-bold text-2xl leading-[0.95] mt-4">No tickets yet</h3>
                         <p className="text-sm text-[#666] mt-2 max-w-sm mx-auto">
-                          When you book a show, your tickets will live here — ready to scan at the door.
+                          When you book a show, your tickets will live here â€” ready to scan at the door.
                         </p>
                         <button
                           onClick={onExploreEvents}
@@ -511,7 +511,7 @@ export default function UserDashboardPage({
                             <div className="min-w-0 flex-1">
                               <span className={`${overline} text-[#8a8a8a]`}>{evt.category}</span>
                               <h4 className="font-bold text-sm truncate mt-1">{evt.title}</h4>
-                              <span className="text-sm text-[#666] mt-0.5 block">From ${evt.price} · {evt.date}</span>
+                              <span className="text-sm text-[#666] mt-0.5 block">From ${evt.price} Â· {evt.date}</span>
                             </div>
                             <button
                               onClick={() => onViewShowDetail(evt)}
@@ -527,10 +527,10 @@ export default function UserDashboardPage({
                   </div>
                 )}
 
-                {/* ── TICKETS ──────────────────────────────────── */}
+                {/* â”€â”€ TICKETS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                 {activeTab === 'passes' && (
                   <div>
-                    {sectionHead('My tickets', 'Show the barcode at the entrance — on screen or printed.')}
+                    {sectionHead('My tickets', 'Show the barcode at the entrance â€” on screen or printed.')}
 
                     {userBookings.length > 0 ? (
                       <div className="space-y-8">
@@ -565,7 +565,7 @@ export default function UserDashboardPage({
                                   </div>
                                   <div>
                                     <span className={`${overline} text-[#8a8a8a] block`}>Seats</span>
-                                    <span className="font-bold mt-1 block">Row {pass.seat} · {pass.quantity}×</span>
+                                    <span className="font-bold mt-1 block">Row {pass.seat} Â· {pass.quantity}Ã—</span>
                                   </div>
                                   <div>
                                     <span className={`${overline} text-[#8a8a8a] block`}>Venue</span>
@@ -623,7 +623,7 @@ export default function UserDashboardPage({
                   </div>
                 )}
 
-                {/* ── WATCHLIST ────────────────────────────────── */}
+                {/* â”€â”€ WATCHLIST â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                 {activeTab === 'watchlist' && (
                   <div>
                     {sectionHead('Watchlist', 'Shows you\'re keeping an eye on. Book before they sell out.')}
@@ -641,7 +641,7 @@ export default function UserDashboardPage({
                             <div className="min-w-0 flex-1">
                               <span className={`${overline} text-[#8a8a8a]`}>{show.category}</span>
                               <h4 className="font-bold text-base truncate mt-0.5">{show.title}</h4>
-                              <span className="text-sm text-[#666]">From ${show.price} · {show.date}</span>
+                              <span className="text-sm text-[#666]">From ${show.price} Â· {show.date}</span>
                             </div>
                             <div className="flex gap-2 shrink-0">
                               <button
@@ -678,10 +678,10 @@ export default function UserDashboardPage({
                   </div>
                 )}
 
-                {/* ── BILLING ──────────────────────────────────── */}
+                {/* â”€â”€ BILLING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                 {activeTab === 'billing' && (
                   <div>
-                    {sectionHead('Orders & billing', 'Every order with its receipt — UK bookings include 20% VAT.')}
+                    {sectionHead('Orders & billing', 'Every order with its receipt â€” UK bookings include 20% VAT.')}
 
                     <div className="overflow-x-auto border border-[#e4e4e4]">
                       <table className="w-full text-left text-sm">
@@ -713,7 +713,7 @@ export default function UserDashboardPage({
                           )) : (
                             <tr>
                               <td colSpan={6} className="py-10 px-5 text-center text-[#666]">
-                                No orders yet — your receipts will appear here after your first booking.
+                                No orders yet â€” your receipts will appear here after your first booking.
                               </td>
                             </tr>
                           )}
@@ -724,13 +724,13 @@ export default function UserDashboardPage({
                     <div className="bg-[#f7f7f7] p-5 mt-6">
                       <span className={`${overline} text-[#666]`}>Billing notes</span>
                       <p className="text-sm text-[#222] mt-2 leading-relaxed">
-                        Need a VAT invoice or a business account? Email <strong className="font-bold">support@jazbaticket.com</strong> with your order number.
+                        Need a VAT invoice or a business account? Email <strong className="font-bold">support@jazbaentertainment.net</strong> with your order number.
                       </p>
                     </div>
                   </div>
                 )}
 
-                {/* ── SETTINGS ─────────────────────────────────── */}
+                {/* â”€â”€ SETTINGS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                 {activeTab === 'settings' && (
                   <div className="space-y-14">
 
@@ -754,7 +754,7 @@ export default function UserDashboardPage({
                           {[
                             { label: 'Full name', icon: User, value: profileName, set: setProfileName, type: 'text', ph: 'Your name' },
                             { label: 'Email address', icon: Mail, value: profileEmail, set: setProfileEmail, type: 'email', ph: 'you@example.com' },
-                            { label: 'Phone', icon: Phone, value: profilePhone, set: setProfilePhone, type: 'tel', ph: '+44 …' },
+                            { label: 'Phone', icon: Phone, value: profilePhone, set: setProfilePhone, type: 'tel', ph: '+44 â€¦' },
                             { label: 'City', icon: MapPin, value: profileCity, set: setProfileCity, type: 'text', ph: 'London' },
                           ].map((f) => (
                             <div key={f.label}>
@@ -830,7 +830,7 @@ export default function UserDashboardPage({
                               type="password"
                               value={currentPassword}
                               onChange={(e) => setCurrentPassword(e.target.value)}
-                              placeholder="••••••••"
+                              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                               className="w-full bg-white px-0 py-2.5 text-base text-black placeholder-[#8a8a8a]"
                             />
                           </div>
@@ -867,7 +867,7 @@ export default function UserDashboardPage({
                   </div>
                 )}
 
-                {/* ── ROLE HUBS ────────────────────────────────── */}
+                {/* â”€â”€ ROLE HUBS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                 {activeTab === 'admin' && userRole === 'admin' && <AdminHub />}
                 {activeTab === 'organizer' && userRole === 'organizer' && <OrganizerHub />}
                 {activeTab === 'artist' && userRole === 'artist' && <ArtistHub />}

@@ -38,6 +38,9 @@ import RefundPoliciesPage from './components/RefundPoliciesPage';
 import TermsOfUsePage from './components/TermsOfUsePage';
 import AboutPage from './components/AboutPage';
 import ContactPage from './components/ContactPage';
+import AffiliatePage from './components/AffiliatePage';
+import TicketSafetyPage from './components/TicketSafetyPage';
+import PrivacyPolicyPage from './components/PrivacyPolicyPage';
 import { categories, faqs } from './data';
 import { EventItem } from './types';
 import { getPublishedEvents, getAllArtists } from './services/backendService';
@@ -71,6 +74,9 @@ const PAGE_TITLES: Array<{ match: (path: string) => boolean; title: string }> = 
   { match: (p) => p === '/contact', title: 'Contact — Jazbaticket' },
   { match: (p) => p === '/refund-policies', title: 'Refund Policy — Jazbaticket' },
   { match: (p) => p === '/terms-of-use', title: 'Terms of Use — Jazbaticket' },
+  { match: (p) => p === '/affiliates', title: 'Affiliate Programme — Jazbaticket' },
+  { match: (p) => p === '/ticket-safety', title: 'Ticket Safety — Jazbaticket' },
+  { match: (p) => p === '/privacy', title: 'Privacy Policy — Jazbaticket' },
   { match: (p) => p === '/login', title: 'Sign In — Jazbaticket' },
   { match: (p) => p === '/signup', title: 'Sign Up — Jazbaticket' },
 ];
@@ -456,6 +462,9 @@ function AppShell() {
     if (id === 'help') return navigate('/help');
     if (id === 'about') return navigate('/about');
     if (id === 'contact') return navigate('/contact');
+    if (id === 'affiliates') return navigate('/affiliates');
+    if (id === 'ticket-safety') return navigate('/ticket-safety');
+    if (id === 'privacy') return navigate('/privacy');
     if (id === 'top') {
       if (location.pathname !== '/') navigate('/');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -500,6 +509,9 @@ function AppShell() {
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/refund-policies" element={<RefundPoliciesPage onBackToHome={() => navigate('/')} />} />
         <Route path="/terms-of-use" element={<TermsOfUsePage onBackToHome={() => navigate('/')} />} />
+        <Route path="/affiliates" element={<AffiliatePage />} />
+        <Route path="/ticket-safety" element={<TicketSafetyPage />} />
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/login" element={<LoginView />} />
         <Route path="/signup" element={<SignupView />} />
         <Route path="*" element={<NotFoundView />} />

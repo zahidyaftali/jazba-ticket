@@ -75,7 +75,7 @@ export default function Footer({ onScrollToSection, onSubscribe, onViewRefundPol
               <div className="w-8 h-8 bg-[#ffed00] flex items-center justify-center">
                 <Ticket className="w-4 h-4 text-black" />
               </div>
-              <span className="font-display font-bold text-xl tracking-tight text-white">Jazbaticket</span>
+              <span className="font-display font-bold text-xl tracking-tight text-white">Jazbatickets</span>
             </div>
             <p className="text-white/50 text-sm leading-relaxed max-w-xs mt-4">
               Book tickets to concerts, theatre, comedy and sport — and the artists to headline your own event.
@@ -100,7 +100,7 @@ export default function Footer({ onScrollToSection, onSubscribe, onViewRefundPol
               <li><button onClick={() => onScrollToSection('help')} className={linkClass}>Help centre</button></li>
               <li><button onClick={onViewRefundPolicies || (() => onScrollToSection('help'))} className={linkClass}>Refund policy</button></li>
               <li><button onClick={onViewTermsOfUse || (() => onScrollToSection('help'))} className={linkClass}>Terms of use</button></li>
-              <li><button onClick={() => onScrollToSection('help')} className={linkClass}>Ticket safety</button></li>
+              <li><button onClick={() => onScrollToSection('ticket-safety')} className={linkClass}>Ticket safety</button></li>
             </ul>
           </div>
 
@@ -110,7 +110,7 @@ export default function Footer({ onScrollToSection, onSubscribe, onViewRefundPol
             <ul className="space-y-3 text-sm">
               <li><button onClick={() => onScrollToSection('about')} className={linkClass}>About us</button></li>
               <li><button onClick={() => onScrollToSection('contact')} className={linkClass}>Contact</button></li>
-              <li><a href="#" className={linkClass}>Affiliate programme</a></li>
+              <li><button onClick={() => onScrollToSection('affiliates')} className={linkClass}>Affiliate programme</button></li>
             </ul>
           </div>
 
@@ -130,10 +130,10 @@ export default function Footer({ onScrollToSection, onSubscribe, onViewRefundPol
       {/* BOTTOM BAR */}
       <div className="border-t border-white/15">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/50">
-          <p>© 2026 Jazbaticket. All rights reserved.</p>
+          <p>© 2026 Jazbatickets · Jazba Entertainment Ltd. All rights reserved.</p>
           <div className="flex items-center gap-5">
             <button onClick={onViewTermsOfUse || (() => onScrollToSection('help'))} className="hover:text-white transition-colors cursor-pointer">Terms</button>
-            <button onClick={onViewRefundPolicies || (() => onScrollToSection('help'))} className="hover:text-white transition-colors cursor-pointer">Privacy</button>
+            <button onClick={() => onScrollToSection('privacy')} className="hover:text-white transition-colors cursor-pointer">Privacy</button>
           </div>
         </div>
       </div>
