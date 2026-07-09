@@ -58,6 +58,8 @@ export interface ArtistProfile {
   featured?: boolean;
   experienceYears?: number;
   recentShows?: string[];
+  // Admin-managed structured show history for the artist profile page
+  pastShows?: { title: string; date: string; venue: string }[];
 }
 
 export interface Booking {
