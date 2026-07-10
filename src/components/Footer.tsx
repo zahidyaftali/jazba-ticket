@@ -88,6 +88,7 @@ export default function Footer({ onScrollToSection, onSubscribe, onViewRefundPol
             <ul className="space-y-3 text-sm">
               <li><button onClick={() => onScrollToSection('explorer')} className={linkClass}>All events</button></li>
               <li><button onClick={() => onScrollToSection('artists')} className={linkClass}>Book an artist</button></li>
+              <li><button onClick={() => onScrollToSection('organizers')} className={linkClass}>Organisers</button></li>
               <li><button onClick={() => onScrollToSection('top-events')} className={linkClass}>Top events</button></li>
               <li><button onClick={() => onScrollToSection('upcoming')} className={linkClass}>Upcoming shows</button></li>
             </ul>

@@ -3,7 +3,7 @@ import {
   ArrowLeft, MapPin, Clock, Ticket, Check,
   Printer, ShieldCheck, Globe, Calendar, Loader2, Minus, Plus,
 } from 'lucide-react';
-import { EventItem } from '../types';
+import { EventItem, getAvailableTiers } from '../types';
 import { auth } from '../firebase';
 import { createBooking } from '../services/backendService';
 import StripeCheckoutForm from './StripeCheckoutForm';
@@ -71,7 +71,12 @@ export default function CheckoutPage({
 }: CheckoutPageProps) {
   const [step, setStep] = useState<'details' | 'loading' | 'ticket'>('details');
   const [ticketCount, setTicketCount] = useState(initialQuantity);
-  const [ticketTier, setTicketTier] = useState<'general' | 'vip' | 'elite'>(initialTier);
+  // Only packages the admin priced are offered; fall back to the first one
+  // if the requested tier isn't available for this event.
+  const availableTiers = getAvailableTiers(event);
+  const [ticketTier, setTicketTier] = useState<'general' | 'vip' | 'elite'>(
+    availableTiers.some((t) => t.tier === initialTier) ? initialTier : (availableTiers[0]?.tier || 'general')
+  );
   const [fullName, setFullName] = useState('');
   const [emailAddress, setEmailAddress] = useState('');
   const [ticketCode] = useState(() => `TT-${Math.floor(100000 + Math.random() * 900000)}`);
@@ -122,9 +127,9 @@ export default function CheckoutPage({
   const profile = REGION_PROFILES[paymentRegion];
 
   const tierPricing = {
-    general: event.price,
-    vip: Math.round(event.price * 1.5),
-    elite: Math.round(event.price * 2.1),
+    general: availableTiers.find((t) => t.tier === 'general')?.price ?? event.price,
+    vip: availableTiers.find((t) => t.tier === 'vip')?.price ?? 0,
+    elite: availableTiers.find((t) => t.tier === 'elite')?.price ?? 0,
   };
 
   const getSubtotal = () => tierPricing[ticketTier] * ticketCount;
@@ -445,7 +450,7 @@ export default function CheckoutPage({
                 {/* Tier rows */}
                 <div className="p-6 border-b border-[#f2f2f2]">
                   <span className={`${overline} text-[#666] block mb-1`}>Ticket type</span>
-                  {(['general', 'vip', 'elite'] as const).map((tier) => (
+                  {availableTiers.map(({ tier }) => (
                     <button
                       key={tier}
                       type="button"

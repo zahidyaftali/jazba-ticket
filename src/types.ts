@@ -26,8 +26,30 @@ export interface EventFaq {
 }
 
 export interface VenueInfo {
-  transport: string[]; // one line per bullet
-  parking: string[]; // one line per bullet
+  mapUrl?: string; // Google Maps embed URL or a plain venue address
+  transport?: string[]; // one line per bullet
+  parking?: string[]; // one line per bullet
+}
+
+// Per-package pricing — a package is only offered when its price is set (> 0)
+export interface TierPrices {
+  general?: number;
+  vip?: number;
+  elite?: number;
+}
+
+export type TicketTier = 'general' | 'vip' | 'elite';
+
+/** The ticket packages this event actually offers, in display order.
+ *  General falls back to the event's base price so every event stays sellable. */
+export function getAvailableTiers(event: EventItem): { tier: TicketTier; price: number }[] {
+  const tp = event.tierPrices;
+  const list: { tier: TicketTier; price: number }[] = [];
+  const general = tp?.general ?? event.price;
+  if (general > 0) list.push({ tier: 'general', price: general });
+  if (tp?.vip && tp.vip > 0) list.push({ tier: 'vip', price: tp.vip });
+  if (tp?.elite && tp.elite > 0) list.push({ tier: 'elite', price: tp.elite });
+  return list;
 }
 
 export interface EventItem {
@@ -49,7 +71,7 @@ export interface EventItem {
   remainingSeconds?: number;
 
   // ---- Optional admin-managed content for the single event page.
-  // Every section falls back to a sensible default when unset.
+  // A section only renders when its content has been added in the admin.
   description?: string;
   highlights?: string[];
   agenda?: AgendaEntry[];
@@ -60,6 +82,10 @@ export interface EventItem {
   reviews?: EventReview[];
   rating?: number; // aggregate, e.g. 4.8
   reviewCount?: number;
+  tierPrices?: TierPrices;
+  organizerName?: string;
+  organizerBio?: string;
+  organizerImage?: string;
 }
 
 export interface CategoryItem {

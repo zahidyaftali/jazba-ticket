@@ -29,6 +29,9 @@ export interface ArtistItem {
   featured: boolean;
   experienceYears: number;
   recentShows: string[];
+  pastShows: { title: string; date: string; venue: string }[];
+  eventsHosted: number;
+  totalAudience: string;
   socials: { spotify?: string; youtube?: string; web?: string };
 }
 
@@ -49,7 +52,7 @@ export function mapArtistProfileToItem(p: ArtistProfile): ArtistItem {
     category: p.category || 'music',
     subCategory: p.subCategory || p.genres?.[0] || 'Performer',
     bio: p.bio || '',
-    rating: p.rating ?? 4.8,
+    rating: p.rating ?? 0,
     totalReviews: p.totalReviews ?? 0,
     hourlyRate: p.hourlyRate ?? 0,
     location: p.location || 'United Kingdom',
@@ -57,6 +60,9 @@ export function mapArtistProfileToItem(p: ArtistProfile): ArtistItem {
     featured: p.featured ?? false,
     experienceYears: p.experienceYears ?? 0,
     recentShows: p.recentShows || [],
+    pastShows: p.pastShows || [],
+    eventsHosted: p.eventsHosted ?? 0,
+    totalAudience: p.totalAudience || '',
     socials: {
       spotify: p.socialLinks?.spotify,
       youtube: p.socialLinks?.youtube,

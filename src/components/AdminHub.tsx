@@ -19,6 +19,9 @@ import {
   updateArtistProfile,
   deleteArtistProfile,
   getAllOrganizers,
+  createOrganizerProfile,
+  updateOrganizerProfile,
+  deleteOrganizerProfile,
   getAllPayments,
   getTickets,
   updateTicketStatus,
@@ -32,6 +35,7 @@ import {
   TicketPass
 } from '../services/backendService';
 import { categories } from '../data';
+import { AgendaEntry, LineupEntry, EventFaq } from '../types';
 import { auth } from '../firebase';
 import { motion } from 'motion/react';
 
@@ -49,7 +53,37 @@ const BLANK_EVENT_FORM = {
   capacity: 1000,
   price: 85,
   type: 'upcoming' as 'top' | 'for-you' | 'near-by' | 'upcoming',
-  status: 'draft' as 'draft' | 'published' | 'cancelled' | 'completed'
+  status: 'draft' as 'draft' | 'published' | 'cancelled' | 'completed',
+
+  // ---- Event page content (each hides its section when left empty) ----
+  priceVip: '',
+  priceElite: '',
+  highlightsText: '',
+  agenda: [] as AgendaEntry[],
+  lineup: [] as LineupEntry[],
+  organizerName: '',
+  organizerBio: '',
+  organizerImage: '',
+  mapUrl: '',
+  transportText: '',
+  parkingText: '',
+  galleryText: '',
+  faqs: [] as EventFaq[],
+};
+
+const parseLines = (text: string) => text.split('\n').map((s) => s.trim()).filter(Boolean);
+
+const BLANK_ORGANIZER_FORM = {
+  companyName: '',
+  email: '',
+  phone: '',
+  logoUrl: '',
+  bannerUrl: '',
+  description: '',
+  website: '',
+  location: '',
+  specialtiesText: '',
+  featured: false,
 };
 
 const BLANK_ARTIST_FORM = {
@@ -65,11 +99,17 @@ const BLANK_ARTIST_FORM = {
   experienceYears: 5,
   availableNow: true,
   featured: false,
-  recentShows: '',
   socialWebsite: '',
   socialInstagram: '',
   socialSpotify: '',
-  socialYoutube: ''
+  socialYoutube: '',
+
+  // ---- Artist page content (each hides its section when left empty) ----
+  rating: '',
+  totalReviews: '',
+  eventsHosted: '',
+  totalAudience: '',
+  pastShows: [] as { title: string; date: string; venue: string }[],
 };
 
 export default function AdminHub() {
@@ -97,6 +137,11 @@ export default function AdminHub() {
   const [editingArtistId, setEditingArtistId] = useState<string | null>(null);
   const [artistForm, setArtistForm] = useState(BLANK_ARTIST_FORM);
   const [genreInput, setGenreInput] = useState('');
+
+  // Organizer create/edit form state
+  const [isOrganizerFormOpen, setIsOrganizerFormOpen] = useState(false);
+  const [editingOrganizerId, setEditingOrganizerId] = useState<string | null>(null);
+  const [organizerForm, setOrganizerForm] = useState(BLANK_ORGANIZER_FORM);
 
   const loadData = async () => {
     setLoading(true);
@@ -160,9 +205,44 @@ export default function AdminHub() {
       capacity: evt.capacity || 1000,
       price: evt.price || 0,
       type: evt.type || 'upcoming',
-      status: evt.status || 'draft'
+      status: evt.status || 'draft',
+
+      priceVip: evt.tierPrices?.vip ? String(evt.tierPrices.vip) : '',
+      priceElite: evt.tierPrices?.elite ? String(evt.tierPrices.elite) : '',
+      highlightsText: (evt.highlights || []).join('\n'),
+      agenda: evt.agenda || [],
+      lineup: evt.lineup || [],
+      organizerName: evt.organizerName || '',
+      organizerBio: evt.organizerBio || '',
+      organizerImage: evt.organizerImage || '',
+      mapUrl: evt.venueInfo?.mapUrl || '',
+      transportText: (evt.venueInfo?.transport || []).join('\n'),
+      parkingText: (evt.venueInfo?.parking || []).join('\n'),
+      galleryText: (evt.gallery || []).join('\n'),
+      faqs: evt.faqs || [],
     });
     setIsEventFormOpen(true);
+  };
+
+  // ---- Dynamic list editors (running order / performers / FAQs) ----
+  const addListRow = (key: 'agenda' | 'lineup' | 'faqs') => {
+    const blank = key === 'agenda'
+      ? { time: '', title: '', desc: '' }
+      : key === 'lineup'
+        ? { name: '', role: '', avatar: '', bio: '' }
+        : { question: '', answer: '' };
+    setEventForm((f) => ({ ...f, [key]: [...(f[key] as any[]), blank] }) as typeof f);
+  };
+
+  const updateListRow = (key: 'agenda' | 'lineup' | 'faqs', idx: number, field: string, value: string) => {
+    setEventForm((f) => ({
+      ...f,
+      [key]: (f[key] as any[]).map((row, i) => (i === idx ? { ...row, [field]: value } : row)),
+    }) as typeof f);
+  };
+
+  const removeListRow = (key: 'agenda' | 'lineup' | 'faqs', idx: number) => {
+    setEventForm((f) => ({ ...f, [key]: (f[key] as any[]).filter((_, i) => i !== idx) }) as typeof f);
   };
 
   const handleSubmitEventForm = async (e: React.FormEvent) => {
@@ -172,14 +252,42 @@ export default function AdminHub() {
       setErrorMessage('Event title and venue are required.');
       return;
     }
+
+    // Assemble the event page content — empty fields save as empty
+    // arrays/strings so their sections stay hidden on the event page.
+    const vip = Number(eventForm.priceVip);
+    const elite = Number(eventForm.priceElite);
+    const { priceVip: _pv, priceElite: _pe, highlightsText: _h, transportText: _t, parkingText: _p, galleryText: _g, mapUrl: _m, ...baseForm } = eventForm;
+    const payload = {
+      ...baseForm,
+      image: eventForm.bannerImage,
+      highlights: parseLines(eventForm.highlightsText),
+      gallery: parseLines(eventForm.galleryText),
+      venueInfo: {
+        mapUrl: eventForm.mapUrl.trim(),
+        transport: parseLines(eventForm.transportText),
+        parking: parseLines(eventForm.parkingText),
+      },
+      organizerName: eventForm.organizerName.trim(),
+      organizerBio: eventForm.organizerBio.trim(),
+      organizerImage: eventForm.organizerImage.trim(),
+      agenda: eventForm.agenda.filter((a) => a.time.trim() || a.title.trim()),
+      lineup: eventForm.lineup.filter((l) => l.name.trim()),
+      faqs: eventForm.faqs.filter((f) => f.question.trim()),
+      tierPrices: {
+        general: Number(eventForm.price) || 0,
+        ...(vip > 0 ? { vip } : {}),
+        ...(elite > 0 ? { elite } : {}),
+      },
+    };
+
     try {
       if (editingEventId) {
-        await updateEvent(editingEventId, { ...eventForm, image: eventForm.bannerImage });
+        await updateEvent(editingEventId, payload);
         flashSuccess('Event updated successfully.');
       } else {
         await createEvent({
-          ...eventForm,
-          image: eventForm.bannerImage,
+          ...payload,
           organizerId: auth.currentUser?.uid || 'admin'
         });
         flashSuccess('Event created successfully.');
@@ -286,14 +394,107 @@ export default function AdminHub() {
       experienceYears: artist.experienceYears || 0,
       availableNow: artist.availableNow ?? true,
       featured: artist.featured ?? false,
-      recentShows: (artist.recentShows || []).join(', '),
       socialWebsite: artist.socialLinks?.website || '',
       socialInstagram: artist.socialLinks?.instagram || '',
       socialSpotify: artist.socialLinks?.spotify || '',
-      socialYoutube: artist.socialLinks?.youtube || ''
+      socialYoutube: artist.socialLinks?.youtube || '',
+
+      rating: artist.rating ? String(artist.rating) : '',
+      totalReviews: artist.totalReviews ? String(artist.totalReviews) : '',
+      eventsHosted: artist.eventsHosted ? String(artist.eventsHosted) : '',
+      totalAudience: artist.totalAudience || '',
+      pastShows: artist.pastShows || [],
     });
     setGenreInput('');
     setIsArtistFormOpen(true);
+  };
+
+  // --- Organizer handlers ---
+  const handleOpenCreateOrganizer = () => {
+    setEditingOrganizerId(null);
+    setOrganizerForm(BLANK_ORGANIZER_FORM);
+    setIsOrganizerFormOpen(true);
+  };
+
+  const handleOpenEditOrganizer = (org: OrganizerProfile) => {
+    setEditingOrganizerId(org.id || null);
+    setOrganizerForm({
+      companyName: org.companyName || '',
+      email: org.email || '',
+      phone: org.phone || '',
+      logoUrl: org.logoUrl || '',
+      bannerUrl: org.bannerUrl || '',
+      description: org.description || '',
+      website: org.website || '',
+      location: org.location || '',
+      specialtiesText: (org.specialties || []).join(', '),
+      featured: org.featured ?? false,
+    });
+    setIsOrganizerFormOpen(true);
+  };
+
+  const handleSubmitOrganizerForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage('');
+    if (!organizerForm.companyName.trim()) {
+      setErrorMessage('Organiser name is required.');
+      return;
+    }
+    const payload = {
+      companyName: organizerForm.companyName.trim(),
+      email: organizerForm.email.trim(),
+      phone: organizerForm.phone.trim(),
+      logoUrl: organizerForm.logoUrl.trim(),
+      bannerUrl: organizerForm.bannerUrl.trim(),
+      description: organizerForm.description.trim(),
+      website: organizerForm.website.trim(),
+      location: organizerForm.location.trim(),
+      specialties: organizerForm.specialtiesText.split(',').map((s) => s.trim()).filter(Boolean),
+      featured: organizerForm.featured,
+    };
+    try {
+      if (editingOrganizerId) {
+        await updateOrganizerProfile(editingOrganizerId, payload);
+        flashSuccess('Organiser profile updated successfully.');
+      } else {
+        await createOrganizerProfile({
+          ...payload,
+          userId: auth.currentUser?.uid || '',
+        });
+        flashSuccess('Organiser profile created successfully.');
+      }
+      setIsOrganizerFormOpen(false);
+      loadData();
+    } catch (err) {
+      setErrorMessage('Failed to save organiser profile. Make sure updated Firestore rules have been deployed.');
+    }
+  };
+
+  const handleDeleteOrganizer = async (orgId: string) => {
+    if (!window.confirm('Delete this organiser? This action cannot be undone.')) {
+      return;
+    }
+    try {
+      await deleteOrganizerProfile(orgId);
+      flashSuccess('Organiser profile deleted.');
+      loadData();
+    } catch (err) {
+      setErrorMessage('Failed to delete organiser profile.');
+    }
+  };
+
+  // ---- Past shows list editor (artist form) ----
+  const addPastShow = () => {
+    setArtistForm((f) => ({ ...f, pastShows: [...f.pastShows, { title: '', date: '', venue: '' }] }));
+  };
+  const updatePastShow = (idx: number, field: 'title' | 'date' | 'venue', value: string) => {
+    setArtistForm((f) => ({
+      ...f,
+      pastShows: f.pastShows.map((row, i) => (i === idx ? { ...row, [field]: value } : row)),
+    }));
+  };
+  const removePastShow = (idx: number) => {
+    setArtistForm((f) => ({ ...f, pastShows: f.pastShows.filter((_, i) => i !== idx) }));
   };
 
   const handleAddGenre = () => {
@@ -329,13 +530,18 @@ export default function AdminHub() {
       experienceYears: artistForm.experienceYears,
       availableNow: artistForm.availableNow,
       featured: artistForm.featured,
-      recentShows: artistForm.recentShows.split(',').map(s => s.trim()).filter(Boolean),
       socialLinks: {
         website: artistForm.socialWebsite,
         instagram: artistForm.socialInstagram,
         spotify: artistForm.socialSpotify,
         youtube: artistForm.socialYoutube
-      }
+      },
+      // Artist page content — zeros/empties keep their sections hidden
+      rating: Number(artistForm.rating) || 0,
+      totalReviews: Number(artistForm.totalReviews) || 0,
+      eventsHosted: Number(artistForm.eventsHosted) || 0,
+      totalAudience: artistForm.totalAudience.trim(),
+      pastShows: artistForm.pastShows.filter((s) => s.title.trim()),
     };
 
     try {
@@ -711,38 +917,219 @@ export default function AdminHub() {
             </div>
           )}
 
-          {/* 3b. Organisers tab */}
+          {/* 3b. Organisers tab — full create/edit/delete management */}
           {activeSubTab === 'organizers' && (
-            <div className="bg-white   rounded-2xl overflow-hidden shadow-3xs">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-neutral-50 text-neutral-500 font-bold text-sentence tracking-wider  ">
-                    <tr>
-                      <th className="py-3 px-4">Company</th>
-                      <th className="py-3 px-4">Contact Email</th>
-                      <th className="py-3 px-4">Phone</th>
-                      <th className="py-3 px-4">Website</th>
-                      <th className="py-3 px-4">Linked User</th>
-                    </tr>
-                  </thead>
-                  <tbody className="  font-semibold text-neutral-800">
-                    {organizers.map((org) => (
-                      <tr key={org.id || org.userId} className="hover:bg-neutral-50/40">
-                        <td className="py-3.5 px-4 font-bold text-neutral-900">{org.companyName || '—'}</td>
-                        <td className="py-3.5 px-4">{org.email || '—'}</td>
-                        <td className="py-3.5 px-4">{org.phone || '—'}</td>
-                        <td className="py-3.5 px-4">{org.website || '—'}</td>
-                        <td className="py-3.5 px-4 font-mono text-[10px] text-neutral-500">{(org.userId || '').substring(0, 8)}...</td>
-                      </tr>
-                    ))}
-                    {organizers.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="py-10 text-center text-neutral-400 font-bold">No organiser profiles yet. Organisers appear here after they complete their profile in the Organizer Hub.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+            <div className="space-y-4">
+              {!isOrganizerFormOpen && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleOpenCreateOrganizer}
+                    className="flex items-center gap-1.5 py-2.5 px-5 bg-[#E34718] hover:bg-[#C23A12] text-white text-xs font-bold text-sentence tracking-wider rounded-full shadow-md cursor-pointer transition-transform active:scale-97"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    <span>Add Organiser</span>
+                  </button>
+                </div>
+              )}
+
+              {isOrganizerFormOpen ? (
+                <div className="bg-white   rounded-2xl p-6 sm:p-8 shadow-3xs text-left max-w-2xl">
+                  <div className="flex items-center gap-2   pb-3.5 mb-6">
+                    <button onClick={() => setIsOrganizerFormOpen(false)} className="text-neutral-500 hover:text-black hover:underline cursor-pointer">
+                      <ArrowLeft className="w-4 h-4 inline mr-1" /> Back
+                    </button>
+                    <h3 className="font-display font-medium text-lg text-neutral-900 text-sentence ml-2">
+                      {editingOrganizerId ? 'Edit Organiser' : 'Add New Organiser'}
+                    </h3>
+                  </div>
+
+                  <form onSubmit={handleSubmitOrganizerForm} className="space-y-4 text-xs font-bold text-neutral-800">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-neutral-500 text-sentence tracking-wider block">Organiser / Company Name</label>
+                        <input
+                          type="text"
+                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          value={organizerForm.companyName}
+                          onChange={(e) => setOrganizerForm({ ...organizerForm, companyName: e.target.value })}
+                          placeholder="e.g. Jazba Entertainment"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-neutral-500 text-sentence tracking-wider block">Location</label>
+                        <input
+                          type="text"
+                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          value={organizerForm.location}
+                          onChange={(e) => setOrganizerForm({ ...organizerForm, location: e.target.value })}
+                          placeholder="e.g. Birmingham, UK"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-neutral-500 text-sentence tracking-wider block">Contact Email</label>
+                        <input
+                          type="email"
+                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          value={organizerForm.email}
+                          onChange={(e) => setOrganizerForm({ ...organizerForm, email: e.target.value })}
+                          placeholder="bookings@company.com"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-neutral-500 text-sentence tracking-wider block">Phone</label>
+                        <input
+                          type="text"
+                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          value={organizerForm.phone}
+                          onChange={(e) => setOrganizerForm({ ...organizerForm, phone: e.target.value })}
+                          placeholder="0333 5777 014"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-neutral-500 text-sentence tracking-wider block">Logo Image URL</label>
+                        <input
+                          type="text"
+                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  font-mono"
+                          value={organizerForm.logoUrl}
+                          onChange={(e) => setOrganizerForm({ ...organizerForm, logoUrl: e.target.value })}
+                          placeholder="https://…"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-neutral-500 text-sentence tracking-wider block">Banner Image URL</label>
+                        <input
+                          type="text"
+                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  font-mono"
+                          value={organizerForm.bannerUrl}
+                          onChange={(e) => setOrganizerForm({ ...organizerForm, bannerUrl: e.target.value })}
+                          placeholder="https://…"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-neutral-500 text-sentence tracking-wider block">Description / About</label>
+                      <textarea
+                        className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  h-24"
+                        value={organizerForm.description}
+                        onChange={(e) => setOrganizerForm({ ...organizerForm, description: e.target.value })}
+                        placeholder="Who they are and the kind of events they run. Leave empty to hide the About section."
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-neutral-500 text-sentence tracking-wider block">Website</label>
+                        <input
+                          type="text"
+                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  font-mono"
+                          value={organizerForm.website}
+                          onChange={(e) => setOrganizerForm({ ...organizerForm, website: e.target.value })}
+                          placeholder="https://company.com"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-neutral-500 text-sentence tracking-wider block">Specialties (comma separated)</label>
+                        <input
+                          type="text"
+                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          value={organizerForm.specialtiesText}
+                          onChange={(e) => setOrganizerForm({ ...organizerForm, specialtiesText: e.target.value })}
+                          placeholder="e.g. Live music, Festivals, Theatre"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-6 pt-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={organizerForm.featured}
+                          onChange={(e) => setOrganizerForm({ ...organizerForm, featured: e.target.checked })}
+                        />
+                        <span className="text-neutral-600">Featured organiser</span>
+                      </label>
+                    </div>
+
+                    <div className="pt-4   flex items-center justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setIsOrganizerFormOpen(false)}
+                        className="py-2.5 px-4 bg-white   hover:bg-neutral-55 text-neutral-800 text-xs font-bold text-sentence tracking-wider rounded-full transition-transform active:scale-97 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="py-2.5 px-5 bg-neutral-900   hover:bg-neutral-800 text-white text-xs font-bold text-sentence tracking-wider rounded-full transition-transform active:scale-97 cursor-pointer shadow-md"
+                      >
+                        Save Organiser
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              ) : (
+                <div className="bg-white   rounded-2xl overflow-hidden shadow-3xs">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-neutral-50 text-neutral-500 font-bold text-sentence tracking-wider  ">
+                        <tr>
+                          <th className="py-3 px-4">Company</th>
+                          <th className="py-3 px-4">Location</th>
+                          <th className="py-3 px-4">Contact Email</th>
+                          <th className="py-3 px-4">Featured</th>
+                          <th className="py-3 px-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="  font-semibold text-neutral-800">
+                        {organizers.map((org) => (
+                          <tr key={org.id || org.userId} className="hover:bg-neutral-50/40">
+                            <td className="py-3.5 px-4 font-bold text-neutral-900">{org.companyName || '—'}</td>
+                            <td className="py-3.5 px-4">{org.location || '—'}</td>
+                            <td className="py-3.5 px-4">{org.email || '—'}</td>
+                            <td className="py-3.5 px-4">
+                              <span className={`inline-block px-2.5 py-0.5 text-[9px] font-black text-sentence rounded-full ${
+                                org.featured ? 'bg-amber-50 text-amber-700' : 'bg-neutral-100 text-neutral-500'
+                              }`}>
+                                {org.featured ? 'Featured' : '—'}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={() => handleOpenEditOrganizer(org)}
+                                  className="p-1.5 bg-neutral-50   hover:bg-neutral-100 text-neutral-700 rounded-lg inline-flex items-center justify-center cursor-pointer hover:shadow-2xs"
+                                  title="Edit organiser"
+                                >
+                                  <Edit3 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteOrganizer(org.id!)}
+                                  className="p-1.5 bg-red-50   hover:bg-red-100 text-red-650 rounded-lg inline-flex items-center justify-center cursor-pointer hover:shadow-2xs"
+                                  title="Delete organiser"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                        {organizers.length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="py-10 text-center text-neutral-400 font-bold">No organiser profiles yet. Click "Add Organiser" to create the first one.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -957,7 +1344,7 @@ export default function AdminHub() {
                         </select>
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-neutral-500 text-sentence tracking-wider block">Ticket Price (USD)</label>
+                        <label className="text-neutral-500 text-sentence tracking-wider block">General Price (USD)</label>
                         <input
                           type="number"
                           className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
@@ -1012,6 +1399,254 @@ export default function AdminHub() {
                         </select>
                       </div>
                     </div>
+
+                    {/* ══════════ EVENT PAGE CONTENT ══════════
+                        Every block below is optional — anything left empty
+                        simply doesn't appear on the public event page. */}
+
+                    {/* Ticket packages */}
+                    <div className="pt-5 border-t border-neutral-100">
+                      <h4 className="font-display font-bold text-sm text-neutral-900">Ticket packages</h4>
+                      <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">General uses the price above. Leave VIP / Elite empty to hide that package on the event page and checkout.</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-neutral-500 text-sentence tracking-wider block">VIP Price (USD) — optional</label>
+                        <input
+                          type="number"
+                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          value={eventForm.priceVip}
+                          onChange={(e) => setEventForm({ ...eventForm, priceVip: e.target.value })}
+                          placeholder="Leave empty to hide VIP"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-neutral-500 text-sentence tracking-wider block">Elite Price (USD) — optional</label>
+                        <input
+                          type="number"
+                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          value={eventForm.priceElite}
+                          onChange={(e) => setEventForm({ ...eventForm, priceElite: e.target.value })}
+                          placeholder="Leave empty to hide Elite"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Highlights */}
+                    <div className="pt-5 border-t border-neutral-100">
+                      <h4 className="font-display font-bold text-sm text-neutral-900">Event highlights</h4>
+                      <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">Shown as ticks under the description — one per line. Leave empty to hide.</p>
+                    </div>
+                    <textarea
+                      className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  h-20"
+                      value={eventForm.highlightsText}
+                      onChange={(e) => setEventForm({ ...eventForm, highlightsText: e.target.value })}
+                      placeholder={'Two full 45-minute acts\nFull stage and light production'}
+                    />
+
+                    {/* Running order */}
+                    <div className="pt-5 border-t border-neutral-100 flex items-center justify-between">
+                      <div>
+                        <h4 className="font-display font-bold text-sm text-neutral-900">Running order</h4>
+                        <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">The schedule accordion. No entries = section hidden.</p>
+                      </div>
+                      <button type="button" onClick={() => addListRow('agenda')} className="flex items-center gap-1 py-1.5 px-3 bg-neutral-900 text-white text-[10px] font-bold rounded-full cursor-pointer hover:bg-neutral-800">
+                        <PlusCircle className="w-3.5 h-3.5" /> Add entry
+                      </button>
+                    </div>
+                    {eventForm.agenda.map((row, idx) => (
+                      <div key={idx} className="grid grid-cols-12 gap-2 items-start bg-neutral-50/60 p-2.5 rounded-lg">
+                        <input
+                          type="text"
+                          className="col-span-3 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                          value={row.time}
+                          onChange={(e) => updateListRow('agenda', idx, 'time', e.target.value)}
+                          placeholder="7:30 PM"
+                        />
+                        <input
+                          type="text"
+                          className="col-span-4 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                          value={row.title}
+                          onChange={(e) => updateListRow('agenda', idx, 'title', e.target.value)}
+                          placeholder="Act one"
+                        />
+                        <input
+                          type="text"
+                          className="col-span-4 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                          value={row.desc}
+                          onChange={(e) => updateListRow('agenda', idx, 'desc', e.target.value)}
+                          placeholder="What happens in this slot"
+                        />
+                        <button type="button" onClick={() => removeListRow('agenda', idx)} className="col-span-1 p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer flex items-center justify-center" title="Remove">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* Performers */}
+                    <div className="pt-5 border-t border-neutral-100 flex items-center justify-between">
+                      <div>
+                        <h4 className="font-display font-bold text-sm text-neutral-900">Performers (on stage)</h4>
+                        <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">The lineup cards. No performers = section hidden.</p>
+                      </div>
+                      <button type="button" onClick={() => addListRow('lineup')} className="flex items-center gap-1 py-1.5 px-3 bg-neutral-900 text-white text-[10px] font-bold rounded-full cursor-pointer hover:bg-neutral-800">
+                        <PlusCircle className="w-3.5 h-3.5" /> Add performer
+                      </button>
+                    </div>
+                    {eventForm.lineup.map((row, idx) => (
+                      <div key={idx} className="space-y-2 bg-neutral-50/60 p-2.5 rounded-lg">
+                        <div className="grid grid-cols-12 gap-2">
+                          <input
+                            type="text"
+                            className="col-span-4 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                            value={row.name}
+                            onChange={(e) => updateListRow('lineup', idx, 'name', e.target.value)}
+                            placeholder="Performer name"
+                          />
+                          <input
+                            type="text"
+                            className="col-span-3 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                            value={row.role}
+                            onChange={(e) => updateListRow('lineup', idx, 'role', e.target.value)}
+                            placeholder="Role (e.g. Lead vocalist)"
+                          />
+                          <input
+                            type="text"
+                            className="col-span-4 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 font-mono"
+                            value={row.avatar}
+                            onChange={(e) => updateListRow('lineup', idx, 'avatar', e.target.value)}
+                            placeholder="Photo URL (optional)"
+                          />
+                          <button type="button" onClick={() => removeListRow('lineup', idx)} className="col-span-1 p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer flex items-center justify-center" title="Remove">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          className="w-full bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                          value={row.bio}
+                          onChange={(e) => updateListRow('lineup', idx, 'bio', e.target.value)}
+                          placeholder="Short bio line"
+                        />
+                      </div>
+                    ))}
+
+                    {/* Organizer */}
+                    <div className="pt-5 border-t border-neutral-100">
+                      <h4 className="font-display font-bold text-sm text-neutral-900">Event organiser (presented by)</h4>
+                      <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">Leave the name empty to hide the "Presented by" card.</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-neutral-500 text-sentence tracking-wider block">Organiser Name</label>
+                        <input
+                          type="text"
+                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          value={eventForm.organizerName}
+                          onChange={(e) => setEventForm({ ...eventForm, organizerName: e.target.value })}
+                          placeholder="e.g. Jazba Entertainment"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-neutral-500 text-sentence tracking-wider block">Organiser Logo / Image URL</label>
+                        <input
+                          type="text"
+                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  font-mono"
+                          value={eventForm.organizerImage}
+                          onChange={(e) => setEventForm({ ...eventForm, organizerImage: e.target.value })}
+                          placeholder="https://…"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-neutral-500 text-sentence tracking-wider block">Organiser Bio</label>
+                      <textarea
+                        className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  h-16"
+                        value={eventForm.organizerBio}
+                        onChange={(e) => setEventForm({ ...eventForm, organizerBio: e.target.value })}
+                        placeholder="A line or two about the organiser"
+                      />
+                    </div>
+
+                    {/* Getting there */}
+                    <div className="pt-5 border-t border-neutral-100">
+                      <h4 className="font-display font-bold text-sm text-neutral-900">Getting there (live map & directions)</h4>
+                      <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">Paste a Google Maps embed URL or just type the venue address — the live map renders automatically. All empty = section hidden.</p>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-neutral-500 text-sentence tracking-wider block">Google Maps URL or Venue Address</label>
+                      <input
+                        type="text"
+                        className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  font-mono"
+                        value={eventForm.mapUrl}
+                        onChange={(e) => setEventForm({ ...eventForm, mapUrl: e.target.value })}
+                        placeholder="e.g. Utilita Arena Birmingham  —  or  https://www.google.com/maps/embed?pb=…"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-neutral-500 text-sentence tracking-wider block">By Public Transport (one line each)</label>
+                        <textarea
+                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  h-20"
+                          value={eventForm.transportText}
+                          onChange={(e) => setEventForm({ ...eventForm, transportText: e.target.value })}
+                          placeholder={'Underground: Westminster — 4-minute walk\nBus: Routes 24 & 88 stop at the gates'}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-neutral-500 text-sentence tracking-wider block">By Car (one line each)</label>
+                        <textarea
+                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  h-20"
+                          value={eventForm.parkingText}
+                          onChange={(e) => setEventForm({ ...eventForm, parkingText: e.target.value })}
+                          placeholder={'Parking: On-site Deck G — pre-book\nDrop-off: Lay-by at the main entrance'}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Gallery */}
+                    <div className="pt-5 border-t border-neutral-100">
+                      <h4 className="font-display font-bold text-sm text-neutral-900">From past shows (photo gallery)</h4>
+                      <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">One image URL per line. Leave empty to hide the gallery.</p>
+                    </div>
+                    <textarea
+                      className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  h-20 font-mono"
+                      value={eventForm.galleryText}
+                      onChange={(e) => setEventForm({ ...eventForm, galleryText: e.target.value })}
+                      placeholder={'https://…/photo-1.jpg\nhttps://…/photo-2.jpg'}
+                    />
+
+                    {/* FAQs */}
+                    <div className="pt-5 border-t border-neutral-100 flex items-center justify-between">
+                      <div>
+                        <h4 className="font-display font-bold text-sm text-neutral-900">FAQs (good to know)</h4>
+                        <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">No questions = section hidden.</p>
+                      </div>
+                      <button type="button" onClick={() => addListRow('faqs')} className="flex items-center gap-1 py-1.5 px-3 bg-neutral-900 text-white text-[10px] font-bold rounded-full cursor-pointer hover:bg-neutral-800">
+                        <PlusCircle className="w-3.5 h-3.5" /> Add FAQ
+                      </button>
+                    </div>
+                    {eventForm.faqs.map((row, idx) => (
+                      <div key={idx} className="grid grid-cols-12 gap-2 items-start bg-neutral-50/60 p-2.5 rounded-lg">
+                        <input
+                          type="text"
+                          className="col-span-5 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                          value={row.question}
+                          onChange={(e) => updateListRow('faqs', idx, 'question', e.target.value)}
+                          placeholder="Question"
+                        />
+                        <input
+                          type="text"
+                          className="col-span-6 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                          value={row.answer}
+                          onChange={(e) => updateListRow('faqs', idx, 'answer', e.target.value)}
+                          placeholder="Answer"
+                        />
+                        <button type="button" onClick={() => removeListRow('faqs', idx)} className="col-span-1 p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer flex items-center justify-center" title="Remove">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
 
                     <div className="pt-4   flex items-center justify-end gap-3">
                       <button
@@ -1248,16 +1883,92 @@ export default function AdminHub() {
                       />
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-neutral-500 text-sentence tracking-wider block">Recent Shows (comma separated)</label>
-                      <input
-                        type="text"
-                        className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
-                        value={artistForm.recentShows}
-                        onChange={(e) => setArtistForm({ ...artistForm, recentShows: e.target.value })}
-                        placeholder="e.g. The Phantom of the Opera, Les Misérables Symphony"
-                      />
+                    {/* Profile stats */}
+                    <div className="pt-5 border-t border-neutral-100">
+                      <h4 className="font-display font-bold text-sm text-neutral-900">Profile stats & rating</h4>
+                      <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">Shown on the artist page hero and rating tile. Leave empty to hide each one.</p>
                     </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-neutral-500 text-sentence tracking-wider block">Rating (0–5)</label>
+                        <input
+                          type="number" step="0.1" min="0" max="5"
+                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          value={artistForm.rating}
+                          onChange={(e) => setArtistForm({ ...artistForm, rating: e.target.value })}
+                          placeholder="e.g. 4.8"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-neutral-500 text-sentence tracking-wider block">Review Count</label>
+                        <input
+                          type="number"
+                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          value={artistForm.totalReviews}
+                          onChange={(e) => setArtistForm({ ...artistForm, totalReviews: e.target.value })}
+                          placeholder="e.g. 120"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-neutral-500 text-sentence tracking-wider block">Events Hosted</label>
+                        <input
+                          type="number"
+                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          value={artistForm.eventsHosted}
+                          onChange={(e) => setArtistForm({ ...artistForm, eventsHosted: e.target.value })}
+                          placeholder="e.g. 42"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-neutral-500 text-sentence tracking-wider block">Total Audience</label>
+                        <input
+                          type="text"
+                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          value={artistForm.totalAudience}
+                          onChange={(e) => setArtistForm({ ...artistForm, totalAudience: e.target.value })}
+                          placeholder="e.g. 12.4k"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Past shows */}
+                    <div className="pt-5 border-t border-neutral-100 flex items-center justify-between">
+                      <div>
+                        <h4 className="font-display font-bold text-sm text-neutral-900">Past shows</h4>
+                        <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">The "Past shows" tab on the artist page. No entries = tab hidden.</p>
+                      </div>
+                      <button type="button" onClick={addPastShow} className="flex items-center gap-1 py-1.5 px-3 bg-neutral-900 text-white text-[10px] font-bold rounded-full cursor-pointer hover:bg-neutral-800">
+                        <PlusCircle className="w-3.5 h-3.5" /> Add show
+                      </button>
+                    </div>
+                    {artistForm.pastShows.map((row, idx) => (
+                      <div key={idx} className="grid grid-cols-12 gap-2 items-start bg-neutral-50/60 p-2.5 rounded-lg">
+                        <input
+                          type="text"
+                          className="col-span-5 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                          value={row.title}
+                          onChange={(e) => updatePastShow(idx, 'title', e.target.value)}
+                          placeholder="Show title"
+                        />
+                        <input
+                          type="text"
+                          className="col-span-3 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                          value={row.date}
+                          onChange={(e) => updatePastShow(idx, 'date', e.target.value)}
+                          placeholder="e.g. May 2026"
+                        />
+                        <input
+                          type="text"
+                          className="col-span-3 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                          value={row.venue}
+                          onChange={(e) => updatePastShow(idx, 'venue', e.target.value)}
+                          placeholder="Venue"
+                        />
+                        <button type="button" onClick={() => removePastShow(idx)} className="col-span-1 p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer flex items-center justify-center" title="Remove">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">

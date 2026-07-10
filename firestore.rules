@@ -81,8 +81,9 @@ service cloud.firestore {
     }
 
     // Match rules for organizers collection
+    // Public read: organiser profiles appear on the public Organisers pages
     match /organizers/{organizerId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow create: if isSignedIn() && (incoming().userId == request.auth.uid) && (isOrganizer() || isAdmin()) && isValidId(organizerId);
       allow update: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin()) && (incoming().userId == existing().userId) && isValidId(organizerId);
       allow delete: if isAdmin();

@@ -37,6 +37,10 @@ export interface OrganizerProfile {
   socialLinks?: Record<string, string>;
   email: string;
   phone?: string;
+  // Admin-managed page content — each hides its section when unset
+  location?: string;
+  specialties?: string[];
+  featured?: boolean;
 }
 
 export interface ArtistProfile {
@@ -60,6 +64,9 @@ export interface ArtistProfile {
   recentShows?: string[];
   // Admin-managed structured show history for the artist profile page
   pastShows?: { title: string; date: string; venue: string }[];
+  // Admin-managed hero stats — a stat is hidden on the page when unset
+  eventsHosted?: number;
+  totalAudience?: string; // free text, e.g. "12.4k"
 }
 
 export interface Booking {
@@ -226,6 +233,30 @@ export async function updateOrganizerProfile(id: string, update: Partial<Organiz
     await updateDoc(doc(db, 'organizers', id), update);
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
+    throw error;
+  }
+}
+
+export async function getOrganizerById(id: string): Promise<OrganizerProfile | null> {
+  const path = `organizers/${id}`;
+  try {
+    const snap = await getDoc(doc(db, 'organizers', id));
+    if (snap.exists()) {
+      return { id: snap.id, ...snap.data() } as OrganizerProfile;
+    }
+    return null;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+    return null;
+  }
+}
+
+export async function deleteOrganizerProfile(id: string): Promise<void> {
+  const path = `organizers/${id}`;
+  try {
+    await deleteDoc(doc(db, 'organizers', id));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
     throw error;
   }
 }

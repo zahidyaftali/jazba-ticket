@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft, Calendar, MapPin, Clock, Ticket, Check, Star,
-  Share2, ShieldCheck, Heart, Plus, Minus, ThumbsUp, ChevronDown, ChevronUp, Image as ImageIcon, X, ArrowRight,
+  Share2, ShieldCheck, Heart, Plus, Minus, ChevronDown, ChevronUp, Image as ImageIcon, X, ArrowRight,
 } from 'lucide-react';
-import { EventItem } from '../types';
+import { EventItem, TicketTier, getAvailableTiers } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth } from '../firebase';
 import { getOrganizerProfile, followTarget, unfollowTarget, isFollowingTarget, getFollowerCount, OrganizerProfile } from '../services/backendService';
@@ -31,7 +31,7 @@ export default function EventDetailPage({
   const [shareCopied, setShareCopied] = useState(false);
 
   // Booking rail
-  const [ticketTier, setTicketTier] = useState<'general' | 'vip' | 'elite'>('general');
+  const [ticketTier, setTicketTier] = useState<TicketTier>('general');
   const [quantity, setQuantity] = useState(1);
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
@@ -115,18 +115,19 @@ export default function EventDetailPage({
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     setQuantity(1);
-    setTicketTier('general');
+    setTicketTier(getAvailableTiers(event)[0]?.tier || 'general');
     setPromoApplied(false);
     setPromoCode('');
     setPromoError('');
     setOpenFaqId(null);
   }, [event]);
 
-  // Pricing
-  const tierPricing = {
-    general: event.price,
-    vip: Math.round(event.price * 1.7),
-    elite: Math.round(event.price * 2.5),
+  // Pricing — admin-set package prices; only offered packages are shown
+  const availableTiers = getAvailableTiers(event);
+  const tierPricing: Record<TicketTier, number> = {
+    general: availableTiers.find((t) => t.tier === 'general')?.price ?? event.price,
+    vip: availableTiers.find((t) => t.tier === 'vip')?.price ?? 0,
+    elite: availableTiers.find((t) => t.tier === 'elite')?.price ?? 0,
   };
   const getSubtotal = () => tierPricing[ticketTier] * quantity;
   const getDiscount = () => (promoApplied ? Math.round(getSubtotal() * 0.18) : 0);
@@ -152,128 +153,37 @@ export default function EventDetailPage({
   };
 
   // ---- Page content: everything below is admin-managed on the event
-  // document in Firestore, with sensible fallbacks when unset. ----
-  const isOpera = event.title.toLowerCase().includes('phantom') || event.title.toLowerCase().includes('opera');
-  const artistName = isOpera ? 'The Royal Philharmonic Ensemble' : 'a hand-picked live lineup';
+  // document. A section only renders when its content has been added. ----
+  const description = event.description?.trim() || '';
+  const highlights = event.highlights?.length ? event.highlights : [];
+  const artistsList = event.lineup?.length ? event.lineup : [];
+  const agendaSchedule = (event.agenda || []).map((item, idx) => ({ ...item, id: idx }));
+  const venueTransport = event.venueInfo?.transport?.length ? event.venueInfo.transport : [];
+  const venueParking = event.venueInfo?.parking?.length ? event.venueInfo.parking : [];
+  const mapUrl = event.venueInfo?.mapUrl?.trim() || '';
+  const galleryImages = event.gallery?.length ? event.gallery : [];
+  const faqList = (event.faqs || []).map((f, idx) => ({ ...f, id: idx }));
 
-  const description = event.description?.trim()
-    ? event.description
-    : `${event.title} brings a full-scale live production to ${event.location} — immersive staging, precision sound and a lineup built for one unforgettable night.`;
+  // Live Google Map: accepts a Google Maps embed URL, a share URL, or a
+  // plain venue address — anything that isn't already embeddable becomes
+  // a search-embed query, so admins can simply type the venue name.
+  const mapEmbedSrc = mapUrl
+    ? (mapUrl.includes('google.com/maps/embed') || mapUrl.includes('output=embed')
+        ? mapUrl
+        : `https://www.google.com/maps?q=${encodeURIComponent(mapUrl)}&output=embed`)
+    : '';
 
-  const highlights = event.highlights?.length
-    ? event.highlights
-    : [
-        'Two full 45-minute acts',
-        'Full-scale stage and light production',
-        'Free souvenir programme',
-        'Bar and food on every level',
-      ];
+  const hasVenueSection = !!mapEmbedSrc || venueTransport.length > 0 || venueParking.length > 0;
 
-  const artistsList = event.lineup?.length
-    ? event.lineup
-    : [
-        {
-          name: isOpera ? 'Dame Sarah Connolly' : 'Marcus Vance',
-          role: isOpera ? 'Lead soprano' : 'Lead vocalist',
-          avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
-          bio: 'Fifteen years of headline performances across Europe\'s biggest stages.',
-        },
-        {
-          name: isOpera ? 'Sir Thomas Hampson' : 'DJ Alok Rivers',
-          role: isOpera ? 'Baritone soloist' : 'Guest DJ',
-          avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-          bio: 'An international name known for commanding stage presence.',
-        },
-        {
-          name: isOpera ? 'Dr. Elizabeth Ward' : 'Chloe Winters',
-          role: isOpera ? 'Conductor' : 'Synth & rhythm',
-          avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-          bio: 'A precise, heartfelt orchestrator who lifts every performance.',
-        },
-      ];
-
-  const agendaSchedule = (event.agenda?.length
-    ? event.agenda
-    : [
-        { time: '5:30 PM', title: 'VIP & Elite doors open', desc: 'Early entry for VIP and Elite ticket holders, with a welcome drink in the lounge.' },
-        { time: '6:30 PM', title: 'General doors open', desc: 'Entry for all ticket types. Merchandise stands and the bar are open.' },
-        { time: '7:30 PM', title: 'Act one', desc: 'The show begins — full stage production, lighting and live sound.' },
-        { time: '8:45 PM', title: 'Intermission', desc: 'A 20-minute break. Refreshments available on every level.' },
-        { time: '9:05 PM', title: 'Act two & encore', desc: 'The second half builds to the night\'s finale and encore.' },
-        { time: '10:30 PM', title: 'Meet & greet', desc: 'Elite ticket holders meet the artists — photos, signings and a parting gift.' },
-      ]
-  ).map((item, idx) => ({ ...item, id: idx }));
-
-  const venueTransport = event.venueInfo?.transport?.length
-    ? event.venueInfo.transport
-    : [
-        'Underground: Westminster (Jubilee / District) — 4-minute walk',
-        'Bus: Routes 24 & 88 stop at the venue gates',
-      ];
-
-  const venueParking = event.venueInfo?.parking?.length
-    ? event.venueInfo.parking
-    : [
-        'Parking: On-site Deck G — pre-book at checkout',
-        'Drop-off: Signed lay-by directly outside the main entrance',
-      ];
-
-  const organizerDetails = {
-    name: organizerProfile?.companyName || 'Jazba Premiere Productions',
-    bio: organizerProfile?.description || 'Producers of large-scale live music, theatre and touring shows across the UK and Canada since 2012.',
-    imageUrl: organizerProfile?.logoUrl || 'https://images.unsplash.com/photo-1519751138087-5bf79df62d5b?w=100&auto=format&fit=crop&q=80',
-  };
-
-  const galleryImages = event.gallery?.length
-    ? event.gallery
-    : [
-        'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=600&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1481162854517-d9e353af153d?w=600&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=600&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80',
-      ];
-
-  const eventReviews = (event.reviews?.length
-    ? event.reviews
-    : [
-        {
-          name: 'Eleanor Sterling',
-          avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
-          rating: 5,
-          date: 'May 2026',
-          text: 'Spellbinding from start to finish. The sound was perfect and booking took under a minute.',
-        },
-        {
-          name: 'Robert Vance',
-          avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80',
-          rating: 4,
-          date: 'May 2026',
-          text: 'Brilliant staging and lighting. VIP was worth it — fast entry and great seats.',
-        },
-        {
-          name: 'Amara Patel',
-          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-          rating: 5,
-          date: 'April 2026',
-          text: 'Unforgettable night. Tickets worked flawlessly on my phone, and Elite gets you the meet-and-greet.',
-        },
-      ]
-  ).map((rev, idx) => ({ ...rev, id: idx }));
-
-  const aggregateRating = event.rating ?? 4.8;
-  const reviewCount = event.reviewCount ?? 148;
-
-  const faqList = (event.faqs?.length
-    ? event.faqs
-    : [
-        { question: 'Where inside the venue is the stage?', answer: 'The show takes place in the main hall. Your ticket shows your section, and staff at every entrance will point you straight to your seats.' },
-        { question: 'What can\'t I bring in?', answer: 'Professional cameras, outside food and drink, and any sharp or hazardous items. A free cloakroom is available next to the ticket scan.' },
-        { question: 'Can I upgrade my ticket later?', answer: 'Yes — upgrades to VIP or Elite are available at the box office on show night, subject to availability. Your original barcode is replaced on upgrade.' },
-        { question: 'Is there parking?', answer: 'Elite tickets include reserved parking. Everyone else can pre-book a space at checkout or use the frequent public transport links right outside.' },
-      ]
-  ).map((f, idx) => ({ ...f, id: idx }));
+  // Organizer card: live organiser profile first, then admin-entered
+  // details on the event itself; hidden when neither exists.
+  const organizerDetails = organizerProfile || event.organizerName?.trim()
+    ? {
+        name: organizerProfile?.companyName || event.organizerName || '',
+        bio: organizerProfile?.description || event.organizerBio || '',
+        imageUrl: organizerProfile?.logoUrl || event.organizerImage || '',
+      }
+    : null;
 
   const relatedEvents = allEvents.filter((evt) => evt.id !== event.id).slice(0, 3);
 
@@ -339,9 +249,11 @@ export default function EventDetailPage({
           <h1 className="font-display font-bold text-4xl sm:text-5xl md:text-[56px] leading-[0.95] tracking-tight mt-5 max-w-3xl">
             {event.title}
           </h1>
-          <p className="text-white/70 text-base sm:text-lg mt-5 max-w-2xl leading-relaxed">
-            One night, one stage — featuring {artistName}. Doors open early, the show starts on time.
-          </p>
+          {artistsList.length > 0 && (
+            <p className="text-white/70 text-base sm:text-lg mt-5 max-w-2xl leading-relaxed">
+              One night, one stage — featuring {artistsList.slice(0, 3).map((a) => a.name).join(', ')}.
+            </p>
+          )}
 
           <div className="flex flex-wrap gap-x-8 gap-y-3 border-t border-white/15 mt-10 pt-6 text-sm">
             <span className="flex items-center gap-2"><Calendar className="w-4 h-4 text-[#ffed00]" />{event.fullDate || `${event.date}, ${event.year || '2026'}`}</span>
@@ -358,26 +270,33 @@ export default function EventDetailPage({
           {/* LEFT — content sections */}
           <div className="lg:col-span-7 space-y-16">
 
-            {/* About */}
+            {/* About — only when a description or highlights were added */}
+            {(description || highlights.length > 0) && (
             <section>
               <h2 className="font-display font-bold text-2xl leading-[0.95] border-b border-black pb-4">About this event</h2>
-              <div className="text-base text-[#222] leading-relaxed mt-6 space-y-4">
-                {description.split('\n').filter(Boolean).map((para, idx) => (
-                  <p key={idx}>{para}</p>
-                ))}
-              </div>
+              {description && (
+                <div className="text-base text-[#222] leading-relaxed mt-6 space-y-4">
+                  {description.split('\n').filter(Boolean).map((para, idx) => (
+                    <p key={idx}>{para}</p>
+                  ))}
+                </div>
+              )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 border-t border-[#f2f2f2] mt-8">
-                {highlights.map((h) => (
-                  <div key={h} className="flex items-center gap-3 py-4 border-b border-[#f2f2f2] text-sm">
-                    <Check className="w-4 h-4 shrink-0" />
-                    <span>{h}</span>
-                  </div>
-                ))}
-              </div>
+              {highlights.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 border-t border-[#f2f2f2] mt-8">
+                  {highlights.map((h) => (
+                    <div key={h} className="flex items-center gap-3 py-4 border-b border-[#f2f2f2] text-sm">
+                      <Check className="w-4 h-4 shrink-0" />
+                      <span>{h}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
+            )}
 
-            {/* Schedule */}
+            {/* Schedule — only when a running order was added */}
+            {agendaSchedule.length > 0 && (
             <section>
               <div className="flex items-end justify-between border-b border-black pb-4">
                 <h2 className="font-display font-bold text-2xl leading-[0.95]">Running order</h2>
@@ -421,20 +340,26 @@ export default function EventDetailPage({
                 })}
               </div>
             </section>
+            )}
 
-            {/* Lineup */}
+            {/* Lineup — only when performers were added */}
+            {artistsList.length > 0 && (
             <section>
               <h2 className="font-display font-bold text-2xl leading-[0.95] border-b border-black pb-4">On stage</h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-[#f2f2f2] border border-[#f2f2f2] mt-8">
                 {artistsList.map((artist, idx) => (
                   <div key={idx} className="bg-white p-6 text-center">
-                    <div className="w-16 h-16 rounded-full overflow-hidden mx-auto">
-                      <img
-                        src={artist.avatar}
-                        alt={artist.name}
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover"
-                      />
+                    <div className="w-16 h-16 rounded-full overflow-hidden mx-auto bg-[#f2f2f2] flex items-center justify-center">
+                      {artist.avatar ? (
+                        <img
+                          src={artist.avatar}
+                          alt={artist.name}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="font-bold text-lg">{artist.name.charAt(0)}</span>
+                      )}
                     </div>
                     <h4 className="font-display font-bold text-base mt-4">{artist.name}</h4>
                     <span className={`${overline} text-[#8a8a8a] block mt-1`}>{artist.role}</span>
@@ -443,62 +368,73 @@ export default function EventDetailPage({
                 ))}
               </div>
             </section>
+            )}
 
-            {/* Venue */}
+            {/* Venue — only when a map, transport or parking info was added */}
+            {hasVenueSection && (
             <section>
               <h2 className="font-display font-bold text-2xl leading-[0.95] border-b border-black pb-4">Getting there</h2>
 
-              {/* Stylised map tile */}
-              <div className="relative h-56 bg-[#f7f7f7] overflow-hidden mt-8 border border-[#e4e4e4]">
-                <div className="absolute inset-0 opacity-30 pointer-events-none">
-                  <div className="absolute w-full h-[4px] bg-white top-1/3 left-0" />
-                  <div className="absolute w-full h-[4px] bg-white top-2/3 left-0" />
-                  <div className="absolute w-[4px] h-full bg-white left-1/4 top-0" />
-                  <div className="absolute w-[4px] h-full bg-white left-3/4 top-0" />
+              {/* Live Google Map */}
+              {mapEmbedSrc && (
+                <div className="relative h-72 overflow-hidden mt-8 border border-[#e4e4e4] bg-[#f7f7f7]">
+                  <iframe
+                    src={mapEmbedSrc}
+                    title={`Map — ${event.location}`}
+                    className="w-full h-full border-0"
+                    loading="lazy"
+                    allowFullScreen
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
                 </div>
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-                  <div className="bg-black text-white px-4 py-2 text-sm font-bold flex items-center gap-2 whitespace-nowrap">
-                    <MapPin className="w-4 h-4 text-[#ffed00]" />
-                    {event.location}
-                  </div>
-                  <div className="w-3 h-3 bg-black rotate-45 -mt-1.5" />
-                </div>
-              </div>
+              )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-[#f2f2f2] border border-[#f2f2f2] mt-6">
-                <div className="bg-white p-6">
-                  <span className={`${overline} text-[#666]`}>By public transport</span>
-                  <ul className="text-sm text-[#222] leading-relaxed mt-3 space-y-2">
-                    {venueTransport.map((line, idx) => (
-                      <li key={idx}>{line}</li>
-                    ))}
-                  </ul>
+              {(venueTransport.length > 0 || venueParking.length > 0) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-[#f2f2f2] border border-[#f2f2f2] mt-6">
+                  {venueTransport.length > 0 && (
+                    <div className="bg-white p-6">
+                      <span className={`${overline} text-[#666]`}>By public transport</span>
+                      <ul className="text-sm text-[#222] leading-relaxed mt-3 space-y-2">
+                        {venueTransport.map((line, idx) => (
+                          <li key={idx}>{line}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {venueParking.length > 0 && (
+                    <div className="bg-white p-6">
+                      <span className={`${overline} text-[#666]`}>By car</span>
+                      <ul className="text-sm text-[#222] leading-relaxed mt-3 space-y-2">
+                        {venueParking.map((line, idx) => (
+                          <li key={idx}>{line}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
-                <div className="bg-white p-6">
-                  <span className={`${overline} text-[#666]`}>By car</span>
-                  <ul className="text-sm text-[#222] leading-relaxed mt-3 space-y-2">
-                    {venueParking.map((line, idx) => (
-                      <li key={idx}>{line}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
+              )}
             </section>
+            )}
 
-            {/* Organizer */}
+            {/* Organizer — only when an organiser profile or admin details exist */}
+            {organizerDetails && (
             <section>
               <h2 className="font-display font-bold text-2xl leading-[0.95] border-b border-black pb-4">Presented by</h2>
 
               <div className="border border-[#e4e4e4] p-6 sm:p-8 mt-8">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                   <div className="flex items-center gap-5">
-                    <div className="w-14 h-14 rounded-full overflow-hidden shrink-0">
-                      <img
-                        src={organizerDetails.imageUrl}
-                        alt={organizerDetails.name}
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover"
-                      />
+                    <div className="w-14 h-14 rounded-full overflow-hidden shrink-0 bg-[#f2f2f2] flex items-center justify-center">
+                      {organizerDetails.imageUrl ? (
+                        <img
+                          src={organizerDetails.imageUrl}
+                          alt={organizerDetails.name}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="font-bold text-lg">{organizerDetails.name.charAt(0)}</span>
+                      )}
                     </div>
                     <div>
                       <h4 className="font-display font-bold text-lg flex items-center gap-2">
@@ -516,26 +452,32 @@ export default function EventDetailPage({
                     </div>
                   </div>
 
-                  <button
-                    onClick={handleToggleFollowOrganizer}
-                    disabled={organizerFollowBusy}
-                    className={`shrink-0 px-6 py-3 text-sm font-bold cursor-pointer transition-colors disabled:opacity-60 ${
-                      isFollowingOrganizer
-                        ? 'bg-white text-black border border-black hover:bg-[#f7f7f7]'
-                        : 'bg-black text-white hover:bg-neutral-800'
-                    }`}
-                  >
-                    {isFollowingOrganizer ? 'Following' : 'Follow'}
-                  </button>
+                  {organizerTargetId && (
+                    <button
+                      onClick={handleToggleFollowOrganizer}
+                      disabled={organizerFollowBusy}
+                      className={`shrink-0 px-6 py-3 text-sm font-bold cursor-pointer transition-colors disabled:opacity-60 ${
+                        isFollowingOrganizer
+                          ? 'bg-white text-black border border-black hover:bg-[#f7f7f7]'
+                          : 'bg-black text-white hover:bg-neutral-800'
+                      }`}
+                    >
+                      {isFollowingOrganizer ? 'Following' : 'Follow'}
+                    </button>
+                  )}
                 </div>
 
-                <p className="text-sm text-[#666] leading-relaxed border-t border-[#f2f2f2] mt-6 pt-5">
-                  {organizerDetails.bio}
-                </p>
+                {organizerDetails.bio && (
+                  <p className="text-sm text-[#666] leading-relaxed border-t border-[#f2f2f2] mt-6 pt-5">
+                    {organizerDetails.bio}
+                  </p>
+                )}
               </div>
             </section>
+            )}
 
-            {/* Gallery */}
+            {/* Gallery — only when past-show images were added */}
+            {galleryImages.length > 0 && (
             <section>
               <h2 className="font-display font-bold text-2xl leading-[0.95] border-b border-black pb-4">From past shows</h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-[#f2f2f2] border border-[#f2f2f2] mt-8">
@@ -558,77 +500,10 @@ export default function EventDetailPage({
                 ))}
               </div>
             </section>
+            )}
 
-            {/* Reviews */}
-            <section>
-              <h2 className="font-display font-bold text-2xl leading-[0.95] border-b border-black pb-4">What people say</h2>
-
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-8 items-center mt-8">
-                <div className="sm:col-span-4 text-center sm:border-r border-[#f2f2f2] sm:pr-8">
-                  <span className="font-display font-bold text-5xl leading-none">{aggregateRating.toFixed(1)}</span>
-                  <div className="flex items-center justify-center gap-1 mt-3">
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <Star key={s} className="w-4 h-4 fill-black text-black" />
-                    ))}
-                  </div>
-                  <span className="text-sm text-[#666] block mt-2">{reviewCount} reviews</span>
-                </div>
-
-                <div className="sm:col-span-8 space-y-2.5 w-full">
-                  {[
-                    { stars: 5, pct: 88 },
-                    { stars: 4, pct: 9 },
-                    { stars: 3, pct: 2 },
-                    { stars: 2, pct: 1 },
-                    { stars: 1, pct: 0 },
-                  ].map((bar) => (
-                    <div key={bar.stars} className="flex items-center gap-3 text-sm text-[#666]">
-                      <span className="w-8 text-right shrink-0">{bar.stars}★</span>
-                      <div className="flex-1 bg-[#f2f2f2] h-2">
-                        <div className="bg-black h-full" style={{ width: `${bar.pct}%` }} />
-                      </div>
-                      <span className="w-10 shrink-0">{bar.pct}%</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="border-t border-[#f2f2f2] mt-8">
-                {eventReviews.map((rev) => (
-                  <div key={rev.id} className="py-6 border-b border-[#f2f2f2] flex gap-4">
-                    <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-[#f2f2f2] flex items-center justify-center">
-                      {rev.avatar ? (
-                        <img src={rev.avatar} alt={rev.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="font-bold text-sm">{rev.name.charAt(0)}</span>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-3 flex-wrap">
-                        <div>
-                          <h4 className="font-bold text-sm flex items-center gap-2">
-                            {rev.name}
-                            <span className={`${overline} border border-[#e4e4e4] px-2 py-0.5 text-[#666]`}>Verified</span>
-                          </h4>
-                          <span className="text-xs text-[#8a8a8a] mt-0.5 block">{rev.date}</span>
-                        </div>
-                        <div className="flex items-center gap-0.5">
-                          {Array.from({ length: rev.rating }).map((_, i) => (
-                            <Star key={i} className="w-3.5 h-3.5 fill-black text-black" />
-                          ))}
-                        </div>
-                      </div>
-                      <p className="text-sm text-[#222] leading-relaxed mt-3">"{rev.text}"</p>
-                      <button className="flex items-center gap-1.5 text-xs font-bold text-[#666] hover:text-black mt-3 cursor-pointer transition-colors">
-                        <ThumbsUp className="w-3.5 h-3.5" /> Helpful · 8
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {/* FAQs */}
+            {/* FAQs — only when questions were added */}
+            {faqList.length > 0 && (
             <section>
               <h2 className="font-display font-bold text-2xl leading-[0.95] border-b border-black pb-4">Good to know</h2>
               <div className="border-b border-[#f2f2f2] mt-4">
@@ -666,6 +541,7 @@ export default function EventDetailPage({
                 })}
               </div>
             </section>
+            )}
 
           </div>
 
@@ -677,9 +553,9 @@ export default function EventDetailPage({
                 <span className={`${overline} text-[#666]`}>Tickets</span>
               </div>
 
-              {/* Tier rows */}
+              {/* Tier rows — only the packages this event offers */}
               <div className="px-6 border-b border-[#f2f2f2]">
-                {(['general', 'vip', 'elite'] as const).map((tier) => (
+                {availableTiers.map(({ tier }) => (
                   <button
                     key={tier}
                     onClick={() => setTicketTier(tier)}

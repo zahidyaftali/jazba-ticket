@@ -346,6 +346,16 @@ footer textarea,
   color: #ffffff;
 }
 
+/* …but light cards nested inside a dark band keep dark text
+   (e.g. the white admin login card on the black portal screen) */
+.bg-black .bg-white input, .bg-black .bg-white textarea,
+.bg-neutral-950 .bg-white input, .bg-neutral-950 .bg-white textarea,
+.bg-neutral-900 .bg-white input, .bg-neutral-900 .bg-white textarea,
+.bg-\[\#121212\] .bg-white input, .bg-\[\#121212\] .bg-white textarea {
+  border-bottom-color: var(--jz-line-strong) !important;
+  color: #000000;
+}
+
 /* ---------------------------------------------------------------
    7. MOTION — a touch of life, never soft or decorative
    --------------------------------------------------------------- */

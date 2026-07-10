@@ -58,6 +58,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
+    setActiveTab('upcoming');
   }, [artist]);
 
   const handleToggleFollow = async () => {
@@ -85,28 +86,23 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
     }
   };
 
-  // Upcoming events in this artist's category
-  const upcomingEvents = useMemo(() => {
-    const matched = allEvents.filter((evt) => evt.category === artist.category);
-    return matched.length > 0 ? matched.slice(0, 3) : allEvents.slice(0, 3);
-  }, [artist, allEvents]);
+  // Upcoming events in this artist's category — no unrelated fillers
+  const upcomingEvents = useMemo(
+    () => allEvents.filter((evt) => evt.category === artist.category).slice(0, 3),
+    [artist, allEvents],
+  );
 
-  // Past shows mapped with sample dates/venues
-  const pastShows = useMemo(() => {
-    const sampleDates = ['October 2025', 'December 2025', 'March 2026', 'May 2026'];
-    const sampleVenues = ['Wembley Arena', 'Broadway Theatre', 'Royal Festival Hall', 'Symphony Hall'];
-    return artist.recentShows.map((title, idx) => ({
-      title,
-      date: sampleDates[idx % sampleDates.length],
-      venue: sampleVenues[idx % sampleVenues.length],
-    }));
-  }, [artist]);
+  // Past shows exactly as entered in the admin (title / date / venue)
+  const pastShows = artist.pastShows || [];
 
-  const stats = useMemo(() => ({
-    hosting: `${artist.experienceYears || 3} yrs`,
-    totalEvents: artist.recentShows.length + 3,
-    attendees: `${((artist.name.length * 280 + artist.experienceYears * 540) / 1000).toFixed(1)}k`,
-  }), [artist]);
+  // Hero stats — admin-managed; a stat is hidden when it hasn't been set
+  const stats = useMemo(() => {
+    const list: { label: string; value: string | number }[] = [{ label: 'Followers', value: followerCount }];
+    if (artist.experienceYears > 0) list.push({ label: 'On stage', value: `${artist.experienceYears} yrs` });
+    if (artist.eventsHosted > 0) list.push({ label: 'Events hosted', value: artist.eventsHosted });
+    if (artist.totalAudience) list.push({ label: 'Total audience', value: artist.totalAudience });
+    return list;
+  }, [artist, followerCount]);
 
   const handleShare = () => {
     try {
@@ -163,15 +159,17 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                   <span className="flex items-center gap-1.5">
                     <MapPin className="w-4 h-4" /> {artist.location}
                   </span>
-                  <a
-                    href={artist.socials?.web || `https://jazba.live/artists/${artist.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 hover:text-white transition-colors"
-                  >
-                    <Globe className="w-4 h-4" />
-                    {artist.socials?.web ? artist.socials.web.replace('https://', '') : 'jazba.live'}
-                  </a>
+                  {artist.socials?.web && (
+                    <a
+                      href={artist.socials.web}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 hover:text-white transition-colors"
+                    >
+                      <Globe className="w-4 h-4" />
+                      {artist.socials.web.replace('https://', '')}
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
@@ -213,14 +211,9 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
             </div>
           </div>
 
-          {/* Stats row — divider-dark separated, breathing room on both sides */}
+          {/* Stats row — only admin-set stats appear */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-6 border-t border-white/15 mt-12 pt-8">
-            {[
-              { label: 'Followers', value: followerCount },
-              { label: 'On stage', value: stats.hosting },
-              { label: 'Events hosted', value: stats.totalEvents },
-              { label: 'Total audience', value: stats.attendees },
-            ].map((s) => (
+            {stats.map((s) => (
               <div key={s.label} className="pr-4 sm:px-10 sm:first:pl-0 sm:border-r sm:border-white/15 sm:last:border-r-0">
                 <div className={`${overline} text-white/50`}>{s.label}</div>
                 <div className="font-display font-bold text-2xl sm:text-3xl mt-2">{s.value}</div>
@@ -230,14 +223,14 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
         </div>
       </section>
 
-      {/* ── TABS — white catalogue band ───────────────────────── */}
+      {/* ── TABS — white catalogue band (Past shows only when added) ── */}
       <div className="border-b border-[#f2f2f2] bg-white sticky top-[60px] z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 flex">
           {([
             { id: 'upcoming', label: 'Upcoming shows' },
-            { id: 'past', label: 'Past shows' },
+            ...(pastShows.length > 0 ? [{ id: 'past', label: 'Past shows' }] : []),
             { id: 'about', label: 'About & booking' },
-          ] as const).map((tab) => (
+          ] as { id: 'upcoming' | 'past' | 'about'; label: string }[]).map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -340,17 +333,19 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                 {/* Biography */}
                 <div className="lg:col-span-7">
                   <h2 className="font-display font-bold text-3xl leading-[0.95]">About {artist.name}</h2>
-                  <p className="text-[#222] text-base leading-relaxed mt-6 whitespace-pre-line">
-                    {artist.bio}
-                  </p>
+                  {artist.bio && (
+                    <p className="text-[#222] text-base leading-relaxed mt-6 whitespace-pre-line">
+                      {artist.bio}
+                    </p>
+                  )}
 
-                  {/* Fact rows */}
+                  {/* Fact rows — only facts that were set in the admin */}
                   <div className="border-t border-[#f2f2f2] mt-10">
                     {[
-                      { label: 'Fee per event', value: `$${artist.hourlyRate.toLocaleString()}` },
-                      { label: 'Experience', value: `${artist.experienceYears} years on stage` },
-                      { label: 'Based in', value: artist.location || 'London, UK' },
-                      { label: 'Category', value: artist.subCategory },
+                      ...(artist.hourlyRate > 0 ? [{ label: 'Fee per event', value: `$${artist.hourlyRate.toLocaleString()}` }] : []),
+                      ...(artist.experienceYears > 0 ? [{ label: 'Experience', value: `${artist.experienceYears} years on stage` }] : []),
+                      ...(artist.location ? [{ label: 'Based in', value: artist.location }] : []),
+                      ...(artist.subCategory ? [{ label: 'Category', value: artist.subCategory }] : []),
                     ].map((row) => (
                       <div key={row.label} className="flex items-center justify-between py-5 border-b border-[#f2f2f2]">
                         <span className={`${overline} text-[#666]`}>{row.label}</span>
@@ -363,15 +358,21 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                 {/* Booking rail */}
                 <div className="lg:col-span-5 space-y-px">
 
-                  {/* Rating tile */}
+                  {/* Rating tile — only when a rating was set in the admin */}
                   <div className="border border-black p-7">
-                    <span className={`${overline} text-[#666]`}>Audience rating</span>
-                    <div className="flex items-center gap-3 mt-3">
-                      <Star className="w-6 h-6 fill-black text-black" />
-                      <span className="font-display font-bold text-4xl leading-none">{artist.rating.toFixed(1)}</span>
-                      <span className="text-sm text-[#666]">({artist.totalReviews} reviews)</span>
-                    </div>
-                    <div className="flex items-start gap-3 border-t border-[#f2f2f2] mt-6 pt-5">
+                    {artist.rating > 0 && (
+                      <>
+                        <span className={`${overline} text-[#666]`}>Audience rating</span>
+                        <div className="flex items-center gap-3 mt-3">
+                          <Star className="w-6 h-6 fill-black text-black" />
+                          <span className="font-display font-bold text-4xl leading-none">{artist.rating.toFixed(1)}</span>
+                          {artist.totalReviews > 0 && (
+                            <span className="text-sm text-[#666]">({artist.totalReviews} reviews)</span>
+                          )}
+                        </div>
+                      </>
+                    )}
+                    <div className={`flex items-start gap-3 ${artist.rating > 0 ? 'border-t border-[#f2f2f2] mt-6 pt-5' : ''}`}>
                       <ShieldCheck className="w-5 h-5 shrink-0" />
                       <p className="text-sm text-[#222]">
                         <strong className="font-bold">Verified performer.</strong> Identity checked, fee agreed upfront, payment held in escrow until the show is done.
@@ -386,7 +387,9 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                       One flat fee. One great night.
                     </h3>
                     <p className="text-sm text-black/70 mt-3">
-                      From ${artist.hourlyRate.toLocaleString()} per event — venue, date and set agreed directly with our booking team.
+                      {artist.hourlyRate > 0
+                        ? `From $${artist.hourlyRate.toLocaleString()} per event — venue, date and set agreed directly with our booking team.`
+                        : 'Venue, date, set and fee agreed directly with our booking team.'}
                     </p>
                     <button
                       onClick={() => setShowContactModal(true)}
@@ -396,26 +399,32 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                     </button>
                   </div>
 
-                  {/* Streams */}
-                  <div className="border border-[#e4e4e4] mt-6">
-                    <div className={`${overline} text-[#666] px-6 pt-5 pb-3`}>Listen & watch</div>
-                    <a
-                      href={artist.socials?.spotify || 'https://spotify.com'}
-                      target="_blank" rel="noopener noreferrer"
-                      className="flex items-center justify-between px-6 py-4 border-t border-[#f2f2f2] hover:bg-[#f7f7f7] transition-colors"
-                    >
-                      <span className="text-sm font-bold">Spotify</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </a>
-                    <a
-                      href={artist.socials?.youtube || 'https://youtube.com'}
-                      target="_blank" rel="noopener noreferrer"
-                      className="flex items-center justify-between px-6 py-4 border-t border-[#f2f2f2] hover:bg-[#f7f7f7] transition-colors"
-                    >
-                      <span className="text-sm font-bold">YouTube</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </a>
-                  </div>
+                  {/* Streams — only links that were added; hidden when none */}
+                  {(artist.socials?.spotify || artist.socials?.youtube) && (
+                    <div className="border border-[#e4e4e4] mt-6">
+                      <div className={`${overline} text-[#666] px-6 pt-5 pb-3`}>Listen & watch</div>
+                      {artist.socials?.spotify && (
+                        <a
+                          href={artist.socials.spotify}
+                          target="_blank" rel="noopener noreferrer"
+                          className="flex items-center justify-between px-6 py-4 border-t border-[#f2f2f2] hover:bg-[#f7f7f7] transition-colors"
+                        >
+                          <span className="text-sm font-bold">Spotify</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </a>
+                      )}
+                      {artist.socials?.youtube && (
+                        <a
+                          href={artist.socials.youtube}
+                          target="_blank" rel="noopener noreferrer"
+                          className="flex items-center justify-between px-6 py-4 border-t border-[#f2f2f2] hover:bg-[#f7f7f7] transition-colors"
+                        >
+                          <span className="text-sm font-bold">YouTube</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </a>
+                      )}
+                    </div>
+                  )}
 
                 </div>
               </div>
