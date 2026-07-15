@@ -1,6 +1,7 @@
 import React from 'react';
 import { MapPin, Clock, ArrowRight } from 'lucide-react';
 import { EventItem } from '../types';
+import { useLocalCurrency } from '../currency';
 
 interface UpcomingRowsProps {
   events: EventItem[];
@@ -13,6 +14,7 @@ const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
 
 export default function UpcomingRows({ events, onBook, onViewAll, onViewDetail }: UpcomingRowsProps) {
   const displayEvents = events.filter((e) => e.type === 'upcoming');
+  const { format } = useLocalCurrency();
 
   return (
     <section className="bg-[#f7f7f7] py-20 px-4 sm:px-6 md:px-8" id="upcoming">
@@ -75,7 +77,7 @@ export default function UpcomingRows({ events, onBook, onViewAll, onViewDetail }
                 <div className="flex items-center justify-between md:justify-end gap-6 shrink-0">
                   <div className="text-left md:text-right">
                     <span className={`${overline} text-[#8a8a8a] block`}>From</span>
-                    <span className="font-display font-bold text-xl leading-none">${item.price}</span>
+                    <span className="font-display font-bold text-xl leading-none">{format(item.price)}</span>
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); onBook(item); }}

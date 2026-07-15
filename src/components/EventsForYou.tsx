@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Hourglass, ArrowRight } from 'lucide-react';
 import { EventItem } from '../types';
+import { useLocalCurrency } from '../currency';
 
 interface EventsForYouProps {
   events: EventItem[];
@@ -12,6 +13,7 @@ const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
 
 export default function EventsForYou({ events, onBook, onViewDetail }: EventsForYouProps) {
   const [activeTab, setActiveTab] = useState<'today' | 'tomorrow' | 'weekend'>('today');
+  const { format } = useLocalCurrency();
 
   // Live countdown state for the featured offers
   const [timers, setTimers] = useState<{ [key: string]: { h: number; m: number; s: number } }>({
@@ -135,7 +137,7 @@ export default function EventsForYou({ events, onBook, onViewDetail }: EventsFor
                     onClick={(e) => { e.stopPropagation(); onBook(item); }}
                     className="mt-4 w-full bg-black text-white py-3.5 text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2"
                   >
-                    Buy from ${item.price} <ArrowRight className="w-4 h-4" />
+                    Buy from {format(item.price)} <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               </div>

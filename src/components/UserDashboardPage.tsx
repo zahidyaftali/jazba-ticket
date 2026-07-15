@@ -6,11 +6,15 @@ import {
 } from 'lucide-react';
 import { EventItem } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { auth } from '../firebase';
+import { auth, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from '../firebase';
 import { isUserBootstrappedAdmin, getUserProfile, createUserProfile, updateUserProfile, getBookings } from '../services/backendService';
 import AdminHub from './AdminHub';
 import OrganizerHub from './OrganizerHub';
 import ArtistHub from './ArtistHub';
+import TicketPrintSheet, { TicketPrintData } from './TicketPrintSheet';
+import brandMark from '../../assets/images/Favicon.png';
+import { shareOrCopy } from '../share';
+import { useLocalCurrency } from '../currency';
 
 const PLACEHOLDER_EVENT: EventItem = {
   id: 'unknown',
@@ -65,6 +69,7 @@ export default function UserDashboardPage({
   const [activeTab, setActiveTab] = useState<TabId>(
     initialTab && VALID_TABS.includes(initialTab as TabId) ? (initialTab as TabId) : 'overview'
   );
+  const { format: formatPrice } = useLocalCurrency();
 
   // Follow header-dropdown deep links while already on the dashboard
   useEffect(() => {
@@ -80,6 +85,7 @@ export default function UserDashboardPage({
   const [profileEmail, setProfileEmail] = useState(currentUser?.email || '');
   const [profilePhone, setProfilePhone] = useState('');
   const [profileCity, setProfileCity] = useState('London');
+  const [profileImageUrl, setProfileImageUrl] = useState(currentUser?.profileImage || '');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState('');
 
@@ -94,6 +100,10 @@ export default function UserDashboardPage({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [passwordError, setPasswordError] = useState('');
+  const [passwordBusy, setPasswordBusy] = useState(false);
+
+  // Ticket selected for download / print (rendered as a print-only sheet)
+  const [printPass, setPrintPass] = useState<PersonalBooking | null>(null);
 
   const [watchlist, setWatchlist] = useState<EventItem[]>([]);
   const [userBookings, setUserBookings] = useState<PersonalBooking[]>([]);
@@ -109,6 +119,7 @@ export default function UserDashboardPage({
         setUserBookings([]);
         return;
       }
+      if (user.photoURL) setProfileImageUrl(user.photoURL);
 
       // 1. Profile from the backend
       try {
@@ -118,6 +129,7 @@ export default function UserDashboardPage({
           if (udata.email) setProfileEmail(udata.email);
           if (udata.phone) setProfilePhone(udata.phone);
           if (udata.city) setProfileCity(udata.city);
+          if (udata.profileImage) setProfileImageUrl(udata.profileImage);
           if (udata.role) setUserRole(udata.role);
           if (udata.status) setUserStatus(udata.status);
         } else {
@@ -222,34 +234,87 @@ export default function UserDashboardPage({
     }
   };
 
-  const handlePasswordResetSubmit = (e: React.FormEvent) => {
+  const handlePasswordResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setPasswordSuccess(false);
     if (!currentPassword) {
       setPasswordError('Enter your current password.');
-      setPasswordSuccess(false);
       return;
     }
     if (newPassword.length < 6) {
       setPasswordError('Your new password needs at least 6 characters.');
-      setPasswordSuccess(false);
       return;
     }
     if (newPassword !== confirmPassword) {
       setPasswordError('The passwords don\'t match.');
-      setPasswordSuccess(false);
+      return;
+    }
+    const user = auth.currentUser;
+    if (!user || !user.email) {
+      setPasswordError('You need to be signed in to change your password.');
       return;
     }
     setPasswordError('');
-    setPasswordSuccess(true);
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setTimeout(() => setPasswordSuccess(false), 4000);
+    setPasswordBusy(true);
+    try {
+      // Firebase requires a recent sign-in before a password change, so
+      // re-authenticate with the current password first.
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, newPassword);
+      setPasswordSuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => setPasswordSuccess(false), 4000);
+    } catch (err: any) {
+      const code = err?.code || '';
+      if (code === 'auth/wrong-password' || code === 'auth/invalid-credential' || code === 'auth/invalid-login-credentials') {
+        setPasswordError('Your current password is incorrect.');
+      } else if (code === 'auth/weak-password') {
+        setPasswordError('That new password is too weak — try something longer.');
+      } else if (code === 'auth/too-many-requests') {
+        setPasswordError('Too many attempts. Please wait a few minutes and try again.');
+      } else {
+        console.error('Password change error:', err);
+        setPasswordError('Could not update your password. Please sign out, sign back in, and try again.');
+      }
+    } finally {
+      setPasswordBusy(false);
+    }
   };
 
   const handleRemoveFromWatchlist = (eventId: string) => {
     setWatchlist((prev) => prev.filter((item) => item.id !== eventId));
   };
+
+  // ── TICKET DOWNLOAD / PRINT — prints only the ticket sheet ──────
+  const handlePrintTicket = (pass: PersonalBooking) => {
+    setPrintPass(pass);
+    // Give React a tick to mount the print sheet before opening the dialog
+    setTimeout(() => window.print(), 120);
+  };
+
+  useEffect(() => {
+    const clear = () => setPrintPass(null);
+    window.addEventListener('afterprint', clear);
+    return () => window.removeEventListener('afterprint', clear);
+  }, []);
+
+  const toPrintData = (pass: PersonalBooking): TicketPrintData => ({
+    eventTitle: pass.event.title,
+    category: pass.event.category,
+    date: pass.event.fullDate || `${pass.event.date}, ${pass.event.year || '2026'}`,
+    time: pass.event.time,
+    venue: pass.event.location,
+    holderName: profileName,
+    holderEmail: profileEmail,
+    orderId: pass.orderId,
+    seat: pass.seat,
+    quantity: pass.quantity,
+    tier: pass.tier,
+    code: `#${pass.barCode.substring(0, 4)}-${pass.barCode.substring(4, 8)}`,
+  });
 
   // â”€â”€ SUSPENDED ACCOUNT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (userStatus === 'suspended') {
@@ -312,10 +377,19 @@ export default function UserDashboardPage({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-14">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
             <div className="flex items-center gap-6">
-              <div className="w-20 h-20 rounded-full bg-[#ffed00] text-black flex items-center justify-center shrink-0">
-                <span className="font-display font-bold text-2xl uppercase">
-                  {profileName.substring(0, 2)}
-                </span>
+              <div className="w-20 h-20 rounded-full bg-[#ffed00] text-black flex items-center justify-center shrink-0 overflow-hidden">
+                {profileImageUrl ? (
+                  <img
+                    src={profileImageUrl}
+                    alt={profileName}
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="font-display font-bold text-2xl uppercase">
+                    {profileName.substring(0, 2)}
+                  </span>
+                )}
               </div>
               <div>
                 <span className={`${overline} text-[#ffed00]`}>My account</span>
@@ -507,7 +581,7 @@ export default function UserDashboardPage({
                             <div className="min-w-0 flex-1">
                               <span className={`${overline} text-[#8a8a8a]`}>{evt.category}</span>
                               <h4 className="font-bold text-sm truncate mt-1">{evt.title}</h4>
-                              <span className="text-sm text-[#666] mt-0.5 block">From ${evt.price} Â· {evt.date}</span>
+                              <span className="text-sm text-[#666] mt-0.5 block">From {formatPrice(evt.price)} · {evt.date}</span>
                             </div>
                             <button
                               onClick={() => onViewShowDetail(evt)}
@@ -531,55 +605,69 @@ export default function UserDashboardPage({
                     {userBookings.length > 0 ? (
                       <div className="space-y-8">
                         {userBookings.map((pass) => (
-                          <div key={pass.id} className="border border-black">
-                            <div className="flex items-center justify-between px-6 py-4 border-b border-[#f2f2f2] flex-wrap gap-2">
-                              <span className={`${overline} text-[#666]`}>Order {pass.orderId}</span>
-                              <span className={`${overline} bg-[#ffed00] text-black px-3 py-1.5`}>
-                                {pass.tier === 'elite' ? 'Elite' : pass.tier === 'vip' ? 'VIP' : 'General admission'}
-                              </span>
-                            </div>
+                          <div key={pass.id} className="border-2 border-black flex flex-col md:flex-row">
 
-                            <div className="grid grid-cols-1 md:grid-cols-12">
-                              <div className="md:col-span-8 p-6">
-                                <div className="flex gap-4">
-                                  <img
-                                    src={pass.event.image}
-                                    alt={pass.event.title}
-                                    referrerPolicy="no-referrer"
-                                    className="w-16 h-16 object-cover shrink-0"
-                                  />
-                                  <div className="min-w-0">
-                                    <h4 className="font-display font-bold text-xl leading-[0.95] truncate">{pass.event.title}</h4>
-                                    <span className={`${overline} text-[#8a8a8a] mt-1.5 block`}>{pass.event.category}</span>
+                            {/* ── Main stub ── */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-3 bg-black text-white px-6 py-3.5 flex-wrap">
+                                <span className="flex items-center gap-2.5">
+                                  <img src={brandMark} alt="" className="w-7 h-7 object-contain" />
+                                  <span className="font-display font-bold text-sm tracking-[0.22em]">JAZBATICKET</span>
+                                </span>
+                                <span className={`${overline} bg-[#ffed00] text-black px-3 py-1.5`}>
+                                  {pass.tier === 'elite' ? 'Elite' : pass.tier === 'vip' ? 'VIP' : 'General admission'}
+                                </span>
+                              </div>
+
+                              <div className="p-6">
+                                <span className={`${overline} text-[#8a8a8a]`}>
+                                  {pass.event.category} · Order {pass.orderId}
+                                </span>
+                                <h4 className="font-display font-bold text-2xl leading-[0.95] mt-2 truncate">
+                                  {pass.event.title}
+                                </h4>
+
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5 border-t border-[#f2f2f2] mt-6 pt-5 text-sm">
+                                  <div>
+                                    <span className={`${overline} text-[#8a8a8a] block`}>Date</span>
+                                    <span className="font-bold mt-1 block">{pass.event.fullDate || `${pass.event.date}, ${pass.event.year || '2026'}`}</span>
                                   </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 border-t border-[#f2f2f2] mt-6 pt-5 text-sm">
                                   <div>
                                     <span className={`${overline} text-[#8a8a8a] block`}>Time</span>
                                     <span className="font-bold mt-1 block">{pass.event.time}</span>
                                   </div>
                                   <div>
-                                    <span className={`${overline} text-[#8a8a8a] block`}>Seats</span>
-                                    <span className="font-bold mt-1 block">Row {pass.seat} Â· {pass.quantity}Ã—</span>
-                                  </div>
-                                  <div>
                                     <span className={`${overline} text-[#8a8a8a] block`}>Venue</span>
                                     <span className="font-bold mt-1 block truncate" title={pass.event.location}>{pass.event.location}</span>
+                                  </div>
+                                  <div>
+                                    <span className={`${overline} text-[#8a8a8a] block`}>Ticket holder</span>
+                                    <span className="font-bold mt-1 block truncate">{profileName}</span>
+                                  </div>
+                                  <div>
+                                    <span className={`${overline} text-[#8a8a8a] block`}>Email</span>
+                                    <span className="font-bold mt-1 block truncate" title={profileEmail}>{profileEmail}</span>
+                                  </div>
+                                  <div>
+                                    <span className={`${overline} text-[#8a8a8a] block`}>Seats</span>
+                                    <span className="font-bold mt-1 block">Row {pass.seat} · {pass.quantity}×</span>
                                   </div>
                                 </div>
 
                                 <div className="flex flex-wrap gap-3 mt-6">
                                   <button
-                                    onClick={() => window.print()}
+                                    onClick={() => handlePrintTicket(pass)}
                                     className="flex items-center gap-2 bg-black text-white px-5 py-2.5 text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors"
                                   >
-                                    <Printer className="w-4 h-4" /> Print
+                                    <Printer className="w-4 h-4" /> Download / Print ticket
                                   </button>
                                   <button
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(JSON.stringify(pass));
-                                      alert('Ticket details copied to clipboard.');
+                                    onClick={async () => {
+                                      const result = await shareOrCopy({
+                                        title: pass.event.title,
+                                        text: `${pass.event.title} — ${pass.event.fullDate || pass.event.date}, ${pass.event.time} at ${pass.event.location}. Order ${pass.orderId}.`,
+                                      });
+                                      if (result === 'copied') alert('Ticket link copied to clipboard.');
                                     }}
                                     className="flex items-center gap-2 bg-white text-black border border-black px-5 py-2.5 text-sm font-bold cursor-pointer hover:bg-[#f7f7f7] transition-colors"
                                   >
@@ -587,22 +675,28 @@ export default function UserDashboardPage({
                                   </button>
                                 </div>
                               </div>
+                            </div>
 
-                              {/* QR panel */}
-                              <div className="md:col-span-4 bg-[#f7f7f7] p-6 flex flex-col items-center justify-center border-t md:border-t-0 md:border-l border-[#f2f2f2]">
-                                <div className="bg-white p-3 border border-[#e4e4e4]">
-                                  <div className="w-24 h-24 grid grid-cols-6 gap-px p-1">
-                                    {Array.from({ length: 36 }).map((_, i) => {
-                                      const filled = (i % 3 === 0) || (i % 5 === 1) || (i < 6) || (i > 30) || (i % 6 === 0);
-                                      return <span key={i} className={`w-full h-full ${filled ? 'bg-black' : 'bg-transparent'}`} />;
-                                    })}
-                                  </div>
+                            {/* ── Tear-off stub with the barcode ── */}
+                            <div className="md:w-56 shrink-0 border-t-2 md:border-t-0 md:border-l-2 border-dashed border-black bg-[#f7f7f7] p-6 flex flex-row md:flex-col items-center justify-center gap-5 text-center">
+                              <div className="bg-white p-3 border border-[#e4e4e4] shrink-0">
+                                <div className="w-24 h-24 grid grid-cols-6 gap-px p-1">
+                                  {Array.from({ length: 36 }).map((_, i) => {
+                                    const seed = Number(pass.barCode.charAt(i % pass.barCode.length)) || i;
+                                    const filled = (i + seed) % 3 === 0 || (i * seed) % 5 === 1 || i < 6 || i > 30 || i % 6 === 0;
+                                    return <span key={i} className={`w-full h-full ${filled ? 'bg-black' : 'bg-transparent'}`} />;
+                                  })}
                                 </div>
-                                <span className="font-bold text-xs tracking-[0.2em] mt-4">
+                              </div>
+                              <div>
+                                <span className="font-bold text-xs tracking-[0.2em] block">
                                   #{pass.barCode.substring(0, 4)}-{pass.barCode.substring(4, 8)}
                                 </span>
-                                <span className={`${overline} text-[#666] mt-2 flex items-center gap-1`}>
+                                <span className={`${overline} text-[#666] mt-2 flex items-center justify-center gap-1`}>
                                   <CheckCircle className="w-3.5 h-3.5" /> Valid for entry
+                                </span>
+                                <span className={`${overline} text-black bg-[#ffed00] px-2.5 py-1 inline-block mt-3`}>
+                                  Admit {pass.quantity}
                                 </span>
                               </div>
                             </div>
@@ -637,7 +731,7 @@ export default function UserDashboardPage({
                             <div className="min-w-0 flex-1">
                               <span className={`${overline} text-[#8a8a8a]`}>{show.category}</span>
                               <h4 className="font-bold text-base truncate mt-0.5">{show.title}</h4>
-                              <span className="text-sm text-[#666]">From ${show.price} Â· {show.date}</span>
+                              <span className="text-sm text-[#666]">From {formatPrice(show.price)} · {show.date}</span>
                             </div>
                             <div className="flex gap-2 shrink-0">
                               <button
@@ -854,9 +948,10 @@ export default function UserDashboardPage({
 
                         <button
                           type="submit"
-                          className="mt-8 bg-black text-white px-8 py-3.5 text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors"
+                          disabled={passwordBusy}
+                          className="mt-8 bg-black text-white px-8 py-3.5 text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors disabled:opacity-50"
                         >
-                          Update password
+                          {passwordBusy ? 'Updating…' : 'Update password'}
                         </button>
                       </form>
                     </div>
@@ -873,6 +968,9 @@ export default function UserDashboardPage({
           </main>
         </div>
       </div>
+
+      {/* Print-only sheet — mounted while a ticket download/print is active */}
+      {printPass && <TicketPrintSheet ticket={toPrintData(printPass)} />}
     </div>
   );
 }

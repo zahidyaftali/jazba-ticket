@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Ticket, Menu, X, ChevronRight, LayoutDashboard, Settings, LogOut } from 'lucide-react';
+import mainLogo from '../../assets/images/Main Logo.png';
 
 interface NavbarProps {
   onScrollToSection: (id: string) => void;
@@ -20,6 +21,7 @@ function initialsOf(name: string): string {
 const NAV_LINKS = [
   { id: 'explorer', label: 'Events' },
   { id: 'artists', label: 'Artists' },
+  { id: 'organizers', label: 'Organisers' },
   { id: 'help', label: 'Help' },
   { id: 'about', label: 'About' },
 ];
@@ -74,12 +76,8 @@ export default function Navbar({ onScrollToSection, onOpenAuth, currentUser, onG
           className="flex items-center gap-2.5 cursor-pointer shrink-0"
           id="nav-logo"
         >
-          <span className="w-9 h-9 bg-[#ffed00] flex items-center justify-center">
-            <Ticket className="w-4.5 h-4.5 text-black" />
-          </span>
-          <span className="font-display font-bold text-xl tracking-tight text-black">
-            Jazbaticket
-          </span>
+          {/* White-wordmark logo turned solid black for the light header */}
+          <img src={mainLogo} alt="Jazbaticket" className="h-12 w-auto object-contain brightness-0" />
         </button>
 
         {/* CENTER NAV (desktop) */}

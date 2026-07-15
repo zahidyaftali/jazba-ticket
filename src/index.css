@@ -371,3 +371,21 @@ button:active { transform: scale(0.985); }
   div.cursor-pointer.bg-white[class*="rounded"]:hover,
   a.bg-white[class*="rounded"]:hover { transform: none; }
 }
+
+/* ---------------------------------------------------------------
+   8. PRINT — when a ticket sheet is mounted, print ONLY the ticket
+   --------------------------------------------------------------- */
+@media print {
+  /* The ticket sheet is portalled directly onto <body>, outside #root,
+     so hiding #root removes the entire app from the printout. */
+  body:has(#print-ticket) #root {
+    display: none !important;
+  }
+  #print-ticket {
+    display: block !important;
+    padding: 24px;
+  }
+  @page {
+    margin: 12mm;
+  }
+}

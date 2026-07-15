@@ -7,6 +7,8 @@ import { EventItem, TicketTier, getAvailableTiers } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth } from '../firebase';
 import { getOrganizerProfile, followTarget, unfollowTarget, isFollowingTarget, getFollowerCount, OrganizerProfile } from '../services/backendService';
+import { shareOrCopy } from '../share';
+import { useLocalCurrency } from '../currency';
 
 interface EventDetailPageProps {
   event: EventItem;
@@ -29,6 +31,7 @@ export default function EventDetailPage({
 }: EventDetailPageProps) {
   const [isLiked, setIsLiked] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const { format } = useLocalCurrency();
 
   // Booking rail
   const [ticketTier, setTicketTier] = useState<TicketTier>('general');
@@ -146,10 +149,15 @@ export default function EventDetailPage({
     }
   };
 
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setShareCopied(true);
-    setTimeout(() => setShareCopied(false), 2000);
+  const handleShare = async () => {
+    const result = await shareOrCopy({
+      title: event.title,
+      text: `${event.title} — ${event.date}, ${event.location}. Tickets on Jazbaticket.`,
+    });
+    if (result === 'copied') {
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    }
   };
 
   // ---- Page content: everything below is admin-managed on the event
@@ -164,14 +172,27 @@ export default function EventDetailPage({
   const galleryImages = event.gallery?.length ? event.gallery : [];
   const faqList = (event.faqs || []).map((f, idx) => ({ ...f, id: idx }));
 
-  // Live Google Map: accepts a Google Maps embed URL, a share URL, or a
-  // plain venue address — anything that isn't already embeddable becomes
-  // a search-embed query, so admins can simply type the venue name.
-  const mapEmbedSrc = mapUrl
-    ? (mapUrl.includes('google.com/maps/embed') || mapUrl.includes('output=embed')
-        ? mapUrl
-        : `https://www.google.com/maps?q=${encodeURIComponent(mapUrl)}&output=embed`)
-    : '';
+  // Live Google Map: accepts a Google Maps embed URL, a share/place URL, or a
+  // plain venue address. Share URLs are reduced to a clean place query (or
+  // coordinates) before embedding — feeding a raw URL into the search embed is
+  // what triggers Google's "Some custom on-map content could not be displayed".
+  const mapEmbedSrc = (() => {
+    if (!mapUrl) return '';
+    if (mapUrl.includes('google.com/maps/embed')) return mapUrl;
+    let query = mapUrl;
+    if (/^https?:\/\//i.test(mapUrl)) {
+      const placeMatch = mapUrl.match(/\/maps\/place\/([^/@?]+)/);
+      const coordMatch = mapUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+      let qParam = '';
+      try { qParam = new URL(mapUrl).searchParams.get('q') || ''; } catch { /* not a parseable URL */ }
+      query =
+        qParam ||
+        (placeMatch ? decodeURIComponent(placeMatch[1].replace(/\+/g, ' ')) : '') ||
+        (coordMatch ? `${coordMatch[1]},${coordMatch[2]}` : '') ||
+        event.location;
+    }
+    return `https://maps.google.com/maps?q=${encodeURIComponent(query)}&z=15&ie=UTF8&output=embed`;
+  })();
 
   const hasVenueSection = !!mapEmbedSrc || venueTransport.length > 0 || venueParking.length > 0;
 
@@ -575,7 +596,7 @@ export default function EventDetailPage({
                       </div>
                     </div>
                     <div className="text-right shrink-0 pl-3">
-                      <span className="font-display font-bold text-base block">${tierPricing[tier]}</span>
+                      <span className="font-display font-bold text-base block">{format(tierPricing[tier])}</span>
                       <span className={`${overline} text-[#8a8a8a]`}>{tierMeta[tier].tag}</span>
                     </div>
                   </button>
@@ -640,21 +661,21 @@ export default function EventDetailPage({
                 <div className="space-y-2.5 text-sm">
                   <div className="flex justify-between text-[#666]">
                     <span>Subtotal ({quantity} × {tierMeta[ticketTier].name})</span>
-                    <span>${getSubtotal()}</span>
+                    <span>{format(getSubtotal())}</span>
                   </div>
                   {promoApplied && (
                     <div className="flex justify-between text-[#666]">
                       <span>Discount (18%)</span>
-                      <span>−${getDiscount()}</span>
+                      <span>−{format(getDiscount())}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-[#666]">
                     <span>Service fee (5%)</span>
-                    <span>${getBookingServiceFee()}</span>
+                    <span>{format(getBookingServiceFee())}</span>
                   </div>
                   <div className="flex justify-between items-baseline border-t border-black mt-4 pt-4">
                     <span className="font-display font-bold text-lg">Total</span>
-                    <span className="font-display font-bold text-2xl">${getTotalPrice()}</span>
+                    <span className="font-display font-bold text-2xl">{format(getTotalPrice())}</span>
                   </div>
                 </div>
 
@@ -670,17 +691,6 @@ export default function EventDetailPage({
                   <ShieldCheck className="w-3.5 h-3.5" /> Free refunds up to 24 hours before doors
                 </p>
               </div>
-            </div>
-
-            {/* Trust tile — dark inversion */}
-            <div className="bg-black text-white p-6 mt-6">
-              <span className={`${overline} text-[#ffed00]`}>Buy with confidence</span>
-              <p className="text-sm text-white/70 leading-relaxed mt-3">
-                Every barcode is issued and verified by Jazbaticket. If an event is cancelled, your refund is automatic.
-              </p>
-              <span className="flex items-center gap-2 text-xs text-white/50 border-t border-white/15 mt-4 pt-4">
-                <ShieldCheck className="w-4 h-4" /> 256-bit SSL encrypted checkout
-              </span>
             </div>
           </div>
         </div>
@@ -725,7 +735,7 @@ export default function EventDetailPage({
                       <MapPin className="w-3.5 h-3.5 shrink-0" /> {evt.location}
                     </span>
                     <span className="font-bold text-sm flex items-center gap-1.5 shrink-0 pl-3">
-                      From ${evt.price} <ArrowRight className="w-4 h-4" />
+                      From {format(evt.price)} <ArrowRight className="w-4 h-4" />
                     </span>
                   </div>
                 </div>

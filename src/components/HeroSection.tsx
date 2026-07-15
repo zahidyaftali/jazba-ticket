@@ -10,6 +10,7 @@ interface HeroSectionProps {
     ticketClass: string;
     dateOffset: number | null;
   }) => void;
+  onBookArtist?: () => void;
 }
 
 const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
@@ -21,7 +22,7 @@ const DATE_WINDOWS = [
   { offset: 3, label: 'Weekend' },
 ] as const;
 
-export default function HeroSection({ onSearch, onSelectDateFilter, onSearchSubmit }: HeroSectionProps) {
+export default function HeroSection({ onSearch, onSelectDateFilter, onSearchSubmit, onBookArtist }: HeroSectionProps) {
   const [searchVal, setSearchVal] = useState('');
   const [venueVal, setVenueVal] = useState('');
   const [classVal, setClassVal] = useState('');
@@ -81,7 +82,7 @@ export default function HeroSection({ onSearch, onSelectDateFilter, onSearchSubm
               Find events <ArrowRight className="w-4 h-4" />
             </button>
             <button
-              onClick={() => document.getElementById('artists')?.scrollIntoView({ behavior: 'smooth' })}
+              onClick={() => onBookArtist?.()}
               className="bg-black text-white border border-white font-bold text-sm px-7 py-4 cursor-pointer hover:bg-white/10 transition-colors"
             >
               Book an artist
@@ -183,7 +184,11 @@ export default function HeroSection({ onSearch, onSelectDateFilter, onSearchSubm
                 {['Opera', 'Coldplay', 'London'].map((tag) => (
                   <button
                     key={tag}
-                    onClick={() => { setSearchVal(tag); onSearch(tag); }}
+                    onClick={() => {
+                      setSearchVal(tag);
+                      onSearch(tag);
+                      onSearchSubmit({ query: tag, venue: venueVal, ticketClass: classVal, dateOffset: activeDateOffset });
+                    }}
                     className="text-white/70 hover:text-[#ffed00] font-bold cursor-pointer transition-colors underline underline-offset-4 decoration-white/30"
                   >
                     {tag}

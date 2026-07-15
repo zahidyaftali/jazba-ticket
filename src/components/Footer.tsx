@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Ticket, ArrowRight, Check } from 'lucide-react';
+import { ArrowRight, Check } from 'lucide-react';
+import mainLogo from '../../assets/images/Main Logo.png';
 
 interface FooterProps {
   onScrollToSection: (id: string) => void;
@@ -71,11 +72,8 @@ export default function Footer({ onScrollToSection, onSubscribe, onViewRefundPol
         <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
           {/* Brand */}
           <div className="md:col-span-4">
-            <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => onScrollToSection('top')}>
-              <div className="w-8 h-8 bg-[#ffed00] flex items-center justify-center">
-                <Ticket className="w-4 h-4 text-black" />
-              </div>
-              <span className="font-display font-bold text-xl tracking-tight text-white">Jazbatickets</span>
+            <div className="cursor-pointer" onClick={() => onScrollToSection('top')}>
+              <img src={mainLogo} alt="Jazbatickets" className="h-14 w-auto object-contain" />
             </div>
             <p className="text-white/50 text-sm leading-relaxed max-w-xs mt-4">
               Book tickets to concerts, theatre, comedy and sport — and the artists to headline your own event.

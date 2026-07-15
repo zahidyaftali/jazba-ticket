@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { getAllArtists, ArtistProfile, followTarget, unfollowTarget, getFollowingIds } from '../services/backendService';
 import { auth } from '../firebase';
+import { useLocalCurrency } from '../currency';
 import {
   Search,
   MapPin,
@@ -90,6 +91,7 @@ const FEE_TIERS = [
 ] as const;
 
 export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectArtist, onRequireLogin }: ArtistsPageProps) {
+  const { format } = useLocalCurrency();
   // Live artist roster from Firestore
   const [artists, setArtists] = useState<ArtistItem[]>([]);
 
@@ -447,7 +449,7 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                       <div className="flex items-center justify-between border-t border-[#f2f2f2] mt-4 pt-4">
                         <div>
                           <span className={`${overline} text-[#8a8a8a] block`}>From</span>
-                          <span className="font-display font-bold text-lg">${artist.hourlyRate.toLocaleString()}<span className="text-xs font-normal text-[#8a8a8a]"> / event</span></span>
+                          <span className="font-display font-bold text-lg">{format(artist.hourlyRate)}<span className="text-xs font-normal text-[#8a8a8a]"> / event</span></span>
                         </div>
                         {followButton(artist)}
                       </div>
@@ -487,7 +489,7 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
 
                     <div className="flex sm:flex-col items-center sm:items-end justify-between gap-3 shrink-0">
                       <span className="font-display font-bold text-lg">
-                        ${artist.hourlyRate.toLocaleString()}<span className="text-xs font-normal text-[#8a8a8a]"> / event</span>
+                        {format(artist.hourlyRate)}<span className="text-xs font-normal text-[#8a8a8a]"> / event</span>
                       </span>
                       {followButton(artist)}
                     </div>

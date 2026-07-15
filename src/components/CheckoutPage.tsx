@@ -8,6 +8,8 @@ import { auth } from '../firebase';
 import { createBooking } from '../services/backendService';
 import StripeCheckoutForm from './StripeCheckoutForm';
 import PayPalCheckoutForm from './PayPalCheckoutForm';
+import TicketPrintSheet from './TicketPrintSheet';
+import { formatMoney as formatLocalMoney } from '../currency';
 
 interface CheckoutPageProps {
   event: EventItem;
@@ -137,12 +139,9 @@ export default function CheckoutPage({
   const getFees = () => Math.round((getSubtotal() - getDiscount()) * 0.08);
   const getTotalInUsd = () => getSubtotal() - getDiscount() + getFees();
 
-  // Local pricing follows the detected region
-  const formatMoney = (usdAmount: number) => {
-    if (paymentRegion === 'PK') return `Rs ${Math.round(usdAmount * 280).toLocaleString()}`;
-    if (paymentRegion === 'UK') return `£${(usdAmount * 0.78).toFixed(2)}`;
-    return `$${usdAmount.toFixed(2)}`;
-  };
+  // Local pricing follows the detected region — same shared rates as the
+  // rest of the site, so card prices and checkout totals always match.
+  const formatMoney = (usdAmount: number) => formatLocalMoney(usdAmount, paymentRegion, { precise: true });
 
   const handleApplyPromo = () => {
     const clean = promoCode.trim().toUpperCase();
@@ -670,7 +669,7 @@ export default function CheckoutPage({
                 onClick={() => window.print()}
                 className="flex items-center justify-center gap-2 bg-black text-white py-4 font-bold text-sm cursor-pointer hover:bg-neutral-800 transition-colors"
               >
-                <Printer className="w-4 h-4" /> Print tickets
+                <Printer className="w-4 h-4" /> Download / Print ticket
               </button>
               <button
                 type="button"
@@ -680,6 +679,24 @@ export default function CheckoutPage({
                 View in your dashboard
               </button>
             </div>
+
+            {/* While the confirmation is on screen, printing outputs only the ticket */}
+            <TicketPrintSheet
+              ticket={{
+                eventTitle: event.title,
+                category: event.category,
+                date: event.fullDate || `${event.date}, ${event.year || '2026'}`,
+                time: event.time,
+                venue: event.location,
+                holderName: fullName || 'Guest',
+                holderEmail: emailAddress || auth.currentUser?.email || '',
+                orderId: ticketCode,
+                seat: seatConfig,
+                quantity: ticketCount,
+                tier: ticketTier,
+                code: ticketCode,
+              }}
+            />
           </div>
         )}
       </div>

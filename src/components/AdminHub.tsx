@@ -35,6 +35,7 @@ import {
   TicketPass
 } from '../services/backendService';
 import { categories } from '../data';
+import { SEED_ARTISTS } from '../seedArtists';
 import { AgendaEntry, LineupEntry, EventFaq } from '../types';
 import { auth } from '../firebase';
 import { motion } from 'motion/react';
@@ -72,6 +73,88 @@ const BLANK_EVENT_FORM = {
 };
 
 const parseLines = (text: string) => text.split('\n').map((s) => s.trim()).filter(Boolean);
+
+// ── Shared admin editor styling — flat, square, black/yellow ──────────────
+const inputCls = 'w-full bg-[#f7f7f7] px-3 py-2.5 text-sm font-medium text-black placeholder-[#9a9a9a] outline-none border border-transparent focus:border-black transition-colors';
+const labelCls = 'text-[10px] font-bold tracking-[0.15em] uppercase text-[#666] block mb-1.5';
+const rowInputCls = 'bg-white px-2.5 py-2 text-sm font-medium text-black placeholder-[#9a9a9a] outline-none border border-[#e4e4e4] focus:border-black transition-colors';
+const addRowBtnCls = 'flex items-center gap-1.5 py-2 px-3.5 bg-black hover:bg-neutral-800 text-white text-[11px] font-bold cursor-pointer transition-colors shrink-0';
+
+/** A titled settings panel — the building block of every admin editor. */
+function EditorPanel({
+  title,
+  sub,
+  action,
+  children,
+}: {
+  title: string;
+  sub?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="bg-white border border-[#e4e4e4]">
+      <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-[#f2f2f2]">
+        <div className="min-w-0">
+          <h4 className="font-display font-bold text-sm text-black">{title}</h4>
+          {sub && <p className="text-[11px] text-[#8a8a8a] font-medium mt-0.5">{sub}</p>}
+        </div>
+        {action}
+      </div>
+      <div className="p-5 space-y-4">{children}</div>
+    </section>
+  );
+}
+
+/** Black command bar on top of an editor: back, breadcrumb + title, cancel/save. */
+function EditorHeader({
+  crumb,
+  title,
+  onBack,
+  formId,
+  saveLabel,
+}: {
+  crumb: string;
+  title: string;
+  onBack: () => void;
+  formId: string;
+  saveLabel: string;
+}) {
+  return (
+    <div className="bg-black text-white px-5 sm:px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex items-center gap-4 min-w-0">
+        <button
+          type="button"
+          onClick={onBack}
+          className="w-9 h-9 border border-white/30 hover:border-white flex items-center justify-center cursor-pointer transition-colors shrink-0"
+          title="Back to list"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </button>
+        <div className="min-w-0">
+          <span className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#ffed00] block">{crumb}</span>
+          <h3 className="font-display font-bold text-lg leading-tight truncate">{title}</h3>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 shrink-0">
+        <button
+          type="button"
+          onClick={onBack}
+          className="py-2.5 px-4 border border-white/30 hover:border-white text-white text-xs font-bold cursor-pointer transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          form={formId}
+          className="py-2.5 px-6 bg-[#ffed00] hover:bg-[#e6d200] text-black text-xs font-bold cursor-pointer transition-colors"
+        >
+          {saveLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const BLANK_ORGANIZER_FORM = {
   companyName: '',
@@ -131,12 +214,14 @@ export default function AdminHub() {
   const [isEventFormOpen, setIsEventFormOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [eventForm, setEventForm] = useState(BLANK_EVENT_FORM);
+  const [lineupArtistPick, setLineupArtistPick] = useState('');
 
   // Artist create/edit form state
   const [isArtistFormOpen, setIsArtistFormOpen] = useState(false);
   const [editingArtistId, setEditingArtistId] = useState<string | null>(null);
   const [artistForm, setArtistForm] = useState(BLANK_ARTIST_FORM);
   const [genreInput, setGenreInput] = useState('');
+  const [importingRoster, setImportingRoster] = useState(false);
 
   // Organizer create/edit form state
   const [isOrganizerFormOpen, setIsOrganizerFormOpen] = useState(false);
@@ -243,6 +328,26 @@ export default function AdminHub() {
 
   const removeListRow = (key: 'agenda' | 'lineup' | 'faqs', idx: number) => {
     setEventForm((f) => ({ ...f, [key]: (f[key] as any[]).filter((_, i) => i !== idx) }) as typeof f);
+  };
+
+  // Pull an existing artist profile straight into the event lineup
+  const addArtistToLineup = () => {
+    const artist = artists.find((a) => a.id === lineupArtistPick);
+    setLineupArtistPick('');
+    if (!artist) return;
+    if (eventForm.lineup.some((l) => l.name.trim().toLowerCase() === artist.stageName.trim().toLowerCase())) return;
+    setEventForm((f) => ({
+      ...f,
+      lineup: [
+        ...f.lineup,
+        {
+          name: artist.stageName,
+          role: artist.subCategory || artist.category || 'Performer',
+          avatar: artist.profileImage || '',
+          bio: (artist.bio || '').split('\n')[0].slice(0, 140),
+        },
+      ],
+    }));
   };
 
   const handleSubmitEventForm = async (e: React.FormEvent) => {
@@ -562,6 +667,41 @@ export default function AdminHub() {
     }
   };
 
+  // One-click import of the researched starter roster (skips existing names)
+  const handleImportRoster = async () => {
+    if (!window.confirm(`Import the starter roster (${SEED_ARTISTS.length} artists)? Artists whose stage name already exists are skipped.`)) {
+      return;
+    }
+    setImportingRoster(true);
+    setErrorMessage('');
+    const existingNames = new Set(artists.map((a) => (a.stageName || '').trim().toLowerCase()));
+    let added = 0;
+    let skipped = 0;
+    let failed = 0;
+    for (const seed of SEED_ARTISTS) {
+      if (existingNames.has(seed.stageName.trim().toLowerCase())) {
+        skipped++;
+        continue;
+      }
+      try {
+        await createArtistProfile({
+          ...seed,
+          userId: auth.currentUser?.uid || '',
+        });
+        added++;
+      } catch (err) {
+        console.error(`Failed to import ${seed.stageName}:`, err);
+        failed++;
+      }
+    }
+    setImportingRoster(false);
+    if (failed > 0) {
+      setErrorMessage(`${failed} artist(s) failed to import — check Firestore rules and try again.`);
+    }
+    flashSuccess(`Roster import finished: ${added} added, ${skipped} already existed.`);
+    loadData();
+  };
+
   const handleDeleteArtist = async (artistId: string) => {
     if (!window.confirm('Delete this artist? This action cannot be undone.')) {
       return;
@@ -650,7 +790,7 @@ export default function AdminHub() {
 
       {loading ? (
         <div className="py-24 text-center">
-          <Loader2 className="w-8 h-8 text-[#E34718] animate-spin mx-auto mb-3" />
+          <Loader2 className="w-8 h-8 text-black animate-spin mx-auto mb-3" />
           <p className="text-xs text-neutral-450 text-sentence tracking-widest font-bold">Loading dashboard data...</p>
         </div>
       ) : (
@@ -761,7 +901,7 @@ export default function AdminHub() {
                   placeholder="Search by name, email, or role..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-white    focus:ring-1 focus:ring-[#E34718]/35 text-xs font-semibold py-3 pl-11 pr-4 rounded-xl shadow-3xs outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                  className="w-full bg-white border border-[#e4e4e4] focus:border-black text-xs font-semibold py-3 pl-11 pr-4 outline-none transition-colors"
                 />
               </div>
 
@@ -790,7 +930,7 @@ export default function AdminHub() {
                             <select 
                               value={usr.role}
                               onChange={(e) => handleRoleChange(usr.uid, e.target.value, usr.status)}
-                              className="bg-neutral-50   text-neutral-800 font-bold px-2 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#E34718] text-sentence text-[10px]"
+                              className="bg-[#f7f7f7] text-neutral-800 font-bold px-2 py-1.5 border border-transparent focus:border-black focus:outline-none text-sentence text-[10px]"
                             >
                               <option value="user">User</option>
                               <option value="organizer">Organizer</option>
@@ -924,7 +1064,7 @@ export default function AdminHub() {
                 <div className="flex justify-end">
                   <button
                     onClick={handleOpenCreateOrganizer}
-                    className="flex items-center gap-1.5 py-2.5 px-5 bg-[#E34718] hover:bg-[#C23A12] text-white text-xs font-bold text-sentence tracking-wider rounded-full shadow-md cursor-pointer transition-transform active:scale-97"
+                    className="flex items-center gap-1.5 py-2.5 px-5 bg-[#ffed00] hover:bg-[#e6d200] text-black text-xs font-bold cursor-pointer transition-colors"
                   >
                     <PlusCircle className="w-4 h-4" />
                     <span>Add Organiser</span>
@@ -933,23 +1073,23 @@ export default function AdminHub() {
               )}
 
               {isOrganizerFormOpen ? (
-                <div className="bg-white   rounded-2xl p-6 sm:p-8 shadow-3xs text-left max-w-2xl">
-                  <div className="flex items-center gap-2   pb-3.5 mb-6">
-                    <button onClick={() => setIsOrganizerFormOpen(false)} className="text-neutral-500 hover:text-black hover:underline cursor-pointer">
-                      <ArrowLeft className="w-4 h-4 inline mr-1" /> Back
-                    </button>
-                    <h3 className="font-display font-medium text-lg text-neutral-900 text-sentence ml-2">
-                      {editingOrganizerId ? 'Edit Organiser' : 'Add New Organiser'}
-                    </h3>
-                  </div>
+                <div className="space-y-6 text-left">
+                  <EditorHeader
+                    crumb={editingOrganizerId ? 'Organisers · Edit profile' : 'Organisers · Add new'}
+                    title={organizerForm.companyName || 'New organiser'}
+                    onBack={() => setIsOrganizerFormOpen(false)}
+                    formId="admin-organizer-form"
+                    saveLabel={editingOrganizerId ? 'Save changes' : 'Create organiser'}
+                  />
 
-                  <form onSubmit={handleSubmitOrganizerForm} className="space-y-4 text-xs font-bold text-neutral-800">
+                  <form id="admin-organizer-form" onSubmit={handleSubmitOrganizerForm} className="text-xs font-bold text-neutral-800">
+                    <EditorPanel title="Organiser profile" sub="Contact details and branding shown on the organiser page.">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <label className="text-neutral-500 text-sentence tracking-wider block">Organiser / Company Name</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                           value={organizerForm.companyName}
                           onChange={(e) => setOrganizerForm({ ...organizerForm, companyName: e.target.value })}
                           placeholder="e.g. Jazba Entertainment"
@@ -959,7 +1099,7 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Location</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                           value={organizerForm.location}
                           onChange={(e) => setOrganizerForm({ ...organizerForm, location: e.target.value })}
                           placeholder="e.g. Birmingham, UK"
@@ -972,7 +1112,7 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Contact Email</label>
                         <input
                           type="email"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                           value={organizerForm.email}
                           onChange={(e) => setOrganizerForm({ ...organizerForm, email: e.target.value })}
                           placeholder="bookings@company.com"
@@ -982,7 +1122,7 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Phone</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                           value={organizerForm.phone}
                           onChange={(e) => setOrganizerForm({ ...organizerForm, phone: e.target.value })}
                           placeholder="0333 5777 014"
@@ -995,7 +1135,7 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Logo Image URL</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  font-mono"
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors  font-mono"
                           value={organizerForm.logoUrl}
                           onChange={(e) => setOrganizerForm({ ...organizerForm, logoUrl: e.target.value })}
                           placeholder="https://…"
@@ -1005,7 +1145,7 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Banner Image URL</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  font-mono"
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors  font-mono"
                           value={organizerForm.bannerUrl}
                           onChange={(e) => setOrganizerForm({ ...organizerForm, bannerUrl: e.target.value })}
                           placeholder="https://…"
@@ -1016,7 +1156,7 @@ export default function AdminHub() {
                     <div className="space-y-1.5">
                       <label className="text-neutral-500 text-sentence tracking-wider block">Description / About</label>
                       <textarea
-                        className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  h-24"
+                        className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors  h-24"
                         value={organizerForm.description}
                         onChange={(e) => setOrganizerForm({ ...organizerForm, description: e.target.value })}
                         placeholder="Who they are and the kind of events they run. Leave empty to hide the About section."
@@ -1028,7 +1168,7 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Website</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  font-mono"
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors  font-mono"
                           value={organizerForm.website}
                           onChange={(e) => setOrganizerForm({ ...organizerForm, website: e.target.value })}
                           placeholder="https://company.com"
@@ -1038,7 +1178,7 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Specialties (comma separated)</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                           value={organizerForm.specialtiesText}
                           onChange={(e) => setOrganizerForm({ ...organizerForm, specialtiesText: e.target.value })}
                           placeholder="e.g. Live music, Festivals, Theatre"
@@ -1057,21 +1197,7 @@ export default function AdminHub() {
                       </label>
                     </div>
 
-                    <div className="pt-4   flex items-center justify-end gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setIsOrganizerFormOpen(false)}
-                        className="py-2.5 px-4 bg-white   hover:bg-neutral-55 text-neutral-800 text-xs font-bold text-sentence tracking-wider rounded-full transition-transform active:scale-97 cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="py-2.5 px-5 bg-neutral-900   hover:bg-neutral-800 text-white text-xs font-bold text-sentence tracking-wider rounded-full transition-transform active:scale-97 cursor-pointer shadow-md"
-                      >
-                        Save Organiser
-                      </button>
-                    </div>
+                    </EditorPanel>
                   </form>
                 </div>
               ) : (
@@ -1246,7 +1372,7 @@ export default function AdminHub() {
                 <div className="flex justify-end">
                   <button
                     onClick={handleOpenCreateEvent}
-                    className="flex items-center gap-1.5 py-2.5 px-5 bg-[#E34718] hover:bg-[#C23A12] text-white text-xs font-bold text-sentence tracking-wider rounded-full shadow-md cursor-pointer transition-transform active:scale-97"
+                    className="flex items-center gap-1.5 py-2.5 px-5 bg-[#ffed00] hover:bg-[#e6d200] text-black text-xs font-bold cursor-pointer transition-colors"
                   >
                     <PlusCircle className="w-4 h-4" />
                     <span>Create Event</span>
@@ -1255,23 +1381,25 @@ export default function AdminHub() {
               )}
 
               {isEventFormOpen ? (
-                <div className="bg-white   rounded-2xl p-6 sm:p-8 shadow-3xs text-left max-w-2xl">
-                  <div className="flex items-center gap-2   pb-3.5 mb-6">
-                    <button onClick={() => setIsEventFormOpen(false)} className="text-neutral-500 hover:text-black hover:underline cursor-pointer">
-                      <ArrowLeft className="w-4 h-4 inline mr-1" /> Back
-                    </button>
-                    <h3 className="font-display font-medium text-lg text-neutral-900 text-sentence ml-2">
-                      {editingEventId ? 'Edit Event' : 'Create New Event'}
-                    </h3>
-                  </div>
+                <div className="space-y-6 text-left">
+                  <EditorHeader
+                    crumb={editingEventId ? 'Events · Edit event' : 'Events · Create new'}
+                    title={eventForm.title || 'Untitled event'}
+                    onBack={() => setIsEventFormOpen(false)}
+                    formId="admin-event-form"
+                    saveLabel={editingEventId ? 'Save changes' : 'Create event'}
+                  />
 
-                  <form onSubmit={handleSubmitEventForm} className="space-y-4 text-xs font-bold text-neutral-800">
+                  <form id="admin-event-form" onSubmit={handleSubmitEventForm} className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start text-xs font-bold text-neutral-800">
+                    {/* ── MAIN COLUMN — event content ─────────────────── */}
+                    <div className="lg:col-span-2 space-y-6">
+                      <EditorPanel title="Event details" sub="The core listing — shown on event cards and the event page hero.">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <label className="text-neutral-500 text-sentence tracking-wider block">Event Title</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                           value={eventForm.title}
                           onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
                           placeholder="e.g. Symphony of the Opera"
@@ -1281,7 +1409,7 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Venue Name</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                           value={eventForm.venue}
                           onChange={(e) => setEventForm({ ...eventForm, venue: e.target.value })}
                           placeholder="e.g. Royal Albert Hall"
@@ -1293,7 +1421,7 @@ export default function AdminHub() {
                       <label className="text-neutral-500 text-sentence tracking-wider block">Cover Banner Image URL</label>
                       <input
                         type="text"
-                        className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  font-mono"
+                        className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors  font-mono"
                         value={eventForm.bannerImage}
                         onChange={(e) => setEventForm({ ...eventForm, bannerImage: e.target.value })}
                       />
@@ -1304,7 +1432,7 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">City</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                           value={eventForm.city}
                           onChange={(e) => setEventForm({ ...eventForm, city: e.target.value })}
                         />
@@ -1313,7 +1441,7 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Date</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                           value={eventForm.date}
                           onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })}
                           placeholder="e.g. 18 Jul"
@@ -1323,54 +1451,17 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Capacity (Seats)</label>
                         <input
                           type="number"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                           value={eventForm.capacity}
                           onChange={(e) => setEventForm({ ...eventForm, capacity: Number(e.target.value) })}
                         />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-neutral-500 text-sentence tracking-wider block">Category</label>
-                        <select
-                          value={eventForm.category}
-                          onChange={(e) => setEventForm({ ...eventForm, category: e.target.value })}
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  text-sentence"
-                        >
-                          {categories.filter(c => c.id !== 'all').map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-neutral-500 text-sentence tracking-wider block">General Price (USD)</label>
-                        <input
-                          type="number"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
-                          value={eventForm.price}
-                          onChange={(e) => setEventForm({ ...eventForm, price: Number(e.target.value) })}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-neutral-500 text-sentence tracking-wider block">Homepage Section</label>
-                        <select
-                          value={eventForm.type}
-                          onChange={(e: any) => setEventForm({ ...eventForm, type: e.target.value })}
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  text-sentence"
-                        >
-                          <option value="top">Top Events</option>
-                          <option value="for-you">Curated For You</option>
-                          <option value="near-by">Near By Your City</option>
-                          <option value="upcoming">Upcoming Shows</option>
-                        </select>
-                      </div>
-                    </div>
-
                     <div className="space-y-1.5">
                       <label className="text-neutral-500 text-sentence tracking-wider block">Description</label>
                       <textarea
-                        className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  h-24"
+                        className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors  h-24"
                         value={eventForm.description}
                         onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })}
                       />
@@ -1381,98 +1472,59 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Start Time</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                           value={eventForm.startTime}
                           onChange={(e) => setEventForm({ ...eventForm, startTime: e.target.value })}
+                          placeholder="e.g. 19:30"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-neutral-500 text-sentence tracking-wider block">Publication Status</label>
-                        <select
-                          value={eventForm.status}
-                          onChange={(e: any) => setEventForm({ ...eventForm, status: e.target.value })}
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  text-sentence"
-                        >
-                          <option value="draft">Draft (hidden from public)</option>
-                          <option value="published">Published (live on site)</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* ══════════ EVENT PAGE CONTENT ══════════
-                        Every block below is optional — anything left empty
-                        simply doesn't appear on the public event page. */}
-
-                    {/* Ticket packages */}
-                    <div className="pt-5 border-t border-neutral-100">
-                      <h4 className="font-display font-bold text-sm text-neutral-900">Ticket packages</h4>
-                      <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">General uses the price above. Leave VIP / Elite empty to hide that package on the event page and checkout.</p>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-neutral-500 text-sentence tracking-wider block">VIP Price (USD) — optional</label>
-                        <input
-                          type="number"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
-                          value={eventForm.priceVip}
-                          onChange={(e) => setEventForm({ ...eventForm, priceVip: e.target.value })}
-                          placeholder="Leave empty to hide VIP"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-neutral-500 text-sentence tracking-wider block">Elite Price (USD) — optional</label>
-                        <input
-                          type="number"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
-                          value={eventForm.priceElite}
-                          onChange={(e) => setEventForm({ ...eventForm, priceElite: e.target.value })}
-                          placeholder="Leave empty to hide Elite"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Highlights */}
-                    <div className="pt-5 border-t border-neutral-100">
-                      <h4 className="font-display font-bold text-sm text-neutral-900">Event highlights</h4>
-                      <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">Shown as ticks under the description — one per line. Leave empty to hide.</p>
-                    </div>
-                    <textarea
-                      className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  h-20"
-                      value={eventForm.highlightsText}
-                      onChange={(e) => setEventForm({ ...eventForm, highlightsText: e.target.value })}
-                      placeholder={'Two full 45-minute acts\nFull stage and light production'}
-                    />
-
-                    {/* Running order */}
-                    <div className="pt-5 border-t border-neutral-100 flex items-center justify-between">
-                      <div>
-                        <h4 className="font-display font-bold text-sm text-neutral-900">Running order</h4>
-                        <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">The schedule accordion. No entries = section hidden.</p>
-                      </div>
-                      <button type="button" onClick={() => addListRow('agenda')} className="flex items-center gap-1 py-1.5 px-3 bg-neutral-900 text-white text-[10px] font-bold rounded-full cursor-pointer hover:bg-neutral-800">
-                        <PlusCircle className="w-3.5 h-3.5" /> Add entry
-                      </button>
-                    </div>
-                    {eventForm.agenda.map((row, idx) => (
-                      <div key={idx} className="grid grid-cols-12 gap-2 items-start bg-neutral-50/60 p-2.5 rounded-lg">
+                        <label className="text-neutral-500 text-sentence tracking-wider block">End Time</label>
                         <input
                           type="text"
-                          className="col-span-3 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
+                          value={eventForm.endTime}
+                          onChange={(e) => setEventForm({ ...eventForm, endTime: e.target.value })}
+                          placeholder="e.g. 22:30"
+                        />
+                      </div>
+                    </div>
+                      </EditorPanel>
+
+                      {/* Everything below is optional — empty content keeps
+                          its section hidden on the public event page. */}
+
+                      <EditorPanel
+                        title="Running order"
+                        sub="The schedule accordion on the event page. No entries = section hidden."
+                        action={(
+                          <button type="button" onClick={() => addListRow('agenda')} className={addRowBtnCls}>
+                            <PlusCircle className="w-3.5 h-3.5" /> Add entry
+                          </button>
+                        )}
+                      >
+                        {eventForm.agenda.length === 0 && (
+                          <p className="text-[11px] text-[#8a8a8a] font-medium">No entries yet — this section stays hidden on the event page.</p>
+                        )}
+                    {eventForm.agenda.map((row, idx) => (
+                      <div key={idx} className="grid grid-cols-12 gap-2 items-start bg-[#f7f7f7] p-2.5 border border-[#e4e4e4]">
+                        <input
+                          type="text"
+                          className="col-span-3 bg-white p-2 outline-none border border-[#e4e4e4] focus:border-black transition-colors"
                           value={row.time}
                           onChange={(e) => updateListRow('agenda', idx, 'time', e.target.value)}
                           placeholder="7:30 PM"
                         />
                         <input
                           type="text"
-                          className="col-span-4 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                          className="col-span-4 bg-white p-2 outline-none border border-[#e4e4e4] focus:border-black transition-colors"
                           value={row.title}
                           onChange={(e) => updateListRow('agenda', idx, 'title', e.target.value)}
                           placeholder="Act one"
                         />
                         <input
                           type="text"
-                          className="col-span-4 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                          className="col-span-4 bg-white p-2 outline-none border border-[#e4e4e4] focus:border-black transition-colors"
                           value={row.desc}
                           onChange={(e) => updateListRow('agenda', idx, 'desc', e.target.value)}
                           placeholder="What happens in this slot"
@@ -1483,36 +1535,67 @@ export default function AdminHub() {
                       </div>
                     ))}
 
-                    {/* Performers */}
-                    <div className="pt-5 border-t border-neutral-100 flex items-center justify-between">
-                      <div>
-                        <h4 className="font-display font-bold text-sm text-neutral-900">Performers (on stage)</h4>
-                        <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">The lineup cards. No performers = section hidden.</p>
-                      </div>
-                      <button type="button" onClick={() => addListRow('lineup')} className="flex items-center gap-1 py-1.5 px-3 bg-neutral-900 text-white text-[10px] font-bold rounded-full cursor-pointer hover:bg-neutral-800">
-                        <PlusCircle className="w-3.5 h-3.5" /> Add performer
-                      </button>
-                    </div>
+                      </EditorPanel>
+
+                      <EditorPanel
+                        title="Performers on stage"
+                        sub="Pick artists already added to the site, or add one manually. No performers = section hidden."
+                        action={(
+                          <button type="button" onClick={() => addListRow('lineup')} className={addRowBtnCls}>
+                            <PlusCircle className="w-3.5 h-3.5" /> Add manually
+                          </button>
+                        )}
+                      >
+                        {/* Choose from the existing artist roster */}
+                        {artists.length > 0 ? (
+                          <div className="flex flex-col sm:flex-row gap-2 bg-[#f7f7f7] p-3 border border-[#e4e4e4]">
+                            <select
+                              value={lineupArtistPick}
+                              onChange={(e) => setLineupArtistPick(e.target.value)}
+                              className="flex-1 bg-white px-3 py-2.5 text-sm font-medium text-black outline-none border border-[#e4e4e4] focus:border-black transition-colors"
+                            >
+                              <option value="">Choose from your artists…</option>
+                              {artists.map((a) => (
+                                <option key={a.id} value={a.id}>
+                                  {a.stageName}{a.subCategory ? ` — ${a.subCategory}` : ''}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={addArtistToLineup}
+                              disabled={!lineupArtistPick}
+                              className="py-2.5 px-5 bg-[#ffed00] hover:bg-[#e6d200] disabled:opacity-40 text-black text-xs font-bold cursor-pointer transition-colors shrink-0"
+                            >
+                              <PlusCircle className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
+                              Add to lineup
+                            </button>
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-[#8a8a8a] font-medium">
+                            No artists on the site yet — create one under the Artists tab and you'll be able to pick them here.
+                          </p>
+                        )}
                     {eventForm.lineup.map((row, idx) => (
-                      <div key={idx} className="space-y-2 bg-neutral-50/60 p-2.5 rounded-lg">
+                      <div key={idx} className="space-y-2 bg-[#f7f7f7] p-2.5 border border-[#e4e4e4]">
                         <div className="grid grid-cols-12 gap-2">
                           <input
                             type="text"
-                            className="col-span-4 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                            className="col-span-4 bg-white p-2 outline-none border border-[#e4e4e4] focus:border-black transition-colors"
                             value={row.name}
                             onChange={(e) => updateListRow('lineup', idx, 'name', e.target.value)}
                             placeholder="Performer name"
                           />
                           <input
                             type="text"
-                            className="col-span-3 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                            className="col-span-3 bg-white p-2 outline-none border border-[#e4e4e4] focus:border-black transition-colors"
                             value={row.role}
                             onChange={(e) => updateListRow('lineup', idx, 'role', e.target.value)}
                             placeholder="Role (e.g. Lead vocalist)"
                           />
                           <input
                             type="text"
-                            className="col-span-4 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 font-mono"
+                            className="col-span-4 bg-white p-2 outline-none border border-[#e4e4e4] focus:border-black transition-colors font-mono"
                             value={row.avatar}
                             onChange={(e) => updateListRow('lineup', idx, 'avatar', e.target.value)}
                             placeholder="Photo URL (optional)"
@@ -1523,7 +1606,7 @@ export default function AdminHub() {
                         </div>
                         <input
                           type="text"
-                          className="w-full bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                          className="w-full bg-white p-2 outline-none border border-[#e4e4e4] focus:border-black transition-colors"
                           value={row.bio}
                           onChange={(e) => updateListRow('lineup', idx, 'bio', e.target.value)}
                           placeholder="Short bio line"
@@ -1531,17 +1614,15 @@ export default function AdminHub() {
                       </div>
                     ))}
 
-                    {/* Organizer */}
-                    <div className="pt-5 border-t border-neutral-100">
-                      <h4 className="font-display font-bold text-sm text-neutral-900">Event organiser (presented by)</h4>
-                      <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">Leave the name empty to hide the "Presented by" card.</p>
-                    </div>
+                      </EditorPanel>
+
+                      <EditorPanel title="Event organiser (presented by)" sub='Leave the name empty to hide the "Presented by" card.'>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <label className="text-neutral-500 text-sentence tracking-wider block">Organiser Name</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                           value={eventForm.organizerName}
                           onChange={(e) => setEventForm({ ...eventForm, organizerName: e.target.value })}
                           placeholder="e.g. Jazba Entertainment"
@@ -1551,7 +1632,7 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Organiser Logo / Image URL</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  font-mono"
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors  font-mono"
                           value={eventForm.organizerImage}
                           onChange={(e) => setEventForm({ ...eventForm, organizerImage: e.target.value })}
                           placeholder="https://…"
@@ -1561,23 +1642,21 @@ export default function AdminHub() {
                     <div className="space-y-1.5">
                       <label className="text-neutral-500 text-sentence tracking-wider block">Organiser Bio</label>
                       <textarea
-                        className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  h-16"
+                        className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors  h-16"
                         value={eventForm.organizerBio}
                         onChange={(e) => setEventForm({ ...eventForm, organizerBio: e.target.value })}
                         placeholder="A line or two about the organiser"
                       />
                     </div>
 
-                    {/* Getting there */}
-                    <div className="pt-5 border-t border-neutral-100">
-                      <h4 className="font-display font-bold text-sm text-neutral-900">Getting there (live map & directions)</h4>
-                      <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">Paste a Google Maps embed URL or just type the venue address — the live map renders automatically. All empty = section hidden.</p>
-                    </div>
+                      </EditorPanel>
+
+                      <EditorPanel title="Getting there (live map & directions)" sub="Paste any Google Maps link or just type the venue address — the live map renders automatically. All empty = section hidden.">
                     <div className="space-y-1.5">
                       <label className="text-neutral-500 text-sentence tracking-wider block">Google Maps URL or Venue Address</label>
                       <input
                         type="text"
-                        className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  font-mono"
+                        className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors  font-mono"
                         value={eventForm.mapUrl}
                         onChange={(e) => setEventForm({ ...eventForm, mapUrl: e.target.value })}
                         placeholder="e.g. Utilita Arena Birmingham  —  or  https://www.google.com/maps/embed?pb=…"
@@ -1587,7 +1666,7 @@ export default function AdminHub() {
                       <div className="space-y-1.5">
                         <label className="text-neutral-500 text-sentence tracking-wider block">By Public Transport (one line each)</label>
                         <textarea
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  h-20"
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors  h-20"
                           value={eventForm.transportText}
                           onChange={(e) => setEventForm({ ...eventForm, transportText: e.target.value })}
                           placeholder={'Underground: Westminster — 4-minute walk\nBus: Routes 24 & 88 stop at the gates'}
@@ -1596,7 +1675,7 @@ export default function AdminHub() {
                       <div className="space-y-1.5">
                         <label className="text-neutral-500 text-sentence tracking-wider block">By Car (one line each)</label>
                         <textarea
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  h-20"
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors  h-20"
                           value={eventForm.parkingText}
                           onChange={(e) => setEventForm({ ...eventForm, parkingText: e.target.value })}
                           placeholder={'Parking: On-site Deck G — pre-book\nDrop-off: Lay-by at the main entrance'}
@@ -1604,40 +1683,42 @@ export default function AdminHub() {
                       </div>
                     </div>
 
-                    {/* Gallery */}
-                    <div className="pt-5 border-t border-neutral-100">
-                      <h4 className="font-display font-bold text-sm text-neutral-900">From past shows (photo gallery)</h4>
-                      <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">One image URL per line. Leave empty to hide the gallery.</p>
-                    </div>
+                      </EditorPanel>
+
+                      <EditorPanel title="From past shows (photo gallery)" sub="One image URL per line. Leave empty to hide the gallery.">
                     <textarea
-                      className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  h-20 font-mono"
+                      className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors  h-20 font-mono"
                       value={eventForm.galleryText}
                       onChange={(e) => setEventForm({ ...eventForm, galleryText: e.target.value })}
                       placeholder={'https://…/photo-1.jpg\nhttps://…/photo-2.jpg'}
                     />
 
-                    {/* FAQs */}
-                    <div className="pt-5 border-t border-neutral-100 flex items-center justify-between">
-                      <div>
-                        <h4 className="font-display font-bold text-sm text-neutral-900">FAQs (good to know)</h4>
-                        <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">No questions = section hidden.</p>
-                      </div>
-                      <button type="button" onClick={() => addListRow('faqs')} className="flex items-center gap-1 py-1.5 px-3 bg-neutral-900 text-white text-[10px] font-bold rounded-full cursor-pointer hover:bg-neutral-800">
-                        <PlusCircle className="w-3.5 h-3.5" /> Add FAQ
-                      </button>
-                    </div>
+                      </EditorPanel>
+
+                      <EditorPanel
+                        title="FAQs (good to know)"
+                        sub="No questions = section hidden."
+                        action={(
+                          <button type="button" onClick={() => addListRow('faqs')} className={addRowBtnCls}>
+                            <PlusCircle className="w-3.5 h-3.5" /> Add FAQ
+                          </button>
+                        )}
+                      >
+                        {eventForm.faqs.length === 0 && (
+                          <p className="text-[11px] text-[#8a8a8a] font-medium">No questions yet — this section stays hidden on the event page.</p>
+                        )}
                     {eventForm.faqs.map((row, idx) => (
-                      <div key={idx} className="grid grid-cols-12 gap-2 items-start bg-neutral-50/60 p-2.5 rounded-lg">
+                      <div key={idx} className="grid grid-cols-12 gap-2 items-start bg-[#f7f7f7] p-2.5 border border-[#e4e4e4]">
                         <input
                           type="text"
-                          className="col-span-5 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                          className="col-span-5 bg-white p-2 outline-none border border-[#e4e4e4] focus:border-black transition-colors"
                           value={row.question}
                           onChange={(e) => updateListRow('faqs', idx, 'question', e.target.value)}
                           placeholder="Question"
                         />
                         <input
                           type="text"
-                          className="col-span-6 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                          className="col-span-6 bg-white p-2 outline-none border border-[#e4e4e4] focus:border-black transition-colors"
                           value={row.answer}
                           onChange={(e) => updateListRow('faqs', idx, 'answer', e.target.value)}
                           placeholder="Answer"
@@ -1648,19 +1729,99 @@ export default function AdminHub() {
                       </div>
                     ))}
 
-                    <div className="pt-4   flex items-center justify-end gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setIsEventFormOpen(false)}
-                        className="py-2.5 px-4 bg-white   hover:bg-neutral-55 text-neutral-800 text-xs font-bold text-sentence tracking-wider rounded-full transition-transform active:scale-97 cursor-pointer"
-                      >
-                        Cancel
-                      </button>
+                      </EditorPanel>
+                    </div>
+
+                    {/* ── SIDE RAIL — publishing & pricing ─────────────── */}
+                    <div className="space-y-6">
+                      <EditorPanel title="Publishing" sub="Where and whether this event appears on the site.">
+                        <div className="space-y-1.5">
+                          <label className={labelCls}>Publication Status</label>
+                          <select
+                            value={eventForm.status}
+                            onChange={(e: any) => setEventForm({ ...eventForm, status: e.target.value })}
+                            className={inputCls}
+                          >
+                            <option value="draft">Draft (hidden from public)</option>
+                            <option value="published">Published (live on site)</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className={labelCls}>Homepage Section</label>
+                          <select
+                            value={eventForm.type}
+                            onChange={(e: any) => setEventForm({ ...eventForm, type: e.target.value })}
+                            className={inputCls}
+                          >
+                            <option value="top">Top Events</option>
+                            <option value="for-you">Tonight's Best Offers (yellow band)</option>
+                            <option value="near-by">Events Near You</option>
+                            <option value="upcoming">Upcoming Shows</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className={labelCls}>Category</label>
+                          <select
+                            value={eventForm.category}
+                            onChange={(e) => setEventForm({ ...eventForm, category: e.target.value })}
+                            className={inputCls}
+                          >
+                            {categories.filter(c => c.id !== 'all').map(c => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </EditorPanel>
+
+                      <EditorPanel title="Ticket packages" sub="Leave VIP / Elite empty to hide that package on the event page and checkout.">
+                        <div className="space-y-1.5">
+                          <label className={labelCls}>General Price (USD)</label>
+                          <input
+                            type="number"
+                            className={inputCls}
+                            value={eventForm.price}
+                            onChange={(e) => setEventForm({ ...eventForm, price: Number(e.target.value) })}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <label className={labelCls}>VIP (USD)</label>
+                            <input
+                              type="number"
+                              className={inputCls}
+                              value={eventForm.priceVip}
+                              onChange={(e) => setEventForm({ ...eventForm, priceVip: e.target.value })}
+                              placeholder="Optional"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className={labelCls}>Elite (USD)</label>
+                            <input
+                              type="number"
+                              className={inputCls}
+                              value={eventForm.priceElite}
+                              onChange={(e) => setEventForm({ ...eventForm, priceElite: e.target.value })}
+                              placeholder="Optional"
+                            />
+                          </div>
+                        </div>
+                      </EditorPanel>
+
+                      <EditorPanel title="Event highlights" sub="Shown as ticks under the description — one per line. Leave empty to hide.">
+                        <textarea
+                          className={`${inputCls} h-24`}
+                          value={eventForm.highlightsText}
+                          onChange={(e) => setEventForm({ ...eventForm, highlightsText: e.target.value })}
+                          placeholder={'Two full 45-minute acts\nFull stage and light production'}
+                        />
+                      </EditorPanel>
+
                       <button
                         type="submit"
-                        className="py-2.5 px-5 bg-neutral-900   hover:bg-neutral-800 text-white text-xs font-bold text-sentence tracking-wider rounded-full transition-transform active:scale-97 cursor-pointer shadow-md"
+                        className="w-full py-3.5 bg-[#ffed00] hover:bg-[#e6d200] text-black text-sm font-bold cursor-pointer transition-colors"
                       >
-                        Save Event
+                        {editingEventId ? 'Save changes' : 'Create event'}
                       </button>
                     </div>
                   </form>
@@ -1730,10 +1891,19 @@ export default function AdminHub() {
           {activeSubTab === 'artists' && (
             <div className="space-y-4">
               {!isArtistFormOpen && (
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={handleImportRoster}
+                    disabled={importingRoster}
+                    className="flex items-center gap-1.5 py-2.5 px-5 bg-black hover:bg-neutral-800 disabled:opacity-50 text-white text-xs font-bold cursor-pointer transition-colors"
+                    title="Adds a researched starter roster of 11 South Asian artists with bios, photos and Spotify links"
+                  >
+                    {importingRoster ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+                    <span>{importingRoster ? 'Importing…' : `Import roster (${SEED_ARTISTS.length})`}</span>
+                  </button>
                   <button
                     onClick={handleOpenCreateArtist}
-                    className="flex items-center gap-1.5 py-2.5 px-5 bg-[#E34718] hover:bg-[#C23A12] text-white text-xs font-bold text-sentence tracking-wider rounded-full shadow-md cursor-pointer transition-transform active:scale-97"
+                    className="flex items-center gap-1.5 py-2.5 px-5 bg-[#ffed00] hover:bg-[#e6d200] text-black text-xs font-bold cursor-pointer transition-colors"
                   >
                     <PlusCircle className="w-4 h-4" />
                     <span>Add Artist</span>
@@ -1742,23 +1912,25 @@ export default function AdminHub() {
               )}
 
               {isArtistFormOpen ? (
-                <div className="bg-white   rounded-2xl p-6 sm:p-8 shadow-3xs text-left max-w-2xl">
-                  <div className="flex items-center gap-2   pb-3.5 mb-6">
-                    <button onClick={() => setIsArtistFormOpen(false)} className="text-neutral-500 hover:text-black hover:underline cursor-pointer">
-                      <ArrowLeft className="w-4 h-4 inline mr-1" /> Back
-                    </button>
-                    <h3 className="font-display font-medium text-lg text-neutral-900 text-sentence ml-2">
-                      {editingArtistId ? 'Edit Artist' : 'Add New Artist'}
-                    </h3>
-                  </div>
+                <div className="space-y-6 text-left">
+                  <EditorHeader
+                    crumb={editingArtistId ? 'Artists · Edit profile' : 'Artists · Add new'}
+                    title={artistForm.stageName || 'New artist'}
+                    onBack={() => setIsArtistFormOpen(false)}
+                    formId="admin-artist-form"
+                    saveLabel={editingArtistId ? 'Save changes' : 'Create artist'}
+                  />
 
-                  <form onSubmit={handleSubmitArtistForm} className="space-y-4 text-xs font-bold text-neutral-800">
+                  <form id="admin-artist-form" onSubmit={handleSubmitArtistForm} className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start text-xs font-bold text-neutral-800">
+                    {/* ── MAIN COLUMN — artist profile ────────────────── */}
+                    <div className="lg:col-span-2 space-y-6">
+                      <EditorPanel title="Artist identity" sub="Name, imagery, genres and story shown on the artist page.">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <label className="text-neutral-500 text-sentence tracking-wider block">Stage Name</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                           value={artistForm.stageName}
                           onChange={(e) => setArtistForm({ ...artistForm, stageName: e.target.value })}
                           placeholder="e.g. DJ Sparkle"
@@ -1768,7 +1940,7 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Sub-category / Title</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                           value={artistForm.subCategory}
                           onChange={(e) => setArtistForm({ ...artistForm, subCategory: e.target.value })}
                           placeholder="e.g. Soprano Vocalist & Opera Lead"
@@ -1781,7 +1953,7 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Profile Image URL</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  font-mono"
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors  font-mono"
                           value={artistForm.profileImage}
                           onChange={(e) => setArtistForm({ ...artistForm, profileImage: e.target.value })}
                         />
@@ -1790,44 +1962,9 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Cover Banner Image URL</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  font-mono"
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors  font-mono"
                           value={artistForm.coverImage}
                           onChange={(e) => setArtistForm({ ...artistForm, coverImage: e.target.value })}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-neutral-500 text-sentence tracking-wider block">Category</label>
-                        <select
-                          value={artistForm.category}
-                          onChange={(e: any) => setArtistForm({ ...artistForm, category: e.target.value })}
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  text-sentence"
-                        >
-                          <option value="music">Music</option>
-                          <option value="theater">Theater</option>
-                          <option value="sports">Sports</option>
-                          <option value="conference">Conference</option>
-                          <option value="exhibition">Exhibition</option>
-                        </select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-neutral-500 text-sentence tracking-wider block">Fee per event (USD)</label>
-                        <input
-                          type="number"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
-                          value={artistForm.hourlyRate}
-                          onChange={(e) => setArtistForm({ ...artistForm, hourlyRate: Number(e.target.value) })}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-neutral-500 text-sentence tracking-wider block">Years of Experience</label>
-                        <input
-                          type="number"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
-                          value={artistForm.experienceYears}
-                          onChange={(e) => setArtistForm({ ...artistForm, experienceYears: Number(e.target.value) })}
                         />
                       </div>
                     </div>
@@ -1836,7 +1973,7 @@ export default function AdminHub() {
                       <label className="text-neutral-500 text-sentence tracking-wider block">Location</label>
                       <input
                         type="text"
-                        className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                        className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                         value={artistForm.location}
                         onChange={(e) => setArtistForm({ ...artistForm, location: e.target.value })}
                         placeholder="e.g. London, UK"
@@ -1848,7 +1985,7 @@ export default function AdminHub() {
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          className="flex-1 bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          className="flex-1 bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                           value={genreInput}
                           onChange={(e) => setGenreInput(e.target.value)}
                           placeholder="e.g. Opera, Vocalist"
@@ -1877,23 +2014,21 @@ export default function AdminHub() {
                     <div className="space-y-1.5">
                       <label className="text-neutral-500 text-sentence tracking-wider block">Biography</label>
                       <textarea
-                        className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50  h-24"
+                        className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors  h-24"
                         value={artistForm.bio}
                         onChange={(e) => setArtistForm({ ...artistForm, bio: e.target.value })}
                       />
                     </div>
 
-                    {/* Profile stats */}
-                    <div className="pt-5 border-t border-neutral-100">
-                      <h4 className="font-display font-bold text-sm text-neutral-900">Profile stats & rating</h4>
-                      <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">Shown on the artist page hero and rating tile. Leave empty to hide each one.</p>
-                    </div>
+                      </EditorPanel>
+
+                      <EditorPanel title="Profile stats & rating" sub="Shown on the artist page hero and rating tile. Leave empty to hide each one.">
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                       <div className="space-y-1.5">
                         <label className="text-neutral-500 text-sentence tracking-wider block">Rating (0–5)</label>
                         <input
                           type="number" step="0.1" min="0" max="5"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                           value={artistForm.rating}
                           onChange={(e) => setArtistForm({ ...artistForm, rating: e.target.value })}
                           placeholder="e.g. 4.8"
@@ -1903,7 +2038,7 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Review Count</label>
                         <input
                           type="number"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                           value={artistForm.totalReviews}
                           onChange={(e) => setArtistForm({ ...artistForm, totalReviews: e.target.value })}
                           placeholder="e.g. 120"
@@ -1913,7 +2048,7 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Events Hosted</label>
                         <input
                           type="number"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                           value={artistForm.eventsHosted}
                           onChange={(e) => setArtistForm({ ...artistForm, eventsHosted: e.target.value })}
                           placeholder="e.g. 42"
@@ -1923,7 +2058,7 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Total Audience</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2.5 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 "
+                          className="w-full bg-[#f7f7f7] p-2.5 outline-none border border-transparent focus:border-black transition-colors "
                           value={artistForm.totalAudience}
                           onChange={(e) => setArtistForm({ ...artistForm, totalAudience: e.target.value })}
                           placeholder="e.g. 12.4k"
@@ -1931,35 +2066,39 @@ export default function AdminHub() {
                       </div>
                     </div>
 
-                    {/* Past shows */}
-                    <div className="pt-5 border-t border-neutral-100 flex items-center justify-between">
-                      <div>
-                        <h4 className="font-display font-bold text-sm text-neutral-900">Past shows</h4>
-                        <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">The "Past shows" tab on the artist page. No entries = tab hidden.</p>
-                      </div>
-                      <button type="button" onClick={addPastShow} className="flex items-center gap-1 py-1.5 px-3 bg-neutral-900 text-white text-[10px] font-bold rounded-full cursor-pointer hover:bg-neutral-800">
-                        <PlusCircle className="w-3.5 h-3.5" /> Add show
-                      </button>
-                    </div>
+                      </EditorPanel>
+
+                      <EditorPanel
+                        title="Past shows"
+                        sub='The "Past shows" tab on the artist page. No entries = tab hidden.'
+                        action={(
+                          <button type="button" onClick={addPastShow} className={addRowBtnCls}>
+                            <PlusCircle className="w-3.5 h-3.5" /> Add show
+                          </button>
+                        )}
+                      >
+                        {artistForm.pastShows.length === 0 && (
+                          <p className="text-[11px] text-[#8a8a8a] font-medium">No shows yet — the tab stays hidden on the artist page.</p>
+                        )}
                     {artistForm.pastShows.map((row, idx) => (
-                      <div key={idx} className="grid grid-cols-12 gap-2 items-start bg-neutral-50/60 p-2.5 rounded-lg">
+                      <div key={idx} className="grid grid-cols-12 gap-2 items-start bg-[#f7f7f7] p-2.5 border border-[#e4e4e4]">
                         <input
                           type="text"
-                          className="col-span-5 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                          className="col-span-5 bg-white p-2 outline-none border border-[#e4e4e4] focus:border-black transition-colors"
                           value={row.title}
                           onChange={(e) => updatePastShow(idx, 'title', e.target.value)}
                           placeholder="Show title"
                         />
                         <input
                           type="text"
-                          className="col-span-3 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                          className="col-span-3 bg-white p-2 outline-none border border-[#e4e4e4] focus:border-black transition-colors"
                           value={row.date}
                           onChange={(e) => updatePastShow(idx, 'date', e.target.value)}
                           placeholder="e.g. May 2026"
                         />
                         <input
                           type="text"
-                          className="col-span-3 bg-white p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50"
+                          className="col-span-3 bg-white p-2 outline-none border border-[#e4e4e4] focus:border-black transition-colors"
                           value={row.venue}
                           onChange={(e) => updatePastShow(idx, 'venue', e.target.value)}
                           placeholder="Venue"
@@ -1970,12 +2109,15 @@ export default function AdminHub() {
                       </div>
                     ))}
 
+                      </EditorPanel>
+
+                      <EditorPanel title="Social links" sub="Optional — shown on the artist page.">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <label className="text-neutral-500 text-sentence tracking-wider block">Website</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 font-mono"
+                          className="w-full bg-[#f7f7f7] p-2 outline-none border border-transparent focus:border-black transition-colors font-mono"
                           value={artistForm.socialWebsite}
                           onChange={(e) => setArtistForm({ ...artistForm, socialWebsite: e.target.value })}
                         />
@@ -1984,7 +2126,7 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Instagram</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 font-mono"
+                          className="w-full bg-[#f7f7f7] p-2 outline-none border border-transparent focus:border-black transition-colors font-mono"
                           value={artistForm.socialInstagram}
                           onChange={(e) => setArtistForm({ ...artistForm, socialInstagram: e.target.value })}
                         />
@@ -1993,7 +2135,7 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">Spotify</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 font-mono"
+                          className="w-full bg-[#f7f7f7] p-2 outline-none border border-transparent focus:border-black transition-colors font-mono"
                           value={artistForm.socialSpotify}
                           onChange={(e) => setArtistForm({ ...artistForm, socialSpotify: e.target.value })}
                         />
@@ -2002,45 +2144,76 @@ export default function AdminHub() {
                         <label className="text-neutral-500 text-sentence tracking-wider block">YouTube</label>
                         <input
                           type="text"
-                          className="w-full bg-neutral-50   p-2 rounded-lg outline-none focus:ring-1 focus:ring-[#E34718]/50 font-mono"
+                          className="w-full bg-[#f7f7f7] p-2 outline-none border border-transparent focus:border-black transition-colors font-mono"
                           value={artistForm.socialYoutube}
                           onChange={(e) => setArtistForm({ ...artistForm, socialYoutube: e.target.value })}
                         />
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-6 pt-2">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={artistForm.availableNow}
-                          onChange={(e) => setArtistForm({ ...artistForm, availableNow: e.target.checked })}
-                        />
-                        <span className="text-neutral-600">Instantly Bookable</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={artistForm.featured}
-                          onChange={(e) => setArtistForm({ ...artistForm, featured: e.target.checked })}
-                        />
-                        <span className="text-neutral-600">Featured / Hot Talent</span>
-                      </label>
+                      </EditorPanel>
                     </div>
 
-                    <div className="pt-4   flex items-center justify-end gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setIsArtistFormOpen(false)}
-                        className="py-2.5 px-4 bg-white   hover:bg-neutral-55 text-neutral-800 text-xs font-bold text-sentence tracking-wider rounded-full transition-transform active:scale-97 cursor-pointer"
-                      >
-                        Cancel
-                      </button>
+                    {/* ── SIDE RAIL — listing settings ─────────────────── */}
+                    <div className="space-y-6">
+                      <EditorPanel title="Listing settings" sub="Category, booking fee and visibility flags.">
+                        <div className="space-y-1.5">
+                          <label className={labelCls}>Category</label>
+                          <select
+                            value={artistForm.category}
+                            onChange={(e: any) => setArtistForm({ ...artistForm, category: e.target.value })}
+                            className={inputCls}
+                          >
+                            <option value="music">Music</option>
+                            <option value="theater">Theater</option>
+                            <option value="sports">Sports</option>
+                            <option value="conference">Conference</option>
+                            <option value="exhibition">Exhibition</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className={labelCls}>Fee per event (USD)</label>
+                          <input
+                            type="number"
+                            className={inputCls}
+                            value={artistForm.hourlyRate}
+                            onChange={(e) => setArtistForm({ ...artistForm, hourlyRate: Number(e.target.value) })}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className={labelCls}>Years of Experience</label>
+                          <input
+                            type="number"
+                            className={inputCls}
+                            value={artistForm.experienceYears}
+                            onChange={(e) => setArtistForm({ ...artistForm, experienceYears: Number(e.target.value) })}
+                          />
+                        </div>
+                        <div className="space-y-3 pt-2 border-t border-[#f2f2f2]">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={artistForm.availableNow}
+                              onChange={(e) => setArtistForm({ ...artistForm, availableNow: e.target.checked })}
+                            />
+                            <span className="text-neutral-600">Instantly Bookable</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={artistForm.featured}
+                              onChange={(e) => setArtistForm({ ...artistForm, featured: e.target.checked })}
+                            />
+                            <span className="text-neutral-600">Featured / Hot Talent</span>
+                          </label>
+                        </div>
+                      </EditorPanel>
+
                       <button
                         type="submit"
-                        className="py-2.5 px-5 bg-neutral-900   hover:bg-neutral-800 text-white text-xs font-bold text-sentence tracking-wider rounded-full transition-transform active:scale-97 cursor-pointer shadow-md"
+                        className="w-full py-3.5 bg-[#ffed00] hover:bg-[#e6d200] text-black text-sm font-bold cursor-pointer transition-colors"
                       >
-                        Save Artist
+                        {editingArtistId ? 'Save changes' : 'Create artist'}
                       </button>
                     </div>
                   </form>

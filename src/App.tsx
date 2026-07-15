@@ -152,6 +152,7 @@ function HomeView({ events }: { events: EventItem[] }) {
       <HeroSection
         onSearch={() => {}}
         onSelectDateFilter={() => {}}
+        onBookArtist={() => navigate('/artists')}
         onSearchSubmit={({ query, venue, ticketClass, dateOffset }) => {
           const p = new URLSearchParams();
           if (query) p.set('q', query);

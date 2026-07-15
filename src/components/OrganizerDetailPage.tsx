@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { shareOrCopy } from '../share';
 import {
   ArrowLeft, Check, Share2, Globe, MapPin, Mail, PhoneCall, Building2, Loader2,
 } from 'lucide-react';
@@ -84,13 +85,18 @@ export default function OrganizerDetailPage({ allEvents, onRequireLogin }: Organ
     }
   };
 
-  const handleShare = () => {
+  const handleShare = async () => {
     try {
-      navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      const result = await shareOrCopy({
+        title: document.title,
+        text: 'Event organiser on Jazbaticket.',
+      });
+      if (result === 'copied') {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
     } catch (err) {
-      console.error('Failed to copy', err);
+      console.error('Failed to share', err);
     }
   };
 

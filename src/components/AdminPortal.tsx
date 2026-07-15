@@ -3,6 +3,7 @@ import { ShieldCheck, Lock, Mail, LogOut, ExternalLink, AlertCircle, Loader2 } f
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, auth, User } from '../firebase';
 import { isUserBootstrappedAdmin, getUserProfile } from '../services/backendService';
 import AdminHub from './AdminHub';
+import brandMark from '../../assets/images/Favicon.png';
 
 type AuthStage = 'checking' | 'signed-out' | 'denied' | 'granted';
 
@@ -76,9 +77,7 @@ export default function AdminPortal() {
       <div className="min-h-screen bg-[#f7f7f7]" id="admin-portal-root">
         <div className="bg-black text-white px-4 sm:px-6 md:px-8 py-4 flex items-center justify-between sticky top-0 z-40 border-b border-white/15">
           <div className="flex items-center gap-3">
-            <span className="w-9 h-9 bg-[#ffed00] flex items-center justify-center">
-              <ShieldCheck className="w-4.5 h-4.5 text-black" />
-            </span>
+            <img src={brandMark} alt="Jazbatickets" className="w-9 h-9 object-contain" />
             <div>
               <span className="font-display font-bold text-sm block leading-none">Jazbatickets Admin Portal</span>
               <span className="text-[10px] text-white/50 block mt-1">Signed in as {adminName}</span>
@@ -112,9 +111,7 @@ export default function AdminPortal() {
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <div className="bg-white p-8 w-full max-w-sm border border-white/20">
         <div className="mb-7 flex flex-col items-center text-center">
-          <div className="w-12 h-12 bg-[#ffed00] flex items-center justify-center mb-4">
-            <ShieldCheck className="w-5 h-5 text-black" />
-          </div>
+          <img src={brandMark} alt="Jazbatickets" className="w-12 h-12 object-contain mb-4" />
           <h1 className="font-display font-bold text-2xl leading-none text-black">Admin Portal</h1>
           <p className="text-xs text-[#8a8a8a] font-medium mt-2">Jazbatickets platform management</p>
         </div>

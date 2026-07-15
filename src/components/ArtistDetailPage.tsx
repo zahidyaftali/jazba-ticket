@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { shareOrCopy } from '../share';
+import { useLocalCurrency } from '../currency';
 import {
   Check,
   X,
@@ -26,6 +28,7 @@ interface ArtistDetailPageProps {
 }
 
 export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShowDetail, onBookEvent, onRequireLogin }: ArtistDetailPageProps) {
+  const { format } = useLocalCurrency();
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followBusy, setFollowBusy] = useState(false);
@@ -104,13 +107,18 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
     return list;
   }, [artist, followerCount]);
 
-  const handleShare = () => {
+  const handleShare = async () => {
     try {
-      navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      const result = await shareOrCopy({
+        title: artist.name,
+        text: `${artist.name} — book this artist on Jazbaticket.`,
+      });
+      if (result === 'copied') {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
     } catch (err) {
-      console.error('Failed to copy', err);
+      console.error('Failed to share', err);
     }
   };
 
@@ -342,7 +350,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                   {/* Fact rows — only facts that were set in the admin */}
                   <div className="border-t border-[#f2f2f2] mt-10">
                     {[
-                      ...(artist.hourlyRate > 0 ? [{ label: 'Fee per event', value: `$${artist.hourlyRate.toLocaleString()}` }] : []),
+                      ...(artist.hourlyRate > 0 ? [{ label: 'Fee per event', value: format(artist.hourlyRate) }] : []),
                       ...(artist.experienceYears > 0 ? [{ label: 'Experience', value: `${artist.experienceYears} years on stage` }] : []),
                       ...(artist.location ? [{ label: 'Based in', value: artist.location }] : []),
                       ...(artist.subCategory ? [{ label: 'Category', value: artist.subCategory }] : []),
@@ -388,7 +396,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                     </h3>
                     <p className="text-sm text-black/70 mt-3">
                       {artist.hourlyRate > 0
-                        ? `From $${artist.hourlyRate.toLocaleString()} per event — venue, date and set agreed directly with our booking team.`
+                        ? `From ${format(artist.hourlyRate)} per event — venue, date and set agreed directly with our booking team.`
                         : 'Venue, date, set and fee agreed directly with our booking team.'}
                     </p>
                     <button
