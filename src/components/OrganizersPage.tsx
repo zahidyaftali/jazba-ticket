@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MapPin, ArrowRight, Building2, Loader2 } from 'lucide-react';
+import { Search, MapPin, ArrowRight, Building2 } from 'lucide-react';
 import { getAllOrganizers, OrganizerProfile } from '../services/backendService';
+import { EventGridSkeleton } from './Skeletons';
 
 const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
 
@@ -73,9 +74,7 @@ export default function OrganizersPage() {
         </div>
 
         {loading ? (
-          <div className="py-24 text-center">
-            <Loader2 className="w-7 h-7 animate-spin mx-auto text-black" />
-          </div>
+          <EventGridSkeleton count={6} cols="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" />
         ) : filtered.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filtered.map((org) => (

@@ -14,15 +14,19 @@ import {
 } from 'lucide-react';
 import { auth } from '../firebase';
 
+// Publishable keys are public by design (they ship to every browser), so the
+// live key is embedded as a fallback; an env var still overrides it.
+const STRIPE_PUBLISHABLE_KEY =
+  (import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_live_LIEA9yOMVhHkwUngSunBepOB';
+
 // Initialize stripe load promise lazily
 let stripePromise: Promise<Stripe | null> | null = null;
 const getStripePromise = () => {
-  const key = (import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY;
-  if (!key) {
+  if (!STRIPE_PUBLISHABLE_KEY) {
     return null;
   }
   if (!stripePromise) {
-    stripePromise = loadStripe(key);
+    stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
   }
   return stripePromise;
 };

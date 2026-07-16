@@ -42,6 +42,7 @@ import TicketSafetyPage from './components/TicketSafetyPage';
 import PrivacyPolicyPage from './components/PrivacyPolicyPage';
 import OrganizersPage from './components/OrganizersPage';
 import OrganizerDetailPage from './components/OrganizerDetailPage';
+import { EventGridSkeleton, DetailPageSkeleton } from './components/Skeletons';
 import { categories, faqs } from './data';
 import { EventItem } from './types';
 import { getPublishedEvents, getAllArtists } from './services/backendService';
@@ -137,22 +138,6 @@ function NotFoundView() {
 // Route views — each turns URL / router state into the props the pages expect
 // ---------------------------------------------------------------------------
 
-/** Grey placeholder cards shown while events stream in from the backend. */
-function EventGridSkeleton({ count = 4 }: { count?: number }) {
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6" aria-busy="true" aria-label="Loading events">
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="animate-pulse">
-          <div className="bg-neutral-200 aspect-[4/3] w-full" />
-          <div className="bg-neutral-200 h-4 w-3/4 mt-4" />
-          <div className="bg-neutral-100 h-3 w-1/2 mt-2" />
-          <div className="bg-neutral-100 h-3 w-2/3 mt-2" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function HomeView({ events, eventsLoaded }: { events: EventItem[]; eventsLoaded: boolean }) {
   const navigate = useNavigate();
 
@@ -218,7 +203,13 @@ function HomeView({ events, eventsLoaded }: { events: EventItem[]; eventsLoaded:
         )}
       </section>
 
-      <EventsForYou events={events} onBook={goCheckout} onViewDetail={goDetail} />
+      {!eventsLoaded ? (
+        <section className="max-w-7xl mx-auto px-4 py-16 sm:px-6 md:px-8">
+          <EventGridSkeleton />
+        </section>
+      ) : (
+        <EventsForYou events={events} onBook={goCheckout} onViewDetail={goDetail} />
+      )}
 
       {/* NEAR BY */}
       <section className="max-w-7xl mx-auto px-4 py-16 sm:px-6 md:px-8" id="near-by">
@@ -252,12 +243,14 @@ function HomeView({ events, eventsLoaded }: { events: EventItem[]; eventsLoaded:
         )}
       </section>
 
-      <UpcomingRows
-        events={events}
-        onBook={goCheckout}
-        onViewAll={() => navigate('/events')}
-        onViewDetail={goDetail}
-      />
+      {eventsLoaded && (
+        <UpcomingRows
+          events={events}
+          onBook={goCheckout}
+          onViewAll={() => navigate('/events')}
+          onViewDetail={goDetail}
+        />
+      )}
 
       <FaqAccordion faqs={faqs} />
     </>
@@ -269,7 +262,17 @@ function ExplorerView({ events, eventsLoaded }: { events: EventItem[]; eventsLoa
   const [params] = useSearchParams();
   const dateParam = params.get('date');
 
-  if (!eventsLoaded) return <PageLoading />;
+  if (!eventsLoaded) {
+    return (
+      <div className="jz-page bg-white min-h-screen">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-12">
+          <div className="animate-pulse bg-neutral-200 h-9 w-56 mb-3" />
+          <div className="animate-pulse bg-neutral-100 h-4 w-80 mb-10" />
+          <EventGridSkeleton count={8} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <EventsExplorerPage
@@ -296,7 +299,7 @@ function EventDetailView({ events, eventsLoaded }: { events: EventItem[]; events
     if (event) document.title = `${event.title} — Tickets | Jazbaticket`;
   }, [event]);
 
-  if (!eventsLoaded) return <PageLoading />;
+  if (!eventsLoaded) return <DetailPageSkeleton />;
   if (!event) return <NotFoundView />;
 
   return (
@@ -382,7 +385,7 @@ function ArtistDetailView({ events }: { events: EventItem[] }) {
   }, [artist]);
 
   if (notFound) return <NotFoundView />;
-  if (!artist) return <PageLoading />;
+  if (!artist) return <DetailPageSkeleton />;
 
   return (
     <ArtistDetailPage
