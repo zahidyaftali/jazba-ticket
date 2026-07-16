@@ -94,9 +94,12 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
   const { format } = useLocalCurrency();
   // Live artist roster from Firestore
   const [artists, setArtists] = useState<ArtistItem[]>([]);
+  const [artistsLoaded, setArtistsLoaded] = useState(false);
 
   useEffect(() => {
-    getAllArtists().then((profiles) => setArtists(profiles.map(mapArtistProfileToItem)));
+    getAllArtists()
+      .then((profiles) => setArtists(profiles.map(mapArtistProfileToItem)))
+      .finally(() => setArtistsLoaded(true));
   }, []);
 
   // Filters & layout
@@ -393,10 +396,22 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
           {/* RESULTS */}
           <main className="lg:col-span-9">
             <div className={`${overline} text-[#666] mb-6`}>
-              {filteredArtists.length} artist{filteredArtists.length !== 1 ? 's' : ''} found
+              {artistsLoaded
+                ? `${filteredArtists.length} artist${filteredArtists.length !== 1 ? 's' : ''} found`
+                : 'Loading artists…'}
             </div>
 
-            {filteredArtists.length === 0 ? (
+            {!artistsLoaded ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6" aria-busy="true" aria-label="Loading artists">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="animate-pulse">
+                    <div className="bg-neutral-200 aspect-[4/5] w-full" />
+                    <div className="bg-neutral-200 h-4 w-2/3 mt-4" />
+                    <div className="bg-neutral-100 h-3 w-1/2 mt-2" />
+                  </div>
+                ))}
+              </div>
+            ) : filteredArtists.length === 0 ? (
               <div className="border border-[#e4e4e4] py-20 text-center">
                 <h4 className="font-display font-bold text-2xl leading-[0.95]">No artists match those filters</h4>
                 <p className="text-sm text-[#666] mt-3 max-w-sm mx-auto">

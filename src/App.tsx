@@ -137,7 +137,23 @@ function NotFoundView() {
 // Route views — each turns URL / router state into the props the pages expect
 // ---------------------------------------------------------------------------
 
-function HomeView({ events }: { events: EventItem[] }) {
+/** Grey placeholder cards shown while events stream in from the backend. */
+function EventGridSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6" aria-busy="true" aria-label="Loading events">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="animate-pulse">
+          <div className="bg-neutral-200 aspect-[4/3] w-full" />
+          <div className="bg-neutral-200 h-4 w-3/4 mt-4" />
+          <div className="bg-neutral-100 h-3 w-1/2 mt-2" />
+          <div className="bg-neutral-100 h-3 w-2/3 mt-2" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function HomeView({ events, eventsLoaded }: { events: EventItem[]; eventsLoaded: boolean }) {
   const navigate = useNavigate();
 
   const topEvents = useMemo(() => events.filter((e) => e.type === 'top'), [events]);
@@ -185,7 +201,9 @@ function HomeView({ events }: { events: EventItem[] }) {
           </button>
         </div>
 
-        {topEvents.length === 0 ? (
+        {!eventsLoaded ? (
+          <EventGridSkeleton />
+        ) : topEvents.length === 0 ? (
           <div className="p-12 text-center bg-neutral-50 rounded-3xl max-w-lg mx-auto">
             <Info className="w-10 h-10 text-neutral-400 mx-auto mb-3" />
             <h4 className="font-extrabold text-[#E34718] text-lg">No events yet</h4>
@@ -217,7 +235,9 @@ function HomeView({ events }: { events: EventItem[] }) {
           </button>
         </div>
 
-        {nearByEvents.length === 0 ? (
+        {!eventsLoaded ? (
+          <EventGridSkeleton />
+        ) : nearByEvents.length === 0 ? (
           <div className="p-12 text-center bg-neutral-50 rounded-3xl max-w-lg mx-auto">
             <Info className="w-10 h-10 text-neutral-400 mx-auto mb-3" />
             <h4 className="font-extrabold text-[#E34718] text-lg">No Local Shows Available</h4>
@@ -244,10 +264,12 @@ function HomeView({ events }: { events: EventItem[] }) {
   );
 }
 
-function ExplorerView({ events }: { events: EventItem[] }) {
+function ExplorerView({ events, eventsLoaded }: { events: EventItem[]; eventsLoaded: boolean }) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const dateParam = params.get('date');
+
+  if (!eventsLoaded) return <PageLoading />;
 
   return (
     <EventsExplorerPage
@@ -289,12 +311,19 @@ function EventDetailView({ events, eventsLoaded }: { events: EventItem[]; events
   );
 }
 
-function CheckoutView() {
+function CheckoutView({ currentUser, authChecked }: { currentUser: AuthUser; authChecked: boolean }) {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as { event?: EventItem; quantity?: number; tier?: 'general' | 'vip' | 'elite' } | null;
 
   if (!state?.event) return <Navigate to="/events" replace />;
+
+  // Guest checkout is not allowed: wait for Firebase to resolve the session,
+  // then send signed-out visitors to login and bring them straight back here.
+  if (!authChecked) return <PageLoading />;
+  if (!currentUser) {
+    return <Navigate to="/login" state={{ redirectTo: '/checkout', checkoutState: state }} replace />;
+  }
 
   return (
     <CheckoutPage
@@ -394,25 +423,51 @@ function DashboardView({
   );
 }
 
+// Login/signup can carry a post-auth destination (e.g. an interrupted
+// checkout) in router state, so the visitor lands back where they left off.
+type AuthRedirectState = { redirectTo?: string; checkoutState?: unknown } | null;
+
 function LoginView() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirect = location.state as AuthRedirectState;
+
+  const handleSuccess = () => {
+    if (redirect?.redirectTo) {
+      navigate(redirect.redirectTo, { state: redirect.checkoutState, replace: true });
+    } else {
+      navigate('/');
+    }
+  };
+
   return (
     <LoginPage
       initialMode="login"
       onBack={() => navigate('/')}
-      onSuccess={() => navigate('/')}
-      onSwitchToSignup={() => navigate('/signup')}
+      onSuccess={handleSuccess}
+      onSwitchToSignup={() => navigate('/signup', { state: redirect })}
     />
   );
 }
 
 function SignupView() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirect = location.state as AuthRedirectState;
+
+  const handleSuccess = () => {
+    if (redirect?.redirectTo) {
+      navigate(redirect.redirectTo, { state: redirect.checkoutState, replace: true });
+    } else {
+      navigate('/');
+    }
+  };
+
   return (
     <SignupPage
       onBack={() => navigate('/')}
-      onSuccess={() => navigate('/')}
-      onSwitchToLogin={() => navigate('/login')}
+      onSuccess={handleSuccess}
+      onSwitchToLogin={() => navigate('/login', { state: redirect })}
     />
   );
 }
@@ -428,6 +483,9 @@ function AppShell() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [eventsLoaded, setEventsLoaded] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthUser>(null);
+  // False until Firebase resolves the stored session — pages that gate on
+  // login wait for this instead of treating "still checking" as "signed out".
+  const [authChecked, setAuthChecked] = useState(false);
 
   // Load published events once
   useEffect(() => {
@@ -448,6 +506,7 @@ function AppShell() {
       } else {
         setCurrentUser(null);
       }
+      setAuthChecked(true);
     });
     return () => unsubscribe();
   }, []);
@@ -505,10 +564,10 @@ function AppShell() {
       />
 
       <Routes>
-        <Route path="/" element={<HomeView events={events} />} />
-        <Route path="/events" element={<ExplorerView events={events} />} />
+        <Route path="/" element={<HomeView events={events} eventsLoaded={eventsLoaded} />} />
+        <Route path="/events" element={<ExplorerView events={events} eventsLoaded={eventsLoaded} />} />
         <Route path="/events/:id" element={<EventDetailView events={events} eventsLoaded={eventsLoaded} />} />
-        <Route path="/checkout" element={<CheckoutView />} />
+        <Route path="/checkout" element={<CheckoutView currentUser={currentUser} authChecked={authChecked} />} />
         <Route path="/artists" element={<ArtistsView events={events} />} />
         <Route path="/artists/:id" element={<ArtistDetailView events={events} />} />
         <Route path="/organizers" element={<OrganizersPage />} />

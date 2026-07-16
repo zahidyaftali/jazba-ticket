@@ -72,8 +72,9 @@ export default function CheckoutPage({
   const [ticketTier, setTicketTier] = useState<'general' | 'vip' | 'elite'>(
     availableTiers.some((t) => t.tier === initialTier) ? initialTier : (availableTiers[0]?.tier || 'general')
   );
-  const [fullName, setFullName] = useState('');
-  const [emailAddress, setEmailAddress] = useState('');
+  // Checkout is login-gated, so prefill from the signed-in account.
+  const [fullName, setFullName] = useState(auth.currentUser?.displayName || '');
+  const [emailAddress, setEmailAddress] = useState(auth.currentUser?.email || '');
   const [ticketCode] = useState(() => `TT-${Math.floor(100000 + Math.random() * 900000)}`);
   const [seatConfig] = useState(() => `${String.fromCharCode(65 + Math.floor(Math.random() * 10))}-${Math.floor(1 + Math.random() * 24)}`);
 
@@ -150,10 +151,14 @@ export default function CheckoutPage({
     if (e) e.preventDefault();
     if (!fullName || !emailAddress) return;
 
+    // Guest checkout is not allowed — payment itself is already gated on a
+    // signed-in user, so this only guards against unexpected states.
+    const user = auth.currentUser;
+    if (!user) return;
+
     setStep('loading');
     window.scrollTo({ top: 0, behavior: 'instant' });
 
-    const user = auth.currentUser;
     const bDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const bPrice = getTotalInUsd();
     const barcodeVal = `8${Math.floor(10000000000 + Math.random() * 90000000000)}`;
@@ -178,32 +183,22 @@ export default function CheckoutPage({
       discountAmount: getDiscount(),
     };
 
-    if (user) {
-      try {
-        await createBooking({
-          id: ticketCode,
-          bookingNumber: ticketCode,
-          userId: user.uid,
-          ticketType: ticketTier,
-          amount: bPrice,
-          bookingStatus: 'active',
-          qrCode: barcodeVal,
-          eventTitle: event.title,
-          eventImage: (event as any).bannerImage || (event as any).image || '',
-          eventDate: (event as any).date || '',
-          ...payload,
-        } as any);
-      } catch (err) {
-        console.error('Failed to write booking to backend:', err);
-      }
-    } else {
-      try {
-        const list = JSON.parse(localStorage.getItem('jazbaticket_bookings') || '[]');
-        list.push(payload);
-        localStorage.setItem('jazbaticket_bookings', JSON.stringify(list));
-      } catch (err) {
-        console.error('Failed to save local booking:', err);
-      }
+    try {
+      await createBooking({
+        id: ticketCode,
+        bookingNumber: ticketCode,
+        userId: user.uid,
+        ticketType: ticketTier,
+        amount: bPrice,
+        bookingStatus: 'active',
+        qrCode: barcodeVal,
+        eventTitle: event.title,
+        eventImage: (event as any).bannerImage || (event as any).image || '',
+        eventDate: (event as any).date || '',
+        ...payload,
+      } as any);
+    } catch (err) {
+      console.error('Failed to write booking to backend:', err);
     }
 
     setTimeout(() => {
@@ -343,6 +338,10 @@ export default function CheckoutPage({
                   <StripeCheckoutForm
                     amount={getTotalInUsd()}
                     currency={paymentRegion === 'PK' ? 'PKR' : paymentRegion === 'UK' ? 'GBP' : 'USD'}
+                    eventId={event.id}
+                    tier={ticketTier}
+                    quantity={ticketCount}
+                    promoCode={promoApplied ? promoCode.trim().toUpperCase() : ''}
                     billingName={fullName}
                     billingEmail={emailAddress}
                     onPaymentSuccess={(txId) => handleCreateBooking(undefined, txId)}
@@ -538,10 +537,10 @@ export default function CheckoutPage({
                 <Check className="w-7 h-7 text-black stroke-[3]" />
               </div>
               <h2 className="font-display font-bold text-3xl sm:text-4xl leading-[0.95] mt-6">
-                You're going to {event.title}.
+                Thank you — you're going to {event.title}.
               </h2>
               <p className="text-[#666] text-sm mt-4 max-w-md mx-auto">
-                Payment confirmed and tickets sent to {emailAddress || 'your email'}. Show the barcode below at the entrance — printed or on your phone.
+                Payment confirmed and tickets sent to {emailAddress || 'your email'}. Your ticket details are below — download them now, or find them any time in your profile. Show the barcode at the entrance, printed or on your phone.
               </p>
             </div>
 
@@ -607,7 +606,7 @@ export default function CheckoutPage({
                 onClick={onGoToDashboard}
                 className="flex items-center justify-center gap-2 bg-white text-black border border-black py-4 font-bold text-sm cursor-pointer hover:bg-[#f7f7f7] transition-colors"
               >
-                View in your dashboard
+                View tickets in my profile
               </button>
             </div>
 

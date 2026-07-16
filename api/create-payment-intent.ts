@@ -3,8 +3,9 @@
 import { createTicketPaymentIntent } from './_lib/stripePayment.js';
 
 // Vercel serverless function: POST /api/create-payment-intent
-// Body: { amountUsd: number, currency: 'USD' | 'GBP' | 'PKR', name?: string, email?: string }
-// Returns: { clientSecret } for Stripe.js confirmCardPayment on the client.
+// Body: { eventId, tier, quantity, promoCode?, currency: 'USD'|'GBP'|'PKR', idToken }
+// The price is computed server-side from the event document; idToken must be
+// a valid Firebase session. Returns { clientSecret } for confirmCardPayment.
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -22,6 +23,6 @@ export default async function handler(req: any, res: any) {
     res.status(200).json(result);
   } catch (err: any) {
     console.error('create-payment-intent failed:', err?.message || err);
-    res.status(400).json({ error: err?.message || 'Unable to start the payment.' });
+    res.status(err?.status || 400).json({ error: err?.message || 'Unable to start the payment.' });
   }
 }

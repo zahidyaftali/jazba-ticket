@@ -12,6 +12,7 @@ import {
   Loader2,
   Lock
 } from 'lucide-react';
+import { auth } from '../firebase';
 
 // Initialize stripe load promise lazily
 let stripePromise: Promise<Stripe | null> | null = null;
@@ -27,8 +28,13 @@ const getStripePromise = () => {
 };
 
 interface StripeCheckoutFormProps {
+  /** USD total — display only; the server recomputes the real charge. */
   amount: number;
   currency: 'USD' | 'PKR' | 'GBP';
+  eventId: string;
+  tier: 'general' | 'vip' | 'elite';
+  quantity: number;
+  promoCode: string;
   billingName: string;
   billingEmail: string;
   onPaymentSuccess: (transactionId: string) => void;
@@ -36,8 +42,11 @@ interface StripeCheckoutFormProps {
 }
 
 function LiveStripeForm({
-  amount,
   currency,
+  eventId,
+  tier,
+  quantity,
+  promoCode,
   billingName,
   billingEmail,
   onPaymentSuccess,
@@ -66,15 +75,24 @@ function LiveStripeForm({
         throw new Error('Card field not loaded. Please refresh and try again.');
       }
 
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('You must be signed in to pay. Please log in and try again.');
+      }
+      const idToken = await user.getIdToken();
+
       // 1. Ask our server to create a PaymentIntent for this order.
+      //    The server verifies the login and computes the price itself.
       const response = await fetch('/api/create-payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amountUsd: amount,
+          eventId,
+          tier,
+          quantity,
+          promoCode,
           currency,
-          name: billingName,
-          email: billingEmail,
+          idToken,
         }),
       });
 
