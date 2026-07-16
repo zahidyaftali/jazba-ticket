@@ -7,7 +7,6 @@ import { EventItem, getAvailableTiers } from '../types';
 import { auth } from '../firebase';
 import { createBooking } from '../services/backendService';
 import StripeCheckoutForm from './StripeCheckoutForm';
-import PayPalCheckoutForm from './PayPalCheckoutForm';
 import TicketPrintSheet from './TicketPrintSheet';
 import { formatMoney as formatLocalMoney } from '../currency';
 
@@ -27,32 +26,26 @@ interface RegionProfile {
   defaultMethod: string;
 }
 
-// Payment options are decided by the visitor's detected location — never picked manually.
+// All payments run through Stripe card checkout — currency follows the visitor's location.
 const REGION_PROFILES: Record<Region, RegionProfile> = {
   PK: {
     currencyLabel: 'Pakistani Rupee (PKR)',
     methods: [
-      { id: 'easypaisa', name: 'Easypaisa', note: 'Mobile wallet' },
-      { id: 'jazzcash', name: 'JazzCash', note: 'Mobile wallet' },
       { id: 'stripe', name: 'Card', note: 'Visa / Mastercard' },
     ],
-    defaultMethod: 'easypaisa',
+    defaultMethod: 'stripe',
   },
   UK: {
     currencyLabel: 'Pound Sterling (GBP)',
     methods: [
-      { id: 'paypal', name: 'PayPal', note: 'Express checkout' },
       { id: 'stripe', name: 'Card', note: 'Visa / Mastercard / Amex' },
     ],
-    defaultMethod: 'paypal',
+    defaultMethod: 'stripe',
   },
   US: {
     currencyLabel: 'US Dollar (USD)',
     methods: [
       { id: 'stripe', name: 'Card', note: 'Visa / Mastercard / Amex' },
-      { id: 'paypal', name: 'PayPal', note: 'Express checkout' },
-      { id: 'applepay', name: 'Apple Pay', note: 'Express wallet' },
-      { id: 'googlepay', name: 'Google Pay', note: 'Express wallet' },
     ],
     defaultMethod: 'stripe',
   },
@@ -92,7 +85,6 @@ export default function CheckoutPage({
   // Region is resolved from the visitor's IP — the checkout adapts automatically.
   const [paymentRegion, setPaymentRegion] = useState<Region>('US');
   const [paymentMethod, setPaymentMethod] = useState<string>('stripe');
-  const [pkMobileNumber, setPkMobileNumber] = useState('');
   const [isDetecting, setIsDetecting] = useState(true);
   const [detectedPlace, setDetectedPlace] = useState('');
 
@@ -246,7 +238,9 @@ export default function CheckoutPage({
 
         {/* ── STEP 1: DETAILS ─────────────────────────────────── */}
         {step === 'details' && (
-          <form onSubmit={handleCreateBooking} className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start pt-10">
+          // Bookings are only created after Stripe confirms the charge — the
+          // form itself never submits (Enter key must not skip payment).
+          <form onSubmit={(e) => e.preventDefault()} className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start pt-10">
 
             {/* LEFT — configurator column */}
             <div className="lg:col-span-7">
@@ -346,68 +340,14 @@ export default function CheckoutPage({
                 {/* Method detail panel */}
                 <div className="bg-[#f7f7f7] p-6 sm:p-8 mt-8">
 
-                  {paymentRegion === 'PK' && (paymentMethod === 'easypaisa' || paymentMethod === 'jazzcash') && (
-                    <div>
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <h3 className="font-display font-bold text-lg">
-                          {paymentMethod === 'easypaisa' ? 'Easypaisa account' : 'JazzCash account'}
-                        </h3>
-                        <span className={`${overline} bg-white border border-[#e4e4e4] px-3 py-1.5`}>SMS PIN confirmation</span>
-                      </div>
-
-                      <div className="mt-6 max-w-sm">
-                        <label className={`${overline} text-[#666] block mb-2`}>Mobile number</label>
-                        <div className="flex items-center gap-3">
-                          <span className="font-bold text-base shrink-0">+92</span>
-                          <input
-                            type="tel"
-                            value={pkMobileNumber}
-                            onChange={(e) => setPkMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                            placeholder="300 0000000"
-                            required
-                            className="w-full bg-transparent px-0 py-3 text-base text-black placeholder-[#8a8a8a]"
-                          />
-                        </div>
-                      </div>
-
-                      <p className="text-sm text-[#666] mt-5 max-w-md">
-                        Use the number linked to your {paymentMethod === 'easypaisa' ? 'Easypaisa' : 'JazzCash'} wallet. A confirmation prompt lands on your phone — approve it and you're done.
-                      </p>
-                    </div>
-                  )}
-
-                  {paymentMethod === 'stripe' && (
-                    <StripeCheckoutForm
-                      amount={getTotalInUsd()}
-                      currency={paymentRegion === 'PK' ? 'PKR' : paymentRegion === 'UK' ? 'GBP' : 'USD'}
-                      billingName={fullName}
-                      billingEmail={emailAddress}
-                      onPaymentSuccess={(txId) => handleCreateBooking(undefined, txId)}
-                      onPaymentError={(err) => console.error('Stripe payment error:', err)}
-                    />
-                  )}
-
-                  {paymentMethod === 'paypal' && (
-                    <PayPalCheckoutForm
-                      amount={getTotalInUsd()}
-                      currency={paymentRegion === 'PK' ? 'PKR' : paymentRegion === 'UK' ? 'GBP' : 'USD'}
-                      billingName={fullName}
-                      billingEmail={emailAddress}
-                      onPaymentSuccess={(txId) => handleCreateBooking(undefined, txId)}
-                      onPaymentError={(err) => console.error('PayPal payment error:', err)}
-                    />
-                  )}
-
-                  {(paymentMethod === 'applepay' || paymentMethod === 'googlepay') && (
-                    <div className="text-center py-6">
-                      <span className="inline-block bg-black text-white text-sm font-bold px-8 py-3.5">
-                        {paymentMethod === 'applepay' ? 'Pay with Apple Pay' : 'Pay with Google Pay'}
-                      </span>
-                      <p className="text-sm text-[#666] mt-4">
-                        Approve the payment in your wallet app to finish your booking.
-                      </p>
-                    </div>
-                  )}
+                  <StripeCheckoutForm
+                    amount={getTotalInUsd()}
+                    currency={paymentRegion === 'PK' ? 'PKR' : paymentRegion === 'UK' ? 'GBP' : 'USD'}
+                    billingName={fullName}
+                    billingEmail={emailAddress}
+                    onPaymentSuccess={(txId) => handleCreateBooking(undefined, txId)}
+                    onPaymentError={(err) => console.error('Stripe payment error:', err)}
+                  />
 
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#e4e4e4] mt-8 pt-5 text-xs text-[#8a8a8a]">
                     <span className="flex items-center gap-1.5">
@@ -552,31 +492,22 @@ export default function CheckoutPage({
                   </div>
 
                   {/* Primary CTA — the page's single yellow moment */}
-                  {paymentMethod === 'stripe' || paymentMethod === 'paypal' ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!fullName || !emailAddress) {
-                          const nameEl = document.getElementById('checkout-name-input');
-                          nameEl?.focus();
-                          nameEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        } else {
-                          const gate = document.getElementById(paymentMethod === 'stripe' ? 'stripe-checkout-gate' : 'paypal-checkout-gate');
-                          gate?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }
-                      }}
-                      className="w-full bg-[#ffed00] text-black py-4 mt-6 font-bold text-sm cursor-pointer hover:bg-[#e6d200] transition-colors"
-                    >
-                      Continue to {paymentMethod === 'stripe' ? 'card' : 'PayPal'} payment
-                    </button>
-                  ) : (
-                    <button
-                      type="submit"
-                      className="w-full bg-[#ffed00] text-black py-4 mt-6 font-bold text-sm cursor-pointer hover:bg-[#e6d200] transition-colors"
-                    >
-                      Pay {formatMoney(getTotalInUsd())}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!fullName || !emailAddress) {
+                        const nameEl = document.getElementById('checkout-name-input');
+                        nameEl?.focus();
+                        nameEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      } else {
+                        const gate = document.getElementById('stripe-checkout-gate');
+                        gate?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    }}
+                    className="w-full bg-[#ffed00] text-black py-4 mt-6 font-bold text-sm cursor-pointer hover:bg-[#e6d200] transition-colors"
+                  >
+                    Continue to card payment
+                  </button>
 
                   <p className="text-xs text-[#8a8a8a] text-center mt-4 leading-relaxed">
                     Every order is covered by our refund guarantee. By paying you accept the terms of use.
