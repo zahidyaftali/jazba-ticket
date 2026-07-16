@@ -1,4 +1,6 @@
-import { createTicketPaymentIntent } from './_lib/stripePayment';
+// The .js extension is required: this repo is ESM ("type": "module") and
+// Vercel compiles each TS file separately, so Node needs the exact path.
+import { createTicketPaymentIntent } from './_lib/stripePayment.js';
 
 // Vercel serverless function: POST /api/create-payment-intent
 // Body: { amountUsd: number, currency: 'USD' | 'GBP' | 'PKR', name?: string, email?: string }
