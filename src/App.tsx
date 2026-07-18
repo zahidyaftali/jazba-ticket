@@ -44,7 +44,7 @@ import OrganizersPage from './components/OrganizersPage';
 import OrganizerDetailPage from './components/OrganizerDetailPage';
 import { EventGridSkeleton, DetailPageSkeleton } from './components/Skeletons';
 import { categories, faqs } from './data';
-import { EventItem } from './types';
+import { EventItem, isPastEvent } from './types';
 import { getPublishedEvents, getAllArtists } from './services/backendService';
 
 type AuthUser = { email: string; name: string; profileImage?: string } | null;
@@ -141,8 +141,11 @@ function NotFoundView() {
 function HomeView({ events, eventsLoaded }: { events: EventItem[]; eventsLoaded: boolean }) {
   const navigate = useNavigate();
 
-  const topEvents = useMemo(() => events.filter((e) => e.type === 'top'), [events]);
-  const nearByEvents = useMemo(() => events.filter((e) => e.type === 'near-by'), [events]);
+  // Home sections only ever show events that haven't happened yet — past
+  // events live in the "Past events" view on the explorer page.
+  const liveEvents = useMemo(() => events.filter((e) => !isPastEvent(e)), [events]);
+  const topEvents = useMemo(() => liveEvents.filter((e) => e.type === 'top'), [liveEvents]);
+  const nearByEvents = useMemo(() => liveEvents.filter((e) => e.type === 'near-by'), [liveEvents]);
 
   const goDetail = (evt: EventItem) => navigate(`/events/${evt.id}`);
   const goCheckout = (evt: EventItem) =>
@@ -208,7 +211,7 @@ function HomeView({ events, eventsLoaded }: { events: EventItem[]; eventsLoaded:
           <EventGridSkeleton />
         </section>
       ) : (
-        <EventsForYou events={events} onBook={goCheckout} onViewDetail={goDetail} />
+        <EventsForYou events={liveEvents} onBook={goCheckout} onViewDetail={goDetail} />
       )}
 
       {/* NEAR BY */}
@@ -245,7 +248,7 @@ function HomeView({ events, eventsLoaded }: { events: EventItem[]; eventsLoaded:
 
       {eventsLoaded && (
         <UpcomingRows
-          events={events}
+          events={liveEvents}
           onBook={goCheckout}
           onViewAll={() => navigate('/events')}
           onViewDetail={goDetail}
@@ -320,6 +323,9 @@ function CheckoutView({ currentUser, authChecked }: { currentUser: AuthUser; aut
   const state = location.state as { event?: EventItem; quantity?: number; tier?: 'general' | 'vip' | 'elite' } | null;
 
   if (!state?.event) return <Navigate to="/events" replace />;
+
+  // Past events can't be booked — send the visitor to the event page instead.
+  if (isPastEvent(state.event)) return <Navigate to={`/events/${state.event.id}`} replace />;
 
   // Guest checkout is not allowed: wait for Firebase to resolve the session,
   // then send signed-out visitors to login and bring them straight back here.

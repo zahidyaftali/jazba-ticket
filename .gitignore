@@ -7,3 +7,6 @@ coverage/
 .env*
 !.env.example
 .vercel
+
+# Raw artist photo library (large source files; web copies live in public/images/artists)
+assets/images/Artists/

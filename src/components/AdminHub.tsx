@@ -40,6 +40,7 @@ import {
   getTickets,
   updateTicketStatus,
   updateBookingStatus,
+  purgeCollection,
   UserProfile,
   Booking,
   PlatformAnalytics,
@@ -50,6 +51,7 @@ import {
 } from "../services/backendService";
 import { categories } from "../data";
 import { SEED_ARTISTS } from "../seedArtists";
+import { SEED_PAST_EVENTS } from "../seedPastEvents";
 import { AgendaEntry, LineupEntry, EventFaq } from "../types";
 import { auth } from "../firebase";
 import { motion } from "motion/react";
@@ -262,6 +264,8 @@ export default function AdminHub() {
   const [artistForm, setArtistForm] = useState(BLANK_ARTIST_FORM);
   const [genreInput, setGenreInput] = useState("");
   const [importingRoster, setImportingRoster] = useState(false);
+  const [importingEvents, setImportingEvents] = useState(false);
+  const [purging, setPurging] = useState(false);
 
   // Organizer create/edit form state
   const [isOrganizerFormOpen, setIsOrganizerFormOpen] = useState(false);
@@ -840,6 +844,95 @@ export default function AdminHub() {
     loadData();
   };
 
+  // One-click import of the organiser's real past events (scraped from
+  // Eventbrite). Skips events whose title already exists.
+  const handleImportPastEvents = async () => {
+    if (
+      !window.confirm(
+        `Import ${SEED_PAST_EVENTS.length} past events from the Jazba Entertainment Eventbrite profile? Events with the same title are skipped.`,
+      )
+    ) {
+      return;
+    }
+    setImportingEvents(true);
+    setErrorMessage("");
+    const existingTitles = new Set(
+      events.map((e) => (e.title || "").trim().toLowerCase()),
+    );
+    let added = 0;
+    let skipped = 0;
+    let failed = 0;
+    for (const seed of SEED_PAST_EVENTS) {
+      if (existingTitles.has(seed.title.trim().toLowerCase())) {
+        skipped++;
+        continue;
+      }
+      try {
+        await createEvent({
+          ...seed,
+          image: seed.bannerImage,
+          tierPrices: { general: seed.price },
+          highlights: [],
+          gallery: [],
+          agenda: [],
+          lineup: [],
+          faqs: [],
+          venueInfo: { mapUrl: `${seed.venue}, ${seed.city}`, transport: [], parking: [] },
+          organizerName: "Jazba Entertainment Ltd.",
+          organizerBio: "",
+          organizerImage: "",
+          organizerId: auth.currentUser?.uid || "admin",
+        });
+        added++;
+      } catch (err) {
+        console.error(`Failed to import event ${seed.title}:`, err);
+        failed++;
+      }
+    }
+    setImportingEvents(false);
+    if (failed > 0) {
+      setErrorMessage(`${failed} event(s) failed to import — try again.`);
+    }
+    flashSuccess(`Past events import finished: ${added} added, ${skipped} already existed.`);
+    loadData();
+  };
+
+  // Admin cleanup — wipe the demo/dummy documents from a collection
+  const handlePurge = async (
+    target: "events" | "artists" | "transactions",
+  ) => {
+    const label =
+      target === "transactions"
+        ? "ALL orders, payments and tickets"
+        : `ALL ${target}`;
+    if (
+      !window.confirm(
+        `Delete ${label}? This permanently removes them from the database and cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    setPurging(true);
+    setErrorMessage("");
+    try {
+      let removed = 0;
+      if (target === "transactions") {
+        removed += await purgeCollection("bookings");
+        removed += await purgeCollection("payments");
+        removed += await purgeCollection("tickets");
+      } else {
+        removed = await purgeCollection(target);
+      }
+      flashSuccess(`Deleted ${removed} record(s).`);
+    } catch (err) {
+      console.error("Purge failed:", err);
+      setErrorMessage("Failed to delete — make sure you are signed in as an admin.");
+    } finally {
+      setPurging(false);
+      loadData();
+    }
+  };
+
   const handleDeleteArtist = async (artistId: string) => {
     if (!window.confirm("Delete this artist? This action cannot be undone.")) {
       return;
@@ -1108,6 +1201,30 @@ export default function AdminHub() {
                   </div>
                 </div>
               </div>
+
+              {/* Demo-data cleanup — analytics above always reflect live counts */}
+              {(bookings.length > 0 || payments.length > 0 || tickets.length > 0) && (
+                <div className="bg-white border border-[#e4e4e4] p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-display font-bold text-sm text-black">Demo data cleanup</h3>
+                    <p className="text-xs text-[#8a8a8a] font-medium mt-1">
+                      Remove test orders, payments and tickets so revenue and sales figures only count real transactions.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handlePurge("transactions")}
+                    disabled={purging}
+                    className="flex items-center gap-1.5 py-2.5 px-5 bg-white border border-black hover:bg-[#f7f7f7] disabled:opacity-50 text-black text-xs font-bold cursor-pointer transition-colors shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>
+                      {purging
+                        ? "Deleting…"
+                        : `Clear orders, payments & tickets (${bookings.length + payments.length + tickets.length})`}
+                    </span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -1783,7 +1900,35 @@ export default function AdminHub() {
           {activeSubTab === "events" && (
             <div className="space-y-4">
               {!isEventFormOpen && (
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-3 flex-wrap">
+                  {events.length > 0 && (
+                    <button
+                      onClick={() => handlePurge("events")}
+                      disabled={purging}
+                      className="flex items-center gap-1.5 py-2.5 px-5 bg-white border border-black hover:bg-[#f7f7f7] disabled:opacity-50 text-black text-xs font-bold cursor-pointer transition-colors"
+                      title="Remove every event from the database"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>{purging ? "Deleting…" : `Delete all events (${events.length})`}</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={handleImportPastEvents}
+                    disabled={importingEvents}
+                    className="flex items-center gap-1.5 py-2.5 px-5 bg-black hover:bg-neutral-800 disabled:opacity-50 text-white text-xs font-bold cursor-pointer transition-colors"
+                    title="Adds the organiser's real past events from the Jazba Entertainment Eventbrite profile"
+                  >
+                    {importingEvents ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Calendar className="w-4 h-4" />
+                    )}
+                    <span>
+                      {importingEvents
+                        ? "Importing…"
+                        : `Import past events (${SEED_PAST_EVENTS.length})`}
+                    </span>
+                  </button>
                   <button
                     onClick={handleOpenCreateEvent}
                     className="flex items-center gap-1.5 py-2.5 px-5 bg-[#ffed00] hover:bg-[#e6d200] text-black text-xs font-bold cursor-pointer transition-colors"
@@ -2617,7 +2762,18 @@ export default function AdminHub() {
           {activeSubTab === "artists" && (
             <div className="space-y-4">
               {!isArtistFormOpen && (
-                <div className="flex justify-end gap-3">
+                <div className="flex justify-end gap-3 flex-wrap">
+                  {artists.length > 0 && (
+                    <button
+                      onClick={() => handlePurge("artists")}
+                      disabled={purging}
+                      className="flex items-center gap-1.5 py-2.5 px-5 bg-white border border-black hover:bg-[#f7f7f7] disabled:opacity-50 text-black text-xs font-bold cursor-pointer transition-colors"
+                      title="Remove every artist from the database"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>{purging ? "Deleting…" : `Delete all artists (${artists.length})`}</span>
+                    </button>
+                  )}
                   <button
                     onClick={handleImportRoster}
                     disabled={importingRoster}

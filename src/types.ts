@@ -88,6 +88,30 @@ export interface EventItem {
   organizerImage?: string;
 }
 
+// ---- Past / upcoming detection ------------------------------------------
+const MONTH_INDEX: Record<string, number> = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+};
+
+/** Timestamp for the end of the event's day, or null when the date can't be parsed. */
+export function getEventTimestamp(event: EventItem): number | null {
+  const m = (event.date || '').match(/(\d{1,2})\s+([A-Za-z]{3})/);
+  if (!m) return null;
+  const day = Number(m[1]);
+  const month = MONTH_INDEX[m[2].toLowerCase()];
+  if (month === undefined) return null;
+  const yearMatch = (event.year || event.fullDate || '').match(/(20\d{2})/);
+  const year = yearMatch ? Number(yearMatch[1]) : new Date().getFullYear();
+  return new Date(year, month, day, 23, 59, 59).getTime();
+}
+
+/** True once the event's date has passed — used to move it out of the upcoming sections. */
+export function isPastEvent(event: EventItem): boolean {
+  const ts = getEventTimestamp(event);
+  return ts !== null && ts < Date.now();
+}
+
 export interface CategoryItem {
   id: string;
   name: string;

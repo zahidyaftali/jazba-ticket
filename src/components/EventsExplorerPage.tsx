@@ -13,7 +13,7 @@ import {
   Check,
   ArrowRight,
 } from 'lucide-react';
-import { EventItem, CategoryItem } from '../types';
+import { EventItem, CategoryItem, isPastEvent } from '../types';
 import { useLocalCurrency } from '../currency';
 
 interface EventsExplorerPageProps {
@@ -96,6 +96,10 @@ export default function EventsExplorerPage({
   // Sort, view, pagination
   const [sortOption, setSortOption] = useState<keyof typeof SORT_LABELS>('sooner');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  // Upcoming vs. past split — an event moves to "Past" the day after it happens
+  const [timeFilter, setTimeFilter] = useState<'upcoming' | 'past'>('upcoming');
+  const upcomingCount = useMemo(() => events.filter((e) => !isPastEvent(e)).length, [events]);
+  const pastCount = events.length - upcomingCount;
   const [visibleCount, setVisibleCount] = useState<number>(9);
 
   const handleToggleLike = (id: string, e: React.MouseEvent) => {
@@ -137,7 +141,7 @@ export default function EventsExplorerPage({
 
   // Filtering + sorting
   const filteredEvents = useMemo(() => {
-    let result = [...events];
+    let result = events.filter((e) => (timeFilter === 'past') === isPastEvent(e));
 
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
@@ -167,7 +171,7 @@ export default function EventsExplorerPage({
     else if (sortOption === 'title') result.sort((a, b) => a.title.localeCompare(b.title));
 
     return result;
-  }, [events, searchTerm, selectedCategory, selectedCity, priceTier, showOnlyFeatured, showOnlyLiked, likedEventIds, sortOption, dateOffset]);
+  }, [events, timeFilter, searchTerm, selectedCategory, selectedCity, priceTier, showOnlyFeatured, showOnlyLiked, likedEventIds, sortOption, dateOffset]);
 
   const displayedEvents = useMemo(() => filteredEvents.slice(0, visibleCount), [filteredEvents, visibleCount]);
 
@@ -425,9 +429,27 @@ export default function EventsExplorerPage({
 
           {/* RESULTS */}
           <main className="lg:col-span-9">
+            {/* Upcoming / Past switch */}
+            <div className="flex border border-black w-fit mb-6">
+              {([
+                { id: 'upcoming', label: `Upcoming (${upcomingCount})` },
+                { id: 'past', label: `Past events (${pastCount})` },
+              ] as const).map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setTimeFilter(t.id)}
+                  className={`px-5 py-2.5 text-sm font-bold cursor-pointer transition-colors ${
+                    timeFilter === t.id ? 'bg-black text-[#ffed00]' : 'bg-white text-black hover:bg-[#f7f7f7]'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
             <div className="flex items-center justify-between mb-6">
               <span className={`${overline} text-[#666]`}>
-                {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''} found
+                {filteredEvents.length} {timeFilter === 'past' ? 'past ' : ''}event{filteredEvents.length !== 1 ? 's' : ''} found
               </span>
               <span className="text-sm text-[#8a8a8a]">
                 Showing {displayedEvents.length} of {filteredEvents.length}

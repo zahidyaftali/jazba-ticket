@@ -769,35 +769,59 @@ export async function getAllArtists(): Promise<ArtistProfile[]> {
  * ----------------------------------------------------
  */
 
+// Live analytics — always computed from the real collections, never from the
+// old seeded `analytics/overall` counter doc (which held demo numbers).
 export async function getPlatformAnalytics(): Promise<PlatformAnalytics> {
-  const path = `analytics/overall`;
+  const path = `analytics (live counts)`;
   try {
-    const docRef = doc(db, 'analytics', 'overall');
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      return snap.data() as PlatformAnalytics;
-    } else {
-      const defaultAnalytics: PlatformAnalytics = {
-        totalUsers: 154,
-        totalOrganizers: 12,
-        totalArtists: 28,
-        totalEvents: 6,
-        totalTicketsSold: 284,
-        totalRevenue: 24850
-      };
-      await setDoc(docRef, defaultAnalytics);
-      return defaultAnalytics;
-    }
-  } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
+    const [usersSnap, organizersSnap, artistsSnap, eventsSnap, bookingsSnap, ticketsSnap] = await Promise.all([
+      getDocs(collection(db, 'users')),
+      getDocs(collection(db, 'organizers')),
+      getDocs(collection(db, 'artists')),
+      getDocs(collection(db, 'events')),
+      getDocs(collection(db, 'bookings')),
+      getDocs(collection(db, 'tickets')),
+    ]);
+
+    let totalRevenue = 0;
+    let totalTicketsSold = 0;
+    bookingsSnap.forEach((d) => {
+      const b = d.data() as any;
+      if (b.paymentStatus === 'paid') {
+        totalRevenue += Number(b.amount ?? b.pricePaid) || 0;
+        totalTicketsSold += Number(b.quantity) || 1;
+      }
+    });
+    if (totalTicketsSold === 0) totalTicketsSold = ticketsSnap.size;
+
     return {
-      totalUsers: 154,
-      totalOrganizers: 12,
-      totalArtists: 28,
-      totalEvents: 6,
-      totalTicketsSold: 284,
-      totalRevenue: 24850
+      totalUsers: usersSnap.size,
+      totalOrganizers: organizersSnap.size,
+      totalArtists: artistsSnap.size,
+      totalEvents: eventsSnap.size,
+      totalTicketsSold,
+      totalRevenue,
     };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path);
+    return { totalUsers: 0, totalOrganizers: 0, totalArtists: 0, totalEvents: 0, totalTicketsSold: 0, totalRevenue: 0 };
+  }
+}
+
+/** Admin cleanup: delete every document in one of the demo-data collections. */
+export async function purgeCollection(
+  name: 'events' | 'artists' | 'bookings' | 'payments' | 'tickets'
+): Promise<number> {
+  const path = name;
+  try {
+    const snap = await getDocs(collection(db, name));
+    for (const d of snap.docs) {
+      await deleteDoc(doc(db, name, d.id));
+    }
+    return snap.size;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+    throw error;
   }
 }
 

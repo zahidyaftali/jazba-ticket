@@ -21,7 +21,7 @@ import {
   ArrowRight,
   Share2,
 } from "lucide-react";
-import { EventItem } from "../types";
+import { EventItem, isPastEvent } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import {
   auth,
@@ -165,7 +165,7 @@ export default function UserDashboardPage({
   // â”€â”€ DATA LOADING (unchanged behaviour) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
-    setWatchlist(allEvents.slice(0, 3));
+    setWatchlist(allEvents.filter((e) => !isPastEvent(e)).slice(0, 3));
 
     const loadUserData = async () => {
       const user = auth.currentUser;
@@ -763,7 +763,7 @@ export default function UserDashboardPage({
                         </button>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-[#f2f2f2] border border-[#f2f2f2]">
-                        {allEvents.slice(0, 4).map((evt) => (
+                        {allEvents.filter((e) => !isPastEvent(e)).slice(0, 4).map((evt) => (
                           <div
                             key={evt.id}
                             className="bg-white p-5 flex items-center gap-4"

@@ -3,7 +3,7 @@ import {
   ArrowLeft, Calendar, MapPin, Clock, Ticket, Check, Star,
   Share2, ShieldCheck, Heart, Plus, Minus, ChevronDown, ChevronUp, Image as ImageIcon, X, ArrowRight,
 } from 'lucide-react';
-import { EventItem, TicketTier, getAvailableTiers } from '../types';
+import { EventItem, TicketTier, getAvailableTiers, isPastEvent } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth } from '../firebase';
 import { getOrganizerProfile, followTarget, unfollowTarget, isFollowingTarget, getFollowerCount, OrganizerProfile } from '../services/backendService';
@@ -32,6 +32,7 @@ export default function EventDetailPage({
   const [isLiked, setIsLiked] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const { format } = useLocalCurrency();
+  const eventEnded = isPastEvent(event);
 
   // Booking rail
   const [ticketTier, setTicketTier] = useState<TicketTier>('general');
@@ -566,8 +567,23 @@ export default function EventDetailPage({
 
           </div>
 
-          {/* RIGHT — sticky booking rail */}
+          {/* RIGHT — sticky booking rail (or "event ended" notice) */}
           <div className="lg:col-span-5 lg:sticky lg:top-20 lg:self-start">
+            {eventEnded ? (
+            <div className="border border-black p-8">
+              <span className={`${overline} bg-black text-white px-3 py-1.5 inline-block`}>Past event</span>
+              <h3 className="font-display font-bold text-2xl leading-[0.95] mt-4">This event has ended</h3>
+              <p className="text-sm text-[#666] leading-relaxed mt-3">
+                {event.title} took place on {event.fullDate || `${event.date} ${event.year || ''}`.trim()} at {event.location}. Tickets are no longer on sale.
+              </p>
+              <button
+                onClick={onBack}
+                className="mt-6 w-full bg-[#ffed00] text-black py-4 font-bold text-sm cursor-pointer hover:bg-[#e6d200] transition-colors"
+              >
+                Browse upcoming events
+              </button>
+            </div>
+            ) : (
             <div className="border border-black">
 
               <div className="px-6 py-5 border-b border-[#f2f2f2]">
@@ -692,6 +708,7 @@ export default function EventDetailPage({
                 </p>
               </div>
             </div>
+            )}
           </div>
         </div>
 
