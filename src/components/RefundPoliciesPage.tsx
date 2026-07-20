@@ -73,7 +73,7 @@ const SECTIONS: Array<{ id: string; title: string; body: React.ReactNode }> = [
           receive a full refund of the ticket price automatically, back to your
           original payment method — no need to contact us. The card processing
           fee is not refundable, as this is charged by our payment provider
-          rather than Jazbaticket.
+          rather than Jazba Tickets.
         </li>
         <li>
           <strong className="font-bold">Postponed/rescheduled events:</strong>{" "}
@@ -141,7 +141,7 @@ const SECTIONS: Array<{ id: string; title: string; body: React.ReactNode }> = [
     body: (
       <>
         <p>
-          Jazbaticket does not own, manage, or operate any venue. If you have
+          Jazba Tickets does not own, manage, or operate any venue. If you have
           accessibility requirements — including step-free access, seating
           needs, or any disability-related access requirement — please contact
           the venue or{" "}

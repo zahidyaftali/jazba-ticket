@@ -89,7 +89,7 @@ export default function OrganizerDetailPage({ allEvents, onRequireLogin }: Organ
     try {
       const result = await shareOrCopy({
         title: document.title,
-        text: 'Event organiser on Jazbaticket.',
+        text: 'Event organiser on Jazba Tickets.',
       });
       if (result === 'copied') {
         setCopied(true);
@@ -332,7 +332,7 @@ export default function OrganizerDetailPage({ allEvents, onRequireLogin }: Organ
             <div className="bg-[#ffed00] text-black p-7">
               <span className={`${overline} text-black/60`}>Are you an organiser?</span>
               <h3 className="font-display font-bold text-2xl leading-[0.95] mt-2">
-                Put your event on Jazbatickets.
+                Put your event on Jazba Tickets.
               </h3>
               <p className="text-sm text-black/70 mt-3">
                 List your show, sell tickets securely and get your own organiser profile — free to start.

@@ -153,7 +153,7 @@ export default function EventDetailPage({
   const handleShare = async () => {
     const result = await shareOrCopy({
       title: event.title,
-      text: `${event.title} — ${event.date}, ${event.location}. Tickets on Jazbaticket.`,
+      text: `${event.title} — ${event.date}, ${event.location}. Tickets on Jazba Tickets.`,
     });
     if (result === 'copied') {
       setShareCopied(true);

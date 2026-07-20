@@ -123,8 +123,8 @@ export default function PrivacyPolicyPage() {
             Privacy <span className="text-[#ffed00]">Policy</span>
           </h1>
           <p className="text-neutral-300 font-normal text-sm sm:text-base max-w-2xl leading-relaxed">
-            Jazba Entertainment Ltd ("Jazbaticket", "we", "us") is the data
-            controller for personal data collected through Jazbatickets. We
+            Jazba Entertainment Ltd ("Jazba Tickets", "we", "us") is the data
+            controller for personal data collected through Jazba Tickets. We
             handle your data in line with UK GDPR and the Data Protection Act
             2018.
           </p>

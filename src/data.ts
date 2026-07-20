@@ -362,6 +362,6 @@ export const faqs: FAQItem[] = [
   {
     id: 'faq-5',
     question: 'What should I do if I don\'t receive my ticket after booking?',
-    answer: 'First, check your Spam or Promotions folder. If you still cannot find your confirmation email, log in to your Jazbaticket account, go to "My Passes", or use our Live Chat assistant with your transaction details to retrieve your ticket instantly.'
+    answer: 'First, check your Spam or Promotions folder. If you still cannot find your confirmation email, log in to your Jazba Tickets account, go to "My Passes", or use our Live Chat assistant with your transaction details to retrieve your ticket instantly.'
   }
 ];

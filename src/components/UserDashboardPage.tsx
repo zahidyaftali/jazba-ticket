@@ -824,7 +824,7 @@ export default function UserDashboardPage({
                                     className="w-7 h-7 object-contain"
                                   />
                                   <span className="font-display font-bold text-sm tracking-[0.22em]">
-                                    JAZBATICKET
+                                    JAZBA TICKETS
                                   </span>
                                 </span>
                                 <span

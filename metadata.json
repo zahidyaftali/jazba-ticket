@@ -1,5 +1,5 @@
 {
-  "name": "Jazbaticket",
+  "name": "Jazba Tickets",
   "description": "Your Ultimate Event Destination - Find, Book & Enjoy! Explore thousands of events, from concerts to conferences. Secure your tickets today!",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

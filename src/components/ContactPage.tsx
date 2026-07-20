@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mail, MessageSquare, MapPin, Phone, Check } from "lucide-react";
+import { Mail, MessageSquare, MapPin, Phone, Check, AlertCircle, Loader2 } from "lucide-react";
+import { sendFormEmail } from "../services/formEmailService";
 
 const CHANNELS = [
   {
@@ -50,10 +51,26 @@ export default function ContactPage() {
   const [topic, setTopic] = useState(TOPICS[0]);
   const [message, setMessage] = useState("");
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !email || !message) return;
+    if (!name || !email || !message || sending) return;
+    setSending(true);
+    setSendError("");
+    const result = await sendFormEmail({
+      formName: "contact",
+      name,
+      email,
+      subject: topic,
+      message,
+    });
+    setSending(false);
+    if (!result.ok) {
+      setSendError(result.error || "Could not send your message. Please try again.");
+      return;
+    }
     setSent(true);
     setName("");
     setEmail("");
@@ -211,11 +228,20 @@ export default function ContactPage() {
                     />
                   </div>
 
+                  {sendError && (
+                    <div className="flex items-start gap-2 bg-[#f7f7f7] border-l-2 border-[#be6464] text-[#be6464] text-xs font-bold p-3">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>{sendError}</span>
+                    </div>
+                  )}
+
                   <button
                     type="submit"
-                    className="bg-[#ffed00] text-black font-bold text-sm px-6 py-3.5 cursor-pointer"
+                    disabled={sending}
+                    className="bg-[#ffed00] text-black font-bold text-sm px-6 py-3.5 cursor-pointer disabled:opacity-60 flex items-center gap-2"
                   >
-                    Send message
+                    {sending && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {sending ? "Sending…" : "Send message"}
                   </button>
                 </form>
               )}

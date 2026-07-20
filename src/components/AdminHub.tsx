@@ -3224,7 +3224,7 @@ export default function AdminHub() {
                         </div>
                         <div className="space-y-1.5">
                           <label className={labelCls}>
-                            Fee per event (USD)
+                            Fee per event (USD) — internal only
                           </label>
                           <input
                             type="number"
@@ -3237,6 +3237,9 @@ export default function AdminHub() {
                               })
                             }
                           />
+                          <p className="text-[10px] text-[#8a8a8a] font-medium">
+                            For your records only — the public artist pages always show "Price on request" (POR).
+                          </p>
                         </div>
                         <div className="space-y-1.5">
                           <label className={labelCls}>

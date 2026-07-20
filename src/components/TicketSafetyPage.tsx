@@ -21,7 +21,7 @@ const SECTIONS: Array<{
     title: "Buy Direct, Buy Safe",
     body: (
       <p>
-        Every ticket sold through Jazbatickets is issued and tracked on our
+        Every ticket sold through Jazba Tickets is issued and tracked on our
         platform, with a unique QR/barcode generated at the point of sale. This
         means it can't be duplicated or resold without our system flagging it —
         unlike tickets bought through unofficial resale sites, social media
@@ -32,12 +32,12 @@ const SECTIONS: Array<{
   {
     id: "5.2",
     icon: QrCode,
-    title: "Spotting a Genuine Jazbatickets Ticket",
+    title: "Spotting a Genuine Ticket",
     body: (
       <ul className="list-disc pl-5 space-y-2.5">
         <li>
           You'll always receive your ticket by email from an
-          @jazbaentertainment.net address, and it's also available in My Passes
+          @jazbatickets.com address, and it's also available in My Passes
           in your account.
         </li>
         <li>
@@ -45,7 +45,7 @@ const SECTIONS: Array<{
           scanned once at entry.
         </li>
         <li>
-          We will never ask you to pay for a ticket outside of the Jazbatickets
+          We will never ask you to pay for a ticket outside of the Jazba Tickets
           checkout.
         </li>
       </ul>
@@ -71,7 +71,7 @@ const SECTIONS: Array<{
     title: "Report a Concern",
     body: (
       <p>
-        If you've been offered a Jazbatickets-branded ticket outside our
+        If you've been offered a Jazba Tickets-branded ticket outside our
         platform, or suspect a scam, contact us immediately at{" "}
         <a
           href="mailto:support@jazbatickets.com"
@@ -131,7 +131,7 @@ export default function TicketSafetyPage() {
             <span className="text-[#ffed00]">real.</span>
           </h1>
           <p className="text-neutral-300 font-normal text-sm sm:text-base max-w-2xl leading-relaxed">
-            Jazbatickets exists to make sure every ticket you buy is real.
+            Jazba Tickets exists to make sure every ticket you buy is real.
             Here's how we protect you.
           </p>
           <span className="inline-block text-[11px] font-bold text-white/50">

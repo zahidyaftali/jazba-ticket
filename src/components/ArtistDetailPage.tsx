@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { shareOrCopy } from '../share';
-import { useLocalCurrency } from '../currency';
+import { sendFormEmail } from '../services/formEmailService';
 import {
   Check,
   X,
@@ -11,6 +11,7 @@ import {
   Star,
   ArrowRight,
   ShieldCheck,
+  AlertCircle,
 } from 'lucide-react';
 import { ArtistItem } from './ArtistsPage';
 import { EventItem } from '../types';
@@ -28,7 +29,6 @@ interface ArtistDetailPageProps {
 }
 
 export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShowDetail, onBookEvent, onRequireLogin }: ArtistDetailPageProps) {
-  const { format } = useLocalCurrency();
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followBusy, setFollowBusy] = useState(false);
@@ -40,6 +40,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
   const [contactMessage, setContactMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
+  const [sendError, setSendError] = useState('');
   const [copied, setCopied] = useState(false);
 
   // Load real follow state & follower count for this artist
@@ -111,7 +112,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
     try {
       const result = await shareOrCopy({
         title: artist.name,
-        text: `${artist.name} — book this artist on Jazbaticket.`,
+        text: `${artist.name} — book this artist on Jazba Tickets.`,
       });
       if (result === 'copied') {
         setCopied(true);
@@ -122,19 +123,29 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
     }
   };
 
-  const handleContactSubmit = (e: React.FormEvent) => {
+  const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contactEmail || !contactMessage) return;
+    if (!contactEmail || !contactMessage || isSending) return;
     setIsSending(true);
+    setSendError('');
+    const result = await sendFormEmail({
+      formName: 'artist-booking',
+      name: contactName,
+      email: contactEmail,
+      message: contactMessage,
+      artistName: artist.name,
+    });
+    setIsSending(false);
+    if (!result.ok) {
+      setSendError(result.error || 'Could not send your enquiry. Please try again.');
+      return;
+    }
+    setSendSuccess(true);
+    setContactMessage('');
     setTimeout(() => {
-      setIsSending(false);
-      setSendSuccess(true);
-      setContactMessage('');
-      setTimeout(() => {
-        setSendSuccess(false);
-        setShowContactModal(false);
-      }, 2000);
-    }, 1200);
+      setSendSuccess(false);
+      setShowContactModal(false);
+    }, 2000);
   };
 
   const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
@@ -153,7 +164,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                 <img
                   src={artist.avatar}
                   alt={artist.name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover object-top"
                   referrerPolicy="no-referrer"
                 />
               </div>
@@ -350,7 +361,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                   {/* Fact rows — only facts that were set in the admin */}
                   <div className="border-t border-[#f2f2f2] mt-10">
                     {[
-                      ...(artist.hourlyRate > 0 ? [{ label: 'Fee per event', value: format(artist.hourlyRate) }] : []),
+                      { label: 'Fee per event', value: 'POR' },
                       ...(artist.experienceYears > 0 ? [{ label: 'Experience', value: `${artist.experienceYears} years on stage` }] : []),
                       ...(artist.location ? [{ label: 'Based in', value: artist.location }] : []),
                       ...(artist.subCategory ? [{ label: 'Category', value: artist.subCategory }] : []),
@@ -395,9 +406,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                       One flat fee. One great night.
                     </h3>
                     <p className="text-sm text-black/70 mt-3">
-                      {artist.hourlyRate > 0
-                        ? `From ${format(artist.hourlyRate)} per event — venue, date and set agreed directly with our booking team.`
-                        : 'Venue, date, set and fee agreed directly with our booking team.'}
+                      Price on request — venue, date, set and fee agreed directly with our booking team.
                     </p>
                     <button
                       onClick={() => setShowContactModal(true)}
@@ -509,6 +518,12 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                       className="w-full bg-[#f7f7f7] px-3 py-3 text-sm text-black placeholder-[#8a8a8a] resize-none"
                     />
                   </div>
+                  {sendError && (
+                    <div className="flex items-start gap-2 bg-[#f7f7f7] border-l-2 border-[#be6464] text-[#be6464] text-xs font-bold p-3">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>{sendError}</span>
+                    </div>
+                  )}
                   <button
                     type="submit"
                     disabled={isSending}

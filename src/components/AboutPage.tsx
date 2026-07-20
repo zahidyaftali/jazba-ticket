@@ -25,7 +25,7 @@ const SERVICES = [
   {
     icon: Music2,
     title: "Live events & festivals",
-    body: "We produce and promote live music events and festivals — and Jazbatickets is where you find and book tickets to them, securely and simply.",
+    body: "We produce and promote live music events and festivals — and Jazba Tickets is where you find and book tickets to them, securely and simply.",
   },
   {
     icon: Disc3,
@@ -163,7 +163,7 @@ export default function AboutPage() {
             <span className="text-[#ffed00]">within reach.</span>
           </h1>
           <p className="text-neutral-300 font-normal text-sm sm:text-base md:text-lg max-w-2xl leading-relaxed">
-            Jazbatickets is the ticketing and artist booking platform from Jazba
+            Jazba Tickets is the ticketing and artist booking platform from Jazba
             Entertainment Ltd — a music and video/film production company based
             in Birmingham, UK, established in 2005. A straightforward way to
             find and book tickets to great live events, and — uniquely — to book
@@ -199,7 +199,7 @@ export default function AboutPage() {
           </div>
           <div className="lg:col-span-7 text-base text-[#222] leading-relaxed space-y-5">
             <p>
-              Jazbatickets is the ticketing and artist booking platform from{" "}
+              Jazba Tickets is the ticketing and artist booking platform from{" "}
               <strong className="font-bold">Jazba Entertainment Ltd</strong> — a
               music and video/film production company based in Birmingham, UK,
               established in 2005.
@@ -213,7 +213,7 @@ export default function AboutPage() {
               marketing and management — all built around music.
             </p>
             <p>
-              Jazbatickets brings that experience together in one place: a
+              Jazba Tickets brings that experience together in one place: a
               straightforward way to find and book tickets to great live events,
               and — uniquely —{" "}
               <strong className="font-bold">
@@ -290,10 +290,10 @@ export default function AboutPage() {
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
           <div className="lg:col-span-5">
             <span className={`${overline} text-[#666]`}>
-              The Jazbatickets guarantee
+              The Jazba Tickets guarantee
             </span>
             <h2 className="font-display font-bold text-3xl sm:text-4xl leading-[0.95] mt-3">
-              In writing, not in spirit.
+              In writing. Not just promises.
             </h2>
             <p className="text-base text-[#222] leading-relaxed mt-5 max-w-md">
               Every order on the platform is covered by the same six commitments

@@ -341,7 +341,7 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
 
         {/* Footer Brand Statement */}
         <div className="mt-6 text-neutral-400 text-[10px] font-sans font-bold text-sentence tracking-widest text-center select-none">
-          Jazbaticket &middot; Secure Ticketing
+          Jazba Tickets &middot; Secure Ticketing
         </div>
 
       </div>

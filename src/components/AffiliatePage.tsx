@@ -72,13 +72,13 @@ export default function AffiliatePage() {
             <span className="text-white">Affiliate programme</span>
           </div>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold tracking-tight leading-[0.95] max-w-3xl text-white">
-            Earn commission promoting <span className="text-[#ffed00]">Jazbatickets events.</span>
+            Earn commission promoting <span className="text-[#ffed00]">Jazba Tickets events.</span>
           </h1>
           <p className="text-neutral-300 font-normal text-sm sm:text-base md:text-lg max-w-2xl leading-relaxed">
-            Join the Jazbatickets Affiliate Programme and earn a commission on every ticket sold through your unique referral link — whether you're a blogger, influencer, community organiser, or run an events-focused page.
+            Join the Jazba Tickets Affiliate Programme and earn a commission on every ticket sold through your unique referral link — whether you're a blogger, influencer, community organiser, or run an events-focused page.
           </p>
           <a
-            href="mailto:affiliates@jazbaentertainment.net"
+            href="mailto:info@jazbatickets.com"
             className="inline-flex items-center gap-2 bg-[#ffed00] text-black font-bold text-sm px-6 py-3.5 hover:bg-[#e6d200] transition-colors"
           >
             <Mail className="w-4 h-4" /> Get started
@@ -155,10 +155,10 @@ export default function AffiliatePage() {
           </div>
           <div className="flex flex-wrap gap-3">
             <a
-              href="mailto:affiliates@jazbaentertainment.net"
+              href="mailto:info@jazbatickets.com"
               className="bg-black text-white font-bold text-sm px-6 py-3.5 flex items-center gap-2 hover:bg-neutral-800 transition-colors"
             >
-              <Mail className="w-4 h-4" /> affiliates@jazbaentertainment.net
+              <Mail className="w-4 h-4" /> info@jazbatickets.com
             </a>
             <button
               onClick={() => navigate('/events')}

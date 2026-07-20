@@ -1,13 +1,19 @@
 import Stripe from 'stripe';
 
-// Shared by the Vercel serverless function (api/create-payment-intent.ts)
-// and the Vite dev-server middleware (vite.config.ts), so local dev and
-// production run the exact same charge logic.
+// Shared by the Vercel serverless functions (api/create-checkout-session.ts,
+// api/get-checkout-session.ts) and the Vite dev-server middleware
+// (vite.config.ts), so local dev and production run the exact same logic.
 //
 // Security model: the client only tells us WHAT it wants to buy
 // (eventId / tier / quantity / promo). The price is computed here from the
 // event document in Firestore, and the buyer must present a valid Firebase
 // ID token — so neither the amount nor the login can be faked in the browser.
+//
+// Payment itself happens entirely on Stripe's own hosted Checkout page
+// (outside this site). We create a Checkout Session with the verified order
+// details, the buyer pays on checkout.stripe.com, and Stripe redirects them
+// back to /checkout/success?session_id=... where getCheckoutSession() below
+// re-verifies the payment before a booking is ever written.
 
 // Public Firebase web config (same values shipped in the frontend bundle).
 const FIREBASE = {
@@ -27,21 +33,21 @@ const USD_RATES: Record<string, number> = {
 // Must mirror the promo codes accepted in CheckoutPage.tsx (18% off).
 const PROMO_CODES = new Set(['JAZBA18', 'EVENT18', 'HAMILTON18']);
 
-export interface CreatePaymentIntentBody {
-  eventId?: unknown;
-  tier?: unknown;
-  quantity?: unknown;
-  promoCode?: unknown;
-  currency?: unknown;
-  idToken?: unknown;
-}
-
-class PaymentError extends Error {
+export class PaymentError extends Error {
   status: number;
   constructor(message: string, status = 400) {
     super(message);
     this.status = status;
   }
+}
+
+/** Derive the site origin from request headers — never trust a client-supplied value. */
+export function getOrigin(req: any): string {
+  const host = req.headers['x-forwarded-host'] || req.headers.host || 'jazbatickets.com';
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  const isLocal = String(host).startsWith('localhost') || String(host).startsWith('127.0.0.1');
+  const proto = forwardedProto || (isLocal ? 'http' : 'https');
+  return `${proto}://${host}`;
 }
 
 /** Verify a Firebase ID token and return the signed-in user. */
@@ -123,16 +129,30 @@ export function toChargeAmount(amountUsd: number, currency: string): number {
   return Math.round(amountUsd * USD_RATES[currency] * 100);
 }
 
-export async function createTicketPaymentIntent(
+export interface CreateCheckoutSessionBody {
+  eventId?: unknown;
+  tier?: unknown;
+  quantity?: unknown;
+  promoCode?: unknown;
+  currency?: unknown;
+  idToken?: unknown;
+  fullName?: unknown;
+}
+
+/** Create a Stripe-hosted Checkout Session — the buyer pays on Stripe's own
+ *  page, entirely outside this site, then is redirected back to /checkout/success. */
+export async function createCheckoutSession(
   secretKey: string,
-  body: CreatePaymentIntentBody,
-): Promise<{ clientSecret: string }> {
+  body: CreateCheckoutSessionBody,
+  origin: string,
+): Promise<{ url: string }> {
   const eventId = typeof body.eventId === 'string' ? body.eventId : '';
   const tier = typeof body.tier === 'string' ? body.tier : '';
   const quantity = Number(body.quantity);
   const promoCode = typeof body.promoCode === 'string' ? body.promoCode.trim().toUpperCase() : '';
   const currency = typeof body.currency === 'string' ? body.currency.toUpperCase() : '';
   const idToken = typeof body.idToken === 'string' ? body.idToken : '';
+  const fullName = typeof body.fullName === 'string' ? body.fullName.trim().slice(0, 200) : '';
 
   if (!eventId || !/^[a-zA-Z0-9_-]{1,128}$/.test(eventId)) throw new PaymentError('Invalid event.');
   if (!['general', 'vip', 'elite'].includes(tier)) throw new PaymentError('Invalid ticket type.');
@@ -150,14 +170,35 @@ export async function createTicketPaymentIntent(
   const amountUsd = computeTotalUsd(tierPrice, quantity, promoApplied);
   if (amountUsd <= 0 || amountUsd > 10000) throw new PaymentError('Invalid payment amount.');
 
+  const seat = `${String.fromCharCode(65 + Math.floor(Math.random() * 10))}-${Math.floor(1 + Math.random() * 24)}`;
+  // A stable, human-readable order number, later reused as the Firestore
+  // booking doc id — so a refreshed success page overwrites the same
+  // document instead of creating a duplicate booking.
+  const orderId = `TT-${Math.floor(100000 + Math.random() * 900000)}`;
+  const tierLabel = tier === 'elite' ? 'Elite' : tier === 'vip' ? 'VIP' : 'General admission';
+
   const stripe = new Stripe(secretKey);
-  const intent = await stripe.paymentIntents.create({
-    amount: toChargeAmount(amountUsd, currency),
-    currency: currency.toLowerCase(),
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
     payment_method_types: ['card'],
-    description: `JazbaTicket — ${event.title} (${tier} × ${quantity})`,
-    receipt_email: user.email || undefined,
+    line_items: [
+      {
+        quantity: 1,
+        price_data: {
+          currency: currency.toLowerCase(),
+          unit_amount: toChargeAmount(amountUsd, currency),
+          product_data: {
+            name: `${event.title} — ${tierLabel} × ${quantity}`,
+            description: `Jazba Tickets order${promoApplied ? ' — promo applied' : ''}, includes service fee`,
+          },
+        },
+      },
+    ],
+    customer_email: user.email || undefined,
+    success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${origin}/events/${encodeURIComponent(eventId)}`,
     metadata: {
+      order_id: orderId,
       event_id: eventId,
       tier,
       quantity: String(quantity),
@@ -165,11 +206,51 @@ export async function createTicketPaymentIntent(
       amount_usd: amountUsd.toFixed(2),
       buyer_uid: user.uid,
       buyer_email: user.email,
+      buyer_name: fullName,
+      seat,
     },
   });
 
-  if (!intent.client_secret) {
-    throw new PaymentError('Stripe did not return a client secret.', 500);
+  if (!session.url) throw new PaymentError('Stripe did not return a checkout URL.', 500);
+  return { url: session.url };
+}
+
+export interface VerifiedCheckoutSession {
+  paid: boolean;
+  orderId: string;
+  eventId: string;
+  tier: 'general' | 'vip' | 'elite';
+  quantity: number;
+  seat: string;
+  buyerUid: string;
+  buyerEmail: string;
+  buyerName: string;
+  amountUsd: number;
+  promoApplied: boolean;
+}
+
+/** Re-verify a completed Checkout Session with Stripe (server-to-server) —
+ *  the success page never trusts the redirect alone. */
+export async function getCheckoutSession(secretKey: string, sessionId: string): Promise<VerifiedCheckoutSession> {
+  if (!sessionId || !/^cs_[a-zA-Z0-9_]+$/.test(sessionId)) {
+    throw new PaymentError('Invalid checkout session.');
   }
-  return { clientSecret: intent.client_secret };
+  const stripe = new Stripe(secretKey);
+  const session = await stripe.checkout.sessions.retrieve(sessionId);
+  const m = session.metadata || {};
+  const tier = m.tier === 'vip' || m.tier === 'elite' ? m.tier : 'general';
+
+  return {
+    paid: session.payment_status === 'paid',
+    orderId: m.order_id || sessionId,
+    eventId: m.event_id || '',
+    tier,
+    quantity: Number(m.quantity) || 1,
+    seat: m.seat || '',
+    buyerUid: m.buyer_uid || '',
+    buyerEmail: m.buyer_email || session.customer_details?.email || '',
+    buyerName: m.buyer_name || '',
+    amountUsd: Number(m.amount_usd) || 0,
+    promoApplied: !!m.promo,
+  };
 }

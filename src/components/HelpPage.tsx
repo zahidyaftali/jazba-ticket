@@ -12,7 +12,9 @@ import {
   Send,
   Loader2,
   X,
+  AlertCircle,
 } from "lucide-react";
+import { sendFormEmail } from "../services/formEmailService";
 
 interface HelpPageProps {
   onBackToHome: () => void;
@@ -48,7 +50,7 @@ export default function HelpPage({
   >([
     {
       sender: "agent",
-      text: "Hi! You're through to Jazbatickets support. How can I help?",
+      text: "Hi! You're through to Jazba Tickets support. How can I help?",
       time: "Just now",
     },
   ]);
@@ -62,13 +64,15 @@ export default function HelpPage({
     message: "",
   });
   const [formSubmitted, setFormSubmitted] = useState(false);
+  const [formSending, setFormSending] = useState(false);
+  const [formError, setFormError] = useState("");
 
   const knowledgebaseArticles = {
     tickets: [
       {
         id: 1,
         title: "How do I book an event ticket online?",
-        desc: "Browse events on Jazbatickets, choose your date, ticket type, and quantity, then check out securely by card or Apple Pay / Google Pay. You'll get a confirmation on screen straight away, and a confirmation email with your digital ticket (QR/barcode) follows immediately after.",
+        desc: "Browse events on Jazba Tickets, choose your date, ticket type, and quantity, then check out securely by card or Apple Pay / Google Pay. You'll get a confirmation on screen straight away, and a confirmation email with your digital ticket (QR/barcode) follows immediately after.",
       },
       {
         id: 2,
@@ -88,7 +92,7 @@ export default function HelpPage({
       {
         id: 5,
         title: "What should I do if I don't receive my ticket after booking?",
-        desc: "First check your spam/junk folder. If it's still not there, log in to your Jazbatickets account and go to My Passes, or contact support@jazbatickets.com with your order reference and we'll resend it.",
+        desc: "First check your spam/junk folder. If it's still not there, log in to your Jazba Tickets account and go to My Passes, or contact support@jazbatickets.com with your order reference and we'll resend it.",
       },
     ],
     organisers: [
@@ -100,7 +104,7 @@ export default function HelpPage({
       {
         id: 7,
         title: "What does it cost to sell tickets?",
-        desc: "Jazbatickets charges a service fee per ticket sold, deducted automatically from each sale. Free events stay free to list.",
+        desc: "Jazba Tickets charges a service fee per ticket sold, deducted automatically from each sale. Free events stay free to list.",
       },
       {
         id: 8,
@@ -218,9 +222,23 @@ export default function HelpPage({
     }, 1600);
   };
 
-  const handleContactSubmit = (e: React.FormEvent) => {
+  const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contactForm.name || !contactForm.email || !contactForm.message) return;
+    if (!contactForm.name || !contactForm.email || !contactForm.message || formSending) return;
+    setFormSending(true);
+    setFormError("");
+    const result = await sendFormEmail({
+      formName: "help",
+      name: contactForm.name,
+      email: contactForm.email,
+      subject: contactForm.subject,
+      message: contactForm.message,
+    });
+    setFormSending(false);
+    if (!result.ok) {
+      setFormError(result.error || "Could not send your message. Please try again.");
+      return;
+    }
     setFormSubmitted(true);
     setTimeout(() => {
       setContactForm({
@@ -229,6 +247,7 @@ export default function HelpPage({
         subject: "A ticket order",
         message: "",
       });
+      setFormSubmitted(false);
     }, 3000);
   };
 
@@ -635,11 +654,20 @@ export default function HelpPage({
                     />
                   </div>
 
+                  {formError && (
+                    <div className="flex items-start gap-2 bg-[#f7f7f7] border-l-2 border-[#be6464] text-[#be6464] text-xs font-bold p-3">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>{formError}</span>
+                    </div>
+                  )}
+
                   <button
                     type="submit"
-                    className="bg-[#ffed00] text-black px-8 py-4 text-sm font-bold cursor-pointer hover:bg-[#e6d200] transition-colors flex items-center gap-2"
+                    disabled={formSending}
+                    className="bg-[#ffed00] text-black px-8 py-4 text-sm font-bold cursor-pointer hover:bg-[#e6d200] transition-colors flex items-center gap-2 disabled:opacity-60"
                   >
-                    Send message <Send className="w-4 h-4" />
+                    {formSending ? "Sending…" : "Send message"}
+                    {formSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   </button>
                 </form>
               )}
@@ -676,7 +704,7 @@ export default function HelpPage({
                 <span className="w-2 h-2 rounded-full bg-[#ffed00]" />
                 <div>
                   <span className="font-bold text-sm block leading-tight">
-                    Jazbatickets support
+                    Jazba Tickets support
                   </span>
                   <span className="text-[11px] text-white/60">
                     Typically replies in under a minute

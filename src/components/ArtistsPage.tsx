@@ -2,7 +2,6 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { getAllArtists, ArtistProfile, followTarget, unfollowTarget, getFollowingIds } from '../services/backendService';
 import { auth } from '../firebase';
-import { useLocalCurrency } from '../currency';
 import {
   Search,
   MapPin,
@@ -83,15 +82,7 @@ const CATEGORIES = [
   { id: 'exhibition', name: 'Exhibition artists' },
 ];
 
-const FEE_TIERS = [
-  { id: 'all', label: 'Any budget' },
-  { id: 'under-150', label: 'Under $150' },
-  { id: '150-250', label: '$150–$250' },
-  { id: 'over-250', label: '$250+' },
-] as const;
-
 export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectArtist, onRequireLogin }: ArtistsPageProps) {
-  const { format } = useLocalCurrency();
   // Live artist roster from Firestore
   const [artists, setArtists] = useState<ArtistItem[]>([]);
   const [artistsLoaded, setArtistsLoaded] = useState(false);
@@ -106,7 +97,6 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
-  const [feeTier, setFeeTier] = useState<'all' | 'under-150' | '150-250' | 'over-250'>('all');
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [onlyFeatured, setOnlyFeatured] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -159,21 +149,17 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
       }
       if (selectedCategory !== 'all' && artist.category !== selectedCategory) return false;
       if (selectedLocation !== 'all' && !artist.location.toLowerCase().includes(selectedLocation.toLowerCase())) return false;
-      if (feeTier === 'under-150' && artist.hourlyRate >= 150) return false;
-      if (feeTier === '150-250' && (artist.hourlyRate < 150 || artist.hourlyRate > 250)) return false;
-      if (feeTier === 'over-250' && artist.hourlyRate <= 250) return false;
       if (onlyAvailable && !artist.availableNow) return false;
       if (onlyFeatured && !artist.featured) return false;
       if (showOnlyLiked && !likedArtistIds.includes(artist.id)) return false;
       return true;
     });
-  }, [artists, searchQuery, selectedCategory, selectedLocation, feeTier, onlyAvailable, onlyFeatured, showOnlyLiked, likedArtistIds]);
+  }, [artists, searchQuery, selectedCategory, selectedLocation, onlyAvailable, onlyFeatured, showOnlyLiked, likedArtistIds]);
 
   const handleResetFilters = () => {
     setSearchQuery('');
     setSelectedCategory('all');
     setSelectedLocation('all');
-    setFeeTier('all');
     setOnlyAvailable(false);
     setOnlyFeatured(false);
     setShowOnlyLiked(false);
@@ -332,28 +318,6 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
               </select>
             </div>
 
-            {/* Fee per event */}
-            <div>
-              <span className={`${overline} text-[#666] border-b border-black pb-3 block`}>Fee per event</span>
-              <div className="border-b border-[#f2f2f2]">
-                {FEE_TIERS.map((tier) => {
-                  const active = feeTier === tier.id;
-                  return (
-                    <button
-                      key={tier.id}
-                      onClick={() => setFeeTier(tier.id)}
-                      className={`w-full flex items-center justify-between py-3.5 border-b border-[#f2f2f2] last:border-b-0 text-sm cursor-pointer text-left transition-colors ${
-                        active ? 'font-bold text-black' : 'text-[#666] hover:text-black'
-                      }`}
-                    >
-                      <span>{tier.label}</span>
-                      {active && <Check className="w-4 h-4" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
             {/* Toggles */}
             <div className="space-y-4">
               <label className="flex items-center gap-3 cursor-pointer">
@@ -441,7 +405,7 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                       <img
                         src={artist.avatar}
                         alt={artist.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
                         referrerPolicy="no-referrer"
                       />
                       {artist.featured && (
@@ -463,8 +427,8 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
 
                       <div className="flex items-center justify-between border-t border-[#f2f2f2] mt-4 pt-4">
                         <div>
-                          <span className={`${overline} text-[#8a8a8a] block`}>From</span>
-                          <span className="font-display font-bold text-lg">{format(artist.hourlyRate)}<span className="text-xs font-normal text-[#8a8a8a]"> / event</span></span>
+                          <span className={`${overline} text-[#8a8a8a] block`}>Fee</span>
+                          <span className="font-display font-bold text-lg">POR</span>
                         </div>
                         {followButton(artist)}
                       </div>
@@ -487,7 +451,7 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                       <img
                         src={artist.avatar}
                         alt={artist.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
                         referrerPolicy="no-referrer"
                       />
                     </div>
@@ -503,9 +467,7 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
                     </div>
 
                     <div className="flex sm:flex-col items-center sm:items-end justify-between gap-3 shrink-0">
-                      <span className="font-display font-bold text-lg">
-                        {format(artist.hourlyRate)}<span className="text-xs font-normal text-[#8a8a8a]"> / event</span>
-                      </span>
+                      <span className="font-display font-bold text-lg">POR</span>
                       {followButton(artist)}
                     </div>
                   </motion.div>

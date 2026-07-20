@@ -11,11 +11,11 @@ const SECTIONS: Array<{ id: string; title: string; body: React.ReactNode }> = [
     title: "The Platform's Role",
     body: (
       <p>
-        For events listed by third-party organisers, Jazbaticket acts as a
+        For events listed by third-party organisers, Jazba Tickets acts as a
         ticketing agent and technology platform. The contract for the event
         itself — its content, safety, running, and any accessibility or seating
         arrangements — is between you and the event organiser and/or venue, not
-        Jazbaticket. Jazbaticket is responsible for the ticketing transaction
+        Jazba Tickets. Jazba Tickets is responsible for the ticketing transaction
         and for events we organise directly ourselves.
       </p>
     ),
@@ -27,13 +27,13 @@ const SECTIONS: Array<{ id: string; title: string; body: React.ReactNode }> = [
       <>
         <p>
           Only a written communication from an authorised representative of
-          Jazba Entertainment Ltd, sent from an @jazbaentertainment.net address,
+          Jazba Entertainment Ltd, sent from an @jazbatickets.com address,
           can vary these Terms, confirm a refund, or make any commitment on
           behalf of the company.
         </p>
         <p className="mt-3">
           Venue staff, security personnel, stewards, box office staff not
-          employed by Jazbaticket, promoters, and any other third party present
+          employed by Jazba Tickets, promoters, and any other third party present
           at or connected with an event have no authority whatsoever to promise
           refunds, exchanges, or any other variation of these Terms on our
           behalf, regardless of anything they say to you at an event or
@@ -178,7 +178,7 @@ const SECTIONS: Array<{ id: string; title: string; body: React.ReactNode }> = [
       <p>
         You agree not to use the Platform for fraudulent purposes, upload false
         or infringing content, interfere with its operation or security, harass
-        or abuse our staff, or impersonate any artist, organiser, or Jazbaticket
+        or abuse our staff, or impersonate any artist, organiser, or Jazba Tickets
         staff member.
       </p>
     ),
@@ -312,7 +312,7 @@ export default function TermsOfUsePage({ onBackToHome }: TermsOfUsePageProps) {
             Terms of <span className="text-[#ffed00]">Use</span>
           </h1>
           <p className="text-neutral-300 font-normal text-sm sm:text-base max-w-2xl leading-relaxed">
-            The rules that govern your use of the Jazbatickets platform —
+            The rules that govern your use of the Jazba Tickets platform —
             accounts, ticket purchases, event listings, and artist bookings.
           </p>
           <span className="inline-block text-[11px] font-bold text-white/50">
@@ -326,12 +326,12 @@ export default function TermsOfUsePage({ onBackToHome }: TermsOfUsePageProps) {
         <div className="max-w-4xl mx-auto">
           <div className="text-sm text-[#444] leading-relaxed border-b border-[#f2f2f2] pb-8">
             <p>
-              Welcome to Jazbaticket. These Terms of Use ("Terms") govern your
+              Welcome to Jazba Tickets. These Terms of Use ("Terms") govern your
               access to and use of jazba-ticket.vercel.app and any associated
               apps (the "Platform"), operated by{" "}
               <strong className="font-bold">Jazba Entertainment Ltd</strong>, a
               company registered in England and Wales (Company No. 08116770),
-              registered office Birmingham, United Kingdom ("Jazbaticket", "we",
+              registered office Birmingham, United Kingdom ("Jazba Tickets", "we",
               "us", "our"). By creating an account, purchasing a ticket, listing
               an event, or booking an artist through the Platform, you agree to
               these Terms.

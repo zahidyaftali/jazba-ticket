@@ -47,7 +47,7 @@ export default function OrganizersPage() {
             The teams behind <span className="text-[#ffed00]">the shows.</span>
           </h1>
           <p className="text-white/70 text-base sm:text-lg mt-5 max-w-2xl leading-relaxed">
-            Meet the event organisers on Jazbatickets — browse their profiles, follow the ones you love, and never miss what they put on next.
+            Meet the event organisers on Jazba Tickets — browse their profiles, follow the ones you love, and never miss what they put on next.
           </p>
 
           {/* Search */}
@@ -141,7 +141,7 @@ export default function OrganizersPage() {
         ) : (
           <div className="border border-[#f2f2f2] py-20 text-center">
             <p className="font-bold">No organisers found{searchQuery.trim() ? ` for "${searchQuery}"` : ' yet'}.</p>
-            <p className="text-sm text-[#666] mt-2">Check back soon — new organisers join Jazbatickets all the time.</p>
+            <p className="text-sm text-[#666] mt-2">Check back soon — new organisers join Jazba Tickets all the time.</p>
           </div>
         )}
       </section>

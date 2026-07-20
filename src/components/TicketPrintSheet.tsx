@@ -40,7 +40,7 @@ export default function TicketPrintSheet({
           <span className="flex items-center gap-3">
             <img src={brandMark} alt="" className="w-9 h-9 object-contain" />
             <span className="font-display font-bold text-base tracking-[0.25em]">
-              JAZBATICKET
+              JAZBA TICKETS
             </span>
           </span>
           <span className="text-[10px] font-bold tracking-[0.18em] uppercase bg-[#ffed00] text-black px-3 py-1.5">
@@ -108,7 +108,7 @@ export default function TicketPrintSheet({
           </div>
           <div className="text-right text-[10px] text-[#666] leading-relaxed max-w-[220px]">
             Show this barcode at the entrance — printed or on your phone. Issued
-            and verified by Jazbaticket · support@jazbatickets.com
+            and verified by Jazba Tickets · support@jazbatickets.com
           </div>
         </div>
       </div>

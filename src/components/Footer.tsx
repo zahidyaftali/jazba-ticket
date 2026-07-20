@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ArrowRight, Check } from 'lucide-react';
+import { ArrowRight, Check, AlertCircle, Loader2 } from 'lucide-react';
 import mainLogo from '../../assets/images/Main Logo.png';
+import { sendFormEmail } from '../services/formEmailService';
 
 interface FooterProps {
   onScrollToSection: (id: string) => void;
@@ -12,10 +13,20 @@ interface FooterProps {
 export default function Footer({ onScrollToSection, onSubscribe, onViewRefundPolicies, onViewTermsOfUse }: FooterProps) {
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
+  const [subscribeError, setSubscribeError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
+    if (!email || subscribing) return;
+    setSubscribing(true);
+    setSubscribeError('');
+    const result = await sendFormEmail({ formName: 'newsletter', email });
+    setSubscribing(false);
+    if (!result.ok) {
+      setSubscribeError(result.error || 'Could not subscribe. Please try again.');
+      return;
+    }
     onSubscribe(email);
     setSubscribed(true);
     setEmail('');
@@ -44,24 +55,33 @@ export default function Footer({ onScrollToSection, onSubscribe, onViewRefundPol
                 <Check className="w-4 h-4" /> You're on the list.
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="flex items-stretch gap-0">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  required
-                  className="flex-1 bg-black text-white placeholder-white/40 text-sm px-4 py-3 border border-white"
-                  id="newsletter-email-input"
-                />
-                <button
-                  type="submit"
-                  className="shrink-0 bg-[#ffed00] text-black px-6 py-3 text-sm font-bold cursor-pointer ml-4 flex items-center gap-2"
-                  id="newsletter-btn-subscribe"
-                >
-                  Subscribe <ArrowRight className="w-4 h-4" />
-                </button>
-              </form>
+              <div>
+                <form onSubmit={handleSubmit} className="flex items-stretch gap-0">
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    required
+                    className="flex-1 bg-black text-white placeholder-white/40 text-sm px-4 py-3 border border-white"
+                    id="newsletter-email-input"
+                  />
+                  <button
+                    type="submit"
+                    disabled={subscribing}
+                    className="shrink-0 bg-[#ffed00] text-black px-6 py-3 text-sm font-bold cursor-pointer ml-4 flex items-center gap-2 disabled:opacity-60"
+                    id="newsletter-btn-subscribe"
+                  >
+                    {subscribing ? 'Subscribing…' : 'Subscribe'}
+                    {subscribing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                  </button>
+                </form>
+                {subscribeError && (
+                  <p className="flex items-center gap-1.5 text-xs font-bold text-[#ff9b9b] mt-2">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {subscribeError}
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -73,7 +93,7 @@ export default function Footer({ onScrollToSection, onSubscribe, onViewRefundPol
           {/* Brand */}
           <div className="md:col-span-4">
             <div className="cursor-pointer" onClick={() => onScrollToSection('top')}>
-              <img src={mainLogo} alt="Jazbatickets" className="h-14 w-auto object-contain" />
+              <img src={mainLogo} alt="Jazba Tickets" className="h-14 w-auto object-contain" />
             </div>
             <p className="text-white/50 text-sm leading-relaxed max-w-xs mt-4">
               Book tickets to concerts, theatre, comedy and sport — and the artists to headline your own event.
@@ -129,7 +149,7 @@ export default function Footer({ onScrollToSection, onSubscribe, onViewRefundPol
       {/* BOTTOM BAR */}
       <div className="border-t border-white/15">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/50">
-          <p>© 2026 Jazbatickets · Jazba Entertainment Ltd. All rights reserved.</p>
+          <p>© 2026 Jazba Tickets · Jazba Entertainment Ltd. All rights reserved.</p>
           <div className="flex items-center gap-5">
             <button onClick={onViewTermsOfUse || (() => onScrollToSection('help'))} className="hover:text-white transition-colors cursor-pointer">Terms</button>
             <button onClick={() => onScrollToSection('privacy')} className="hover:text-white transition-colors cursor-pointer">Privacy</button>

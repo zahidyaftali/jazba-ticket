@@ -433,7 +433,12 @@ export async function getBookings(userId?: string): Promise<Booking[]> {
 export async function createBooking(booking: Booking): Promise<Booking> {
   const path = `bookings`;
   try {
-    const docRef = doc(collection(db, 'bookings'));
+    // Honour a caller-supplied id (e.g. the Stripe order id) so a repeat call
+    // for the same order — a refreshed checkout-success page — targets the
+    // same document instead of creating a duplicate booking. Firestore rules
+    // only allow admins to update an existing booking, so a genuine repeat
+    // write is safely rejected rather than silently duplicated.
+    const docRef = booking.id ? doc(db, 'bookings', booking.id) : doc(collection(db, 'bookings'));
     const cleanBooking = { ...booking, id: docRef.id };
     await setDoc(docRef, cleanBooking);
 

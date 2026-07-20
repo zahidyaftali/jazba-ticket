@@ -77,7 +77,7 @@ export default function Navbar({ onScrollToSection, onOpenAuth, currentUser, onG
           id="nav-logo"
         >
           {/* White-wordmark logo turned solid black for the light header */}
-          <img src={mainLogo} alt="Jazbaticket" className="h-12 w-auto object-contain brightness-0" />
+          <img src={mainLogo} alt="Jazba Tickets" className="h-12 w-auto object-contain brightness-0" />
         </button>
 
         {/* CENTER NAV (desktop) */}

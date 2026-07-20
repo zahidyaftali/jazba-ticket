@@ -25,6 +25,7 @@ import UpcomingRows from './components/UpcomingRows';
 import FaqAccordion from './components/FaqAccordion';
 import Footer from './components/Footer';
 import CheckoutPage from './components/CheckoutPage';
+import CheckoutSuccessPage from './components/CheckoutSuccessPage';
 import EventDetailPage from './components/EventDetailPage';
 import EventsExplorerPage from './components/EventsExplorerPage';
 import ArtistsPage, { ArtistItem, mapArtistProfileToItem } from './components/ArtistsPage';
@@ -64,32 +65,33 @@ function ScrollToTop() {
 
 /** Keep the browser-tab title in sync with the current route (SEO + UX). */
 const PAGE_TITLES: Array<{ match: (path: string) => boolean; title: string }> = [
-  { match: (p) => p === '/', title: 'Jazbaticket — Book Live Events, Concerts & Artists' },
-  { match: (p) => p === '/events', title: 'All Events — Jazbaticket' },
-  { match: (p) => p.startsWith('/events/'), title: 'Event Details — Jazbaticket' },
-  { match: (p) => p === '/artists', title: 'Book an Artist — Jazbaticket' },
-  { match: (p) => p.startsWith('/artists/'), title: 'Artist Profile — Jazbaticket' },
-  { match: (p) => p === '/checkout', title: 'Secure Checkout — Jazbaticket' },
-  { match: (p) => p === '/dashboard', title: 'My Account — Jazbaticket' },
-  { match: (p) => p === '/help', title: 'Help Centre — Jazbaticket' },
-  { match: (p) => p === '/about', title: 'About Us — Jazbaticket' },
-  { match: (p) => p === '/contact', title: 'Contact — Jazbaticket' },
-  { match: (p) => p === '/refund-policies', title: 'Refund Policy — Jazbaticket' },
-  { match: (p) => p === '/terms-of-use', title: 'Terms of Use — Jazbaticket' },
-  { match: (p) => p === '/affiliates', title: 'Affiliate Programme — Jazbaticket' },
-  { match: (p) => p === '/ticket-safety', title: 'Ticket Safety — Jazbaticket' },
-  { match: (p) => p === '/privacy', title: 'Privacy Policy — Jazbaticket' },
-  { match: (p) => p === '/organizers', title: 'Event Organisers — Jazbaticket' },
-  { match: (p) => p.startsWith('/organizers/'), title: 'Organiser Profile — Jazbaticket' },
-  { match: (p) => p === '/login', title: 'Sign In — Jazbaticket' },
-  { match: (p) => p === '/signup', title: 'Sign Up — Jazbaticket' },
+  { match: (p) => p === '/', title: 'Jazba Tickets — Book Live Events, Concerts & Artists' },
+  { match: (p) => p === '/events', title: 'All Events — Jazba Tickets' },
+  { match: (p) => p.startsWith('/events/'), title: 'Event Details — Jazba Tickets' },
+  { match: (p) => p === '/artists', title: 'Book an Artist — Jazba Tickets' },
+  { match: (p) => p.startsWith('/artists/'), title: 'Artist Profile — Jazba Tickets' },
+  { match: (p) => p === '/checkout', title: 'Secure Checkout — Jazba Tickets' },
+  { match: (p) => p === '/checkout/success', title: 'Order Confirmed — Jazba Tickets' },
+  { match: (p) => p === '/dashboard', title: 'My Account — Jazba Tickets' },
+  { match: (p) => p === '/help', title: 'Help Centre — Jazba Tickets' },
+  { match: (p) => p === '/about', title: 'About Us — Jazba Tickets' },
+  { match: (p) => p === '/contact', title: 'Contact — Jazba Tickets' },
+  { match: (p) => p === '/refund-policies', title: 'Refund Policy — Jazba Tickets' },
+  { match: (p) => p === '/terms-of-use', title: 'Terms of Use — Jazba Tickets' },
+  { match: (p) => p === '/affiliates', title: 'Affiliate Programme — Jazba Tickets' },
+  { match: (p) => p === '/ticket-safety', title: 'Ticket Safety — Jazba Tickets' },
+  { match: (p) => p === '/privacy', title: 'Privacy Policy — Jazba Tickets' },
+  { match: (p) => p === '/organizers', title: 'Event Organisers — Jazba Tickets' },
+  { match: (p) => p.startsWith('/organizers/'), title: 'Organiser Profile — Jazba Tickets' },
+  { match: (p) => p === '/login', title: 'Sign In — Jazba Tickets' },
+  { match: (p) => p === '/signup', title: 'Sign Up — Jazba Tickets' },
 ];
 
 function PageTitle() {
   const { pathname } = useLocation();
   useEffect(() => {
     const entry = PAGE_TITLES.find((t) => t.match(pathname));
-    document.title = entry ? entry.title : 'Page Not Found — Jazbaticket';
+    document.title = entry ? entry.title : 'Page Not Found — Jazba Tickets';
   }, [pathname]);
   return null;
 }
@@ -299,7 +301,7 @@ function EventDetailView({ events, eventsLoaded }: { events: EventItem[]; events
   const event = events.find((e) => e.id === id);
 
   useEffect(() => {
-    if (event) document.title = `${event.title} — Tickets | Jazbaticket`;
+    if (event) document.title = `${event.title} — Tickets | Jazba Tickets`;
   }, [event]);
 
   if (!eventsLoaded) return <DetailPageSkeleton />;
@@ -340,7 +342,24 @@ function CheckoutView({ currentUser, authChecked }: { currentUser: AuthUser; aut
       initialQuantity={state.quantity || 1}
       initialTier={state.tier || 'general'}
       onBack={() => navigate(-1)}
-      onGoToDashboard={() => navigate('/dashboard')}
+    />
+  );
+}
+
+/** Where Stripe's hosted Checkout page redirects back to after payment. */
+function CheckoutSuccessView({ events, eventsLoaded }: { events: EventItem[]; eventsLoaded: boolean }) {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const sessionId = searchParams.get('session_id') || '';
+
+  if (!eventsLoaded) return <PageLoading />;
+
+  return (
+    <CheckoutSuccessPage
+      sessionId={sessionId}
+      events={events}
+      onGoToDashboard={() => navigate('/dashboard?tab=passes')}
+      onBrowseEvents={() => navigate('/events')}
     />
   );
 }
@@ -387,7 +406,7 @@ function ArtistDetailView({ events }: { events: EventItem[] }) {
   }, [id, passed]);
 
   useEffect(() => {
-    if (artist) document.title = `${artist.name} — Book This Artist | Jazbaticket`;
+    if (artist) document.title = `${artist.name} — Book This Artist | Jazba Tickets`;
   }, [artist]);
 
   if (notFound) return <NotFoundView />;
@@ -577,6 +596,7 @@ function AppShell() {
         <Route path="/events" element={<ExplorerView events={events} eventsLoaded={eventsLoaded} />} />
         <Route path="/events/:id" element={<EventDetailView events={events} eventsLoaded={eventsLoaded} />} />
         <Route path="/checkout" element={<CheckoutView currentUser={currentUser} authChecked={authChecked} />} />
+        <Route path="/checkout/success" element={<CheckoutSuccessView events={events} eventsLoaded={eventsLoaded} />} />
         <Route path="/artists" element={<ArtistsView events={events} />} />
         <Route path="/artists/:id" element={<ArtistDetailView events={events} />} />
         <Route path="/organizers" element={<OrganizersPage />} />

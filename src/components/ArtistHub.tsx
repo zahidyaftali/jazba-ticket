@@ -375,7 +375,7 @@ export default function ArtistHub() {
                   <img 
                     src={profile.profileImage || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=crop'} 
                     alt={profile.stageName}
-                    className="w-20 h-20 bg-neutral-950 rounded-2xl object-cover   shadow-md shrink-0"
+                    className="w-20 h-20 bg-neutral-950 rounded-2xl object-cover object-top shadow-md shrink-0"
                   />
                   <div>
                     <h3 className="text-2xl sm:text-3xl font-display font-medium text-white text-sentence leading-none">{profile.stageName}</h3>
