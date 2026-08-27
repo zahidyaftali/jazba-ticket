@@ -43,6 +43,7 @@ import TicketSafetyPage from './components/TicketSafetyPage';
 import PrivacyPolicyPage from './components/PrivacyPolicyPage';
 import OrganizersPage from './components/OrganizersPage';
 import OrganizerDetailPage from './components/OrganizerDetailPage';
+import ComingSoonPage from './components/ComingSoonPage';
 import { EventGridSkeleton, DetailPageSkeleton } from './components/Skeletons';
 import { categories, faqs } from './data';
 import { EventItem, isPastEvent } from './types';
@@ -85,6 +86,7 @@ const PAGE_TITLES: Array<{ match: (path: string) => boolean; title: string }> = 
   { match: (p) => p.startsWith('/organizers/'), title: 'Organiser Profile — Jazba Tickets' },
   { match: (p) => p === '/login', title: 'Sign In — Jazba Tickets' },
   { match: (p) => p === '/signup', title: 'Sign Up — Jazba Tickets' },
+  { match: (p) => p === '/coming-soon', title: 'Coming Soon — Jazba Tickets' },
 ];
 
 function PageTitle() {
@@ -578,6 +580,10 @@ function AppShell() {
     }
   };
 
+  // The holding page is deliberately chrome-free — no navbar, no footer,
+  // nothing to click into while ticket sales are closed.
+  if (location.pathname === '/coming-soon') return <ComingSoonPage />;
+
   const isHome = location.pathname === '/';
 
   return (
@@ -612,6 +618,7 @@ function AppShell() {
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/login" element={<LoginView />} />
         <Route path="/signup" element={<SignupView />} />
+        <Route path="/coming-soon" element={<ComingSoonPage />} />
         <Route path="*" element={<NotFoundView />} />
       </Routes>
 
