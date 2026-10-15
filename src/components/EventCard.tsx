@@ -12,7 +12,7 @@ interface EventCardProps {
 
 export default function EventCard({ event, onBook, onViewDetail }: EventCardProps) {
   const [isLiked, setIsLiked] = useState(false);
-  const { format } = useLocalCurrency();
+  const { formatFrom } = useLocalCurrency();
 
   // Determine badge background colors based on parameters or static values
   const getBadgeColorClass = (color?: string) => {
@@ -97,7 +97,7 @@ export default function EventCard({ event, onBook, onViewDetail }: EventCardProp
         <div className="pt-3.5   flex items-center justify-between">
           <div>
             <span className="text-[9px] font-semibold text-neutral-400 block text-sentence tracking-wider">Prices from</span>
-            <span className="font-display font-black text-neutral-900 text-lg">{format(event.price)}</span>
+            <span className="font-display font-black text-neutral-900 text-lg">{formatFrom(event.price)}</span>
           </div>
           <button 
             onClick={(e) => { e.stopPropagation(); onBook(event); }}

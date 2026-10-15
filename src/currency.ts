@@ -73,5 +73,7 @@ export function useLocalCurrency() {
     region,
     currencyCode: currencyCodeFor(region),
     format: (usdAmount: number, opts?: { precise?: boolean }) => formatMoney(usdAmount, region, opts),
+    /** An event's "from" price — "TBA" until a price has been announced. */
+    formatFrom: (usdAmount: number) => (usdAmount > 0 ? formatMoney(usdAmount, region) : 'TBA'),
   };
 }

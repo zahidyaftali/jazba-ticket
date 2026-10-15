@@ -38,18 +38,84 @@ export interface TierPrices {
   elite?: number;
 }
 
-export type TicketTier = 'general' | 'vip' | 'elite';
+/** A ticket package id: "general" | "vip" | "elite" for admin-created events,
+ *  or the event's own package ids (e.g. "meet-greet") when it has ticketOptions. */
+export type TicketTier = string;
 
-/** The ticket packages this event actually offers, in display order.
- *  General falls back to the event's base price so every event stays sellable. */
-export function getAvailableTiers(event: EventItem): { tier: TicketTier; price: number }[] {
+/** A purchasable package defined on the event itself — used by events from
+ *  jazbaentertainment.com. When present it replaces general/vip/elite. */
+export interface TicketOption {
+  id: string;
+  name: string;
+  note?: string;
+  price: number; // USD, like every stored price
+}
+
+/** A price listed for information only (booked by enquiry or on a partner site). */
+export interface PriceLine {
+  name: string;
+  note?: string;
+  price: string; // as written by the organiser, e.g. "PKR 2,200 each"
+}
+
+/** One date/city of a multi-show listing. */
+export interface EventShow {
+  name: string;
+  when: string;
+  details: string[];
+  prices: PriceLine[];
+  ticketUrl?: string;
+}
+
+export const DEFAULT_TIER_META: Record<'general' | 'vip' | 'elite', { name: string; note: string }> = {
+  general: { name: 'General admission', note: 'Standard entry, unreserved seating' },
+  vip: { name: 'VIP', note: 'Reserved seating and priority entry' },
+  elite: { name: 'Elite', note: 'Front rows, lounge access and artist meet' },
+};
+
+/** Display name for a booked tier: the event's own package name, else the
+ *  default label for general/vip/elite. */
+export function tierDisplayName(tier: string, event?: EventItem): string {
+  return (
+    event?.ticketOptions?.find((o) => o.id === tier)?.name ||
+    DEFAULT_TIER_META[tier as keyof typeof DEFAULT_TIER_META]?.name ||
+    tier
+  );
+}
+
+export interface AvailableTier {
+  tier: TicketTier;
+  price: number;
+  name: string;
+  note: string;
+}
+
+/** The ticket packages this site's checkout sells for the event, in display
+ *  order. General falls back to the event's base price so every admin-created
+ *  event stays sellable. Events sold on a partner's site return none. */
+export function getAvailableTiers(event: EventItem): AvailableTier[] {
+  if (event.externalTicketUrl) return [];
+  if (event.ticketOptions?.length) {
+    return event.ticketOptions
+      .filter((o) => o.price > 0)
+      .map((o) => ({ tier: o.id, price: o.price, name: o.name, note: o.note || '' }));
+  }
   const tp = event.tierPrices;
-  const list: { tier: TicketTier; price: number }[] = [];
+  const list: AvailableTier[] = [];
   const general = tp?.general ?? event.price;
-  if (general > 0) list.push({ tier: 'general', price: general });
-  if (tp?.vip && tp.vip > 0) list.push({ tier: 'vip', price: tp.vip });
-  if (tp?.elite && tp.elite > 0) list.push({ tier: 'elite', price: tp.elite });
+  if (general > 0) list.push({ tier: 'general', price: general, ...DEFAULT_TIER_META.general });
+  if (tp?.vip && tp.vip > 0) list.push({ tier: 'vip', price: tp.vip, ...DEFAULT_TIER_META.vip });
+  if (tp?.elite && tp.elite > 0) list.push({ tier: 'elite', price: tp.elite, ...DEFAULT_TIER_META.elite });
   return list;
+}
+
+/** Order maths, in USD. Must stay identical to computeTotalUsd() in
+ *  api/_lib/stripePayment.ts so the total shown is the amount charged. */
+export function computeOrderTotals(unitPrice: number, quantity: number, promoApplied: boolean) {
+  const subtotal = unitPrice * quantity;
+  const discount = promoApplied ? subtotal * 0.18 : 0;
+  const fees = (subtotal - discount) * 0.08;
+  return { subtotal, discount, fees, total: subtotal - discount + fees };
 }
 
 export interface EventItem {
@@ -86,6 +152,17 @@ export interface EventItem {
   organizerName?: string;
   organizerBio?: string;
   organizerImage?: string;
+
+  // ---- Set on events from jazbaentertainment.com (api/_lib/wordpressEvents.ts)
+  ticketOptions?: TicketOption[];
+  /** Tickets are sold on a partner's site, not through this checkout. */
+  externalTicketUrl?: string;
+  /** Per-city dates and prices for tours and partner-sold events. */
+  shows?: EventShow[];
+  /** Packages listed by the organiser but booked by enquiry (e.g. student batches). */
+  enquiryPackages?: PriceLine[];
+  /** ISO date (yyyy-mm-dd) of the event's last day. */
+  endsOn?: string;
 }
 
 // ---- Past / upcoming detection ------------------------------------------
@@ -96,6 +173,10 @@ const MONTH_INDEX: Record<string, number> = {
 
 /** Timestamp for the end of the event's day, or null when the date can't be parsed. */
 export function getEventTimestamp(event: EventItem): number | null {
+  // Multi-date tours stay upcoming until their last show.
+  const ends = (event.endsOn || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (ends) return new Date(Number(ends[1]), Number(ends[2]) - 1, Number(ends[3]), 23, 59, 59).getTime();
+
   const m = (event.date || '').match(/(\d{1,2})\s+([A-Za-z]{3})/);
   if (!m) return null;
   const day = Number(m[1]);

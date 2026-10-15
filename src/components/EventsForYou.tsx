@@ -55,6 +55,9 @@ export default function EventsForYou({ events, onBook, onViewDetail }: EventsFor
     { id: 'weekend', label: 'This weekend' },
   ] as const;
 
+  // No offers on right now — leave the band out rather than show it empty.
+  if (displayEvents.length === 0) return null;
+
   return (
     // The home page's single yellow accent band
     <section className="bg-[#ffed00] text-black py-20 px-4 sm:px-6 md:px-8" id="for-you">
@@ -137,7 +140,7 @@ export default function EventsForYou({ events, onBook, onViewDetail }: EventsFor
                     onClick={(e) => { e.stopPropagation(); onBook(item); }}
                     className="mt-4 w-full bg-black text-white py-3.5 text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2"
                   >
-                    Buy from {format(item.price)} <ArrowRight className="w-4 h-4" />
+                    {item.price > 0 ? `Buy from ${format(item.price)}` : 'View event'} <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               </div>

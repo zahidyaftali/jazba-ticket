@@ -14,6 +14,8 @@ export interface TicketPrintData {
   seat?: string;
   quantity: number;
   tier: "general" | "vip" | "elite" | string;
+  /** The package name, when the event defines its own (e.g. "Meet & Greet"). */
+  tierName?: string;
   code: string;
 }
 
@@ -44,7 +46,7 @@ export default function TicketPrintSheet({
             </span>
           </span>
           <span className="text-[10px] font-bold tracking-[0.18em] uppercase bg-[#ffed00] text-black px-3 py-1.5">
-            {tierLabel(ticket.tier)}
+            {ticket.tierName || tierLabel(ticket.tier)}
           </span>
         </div>
 

@@ -21,7 +21,7 @@ import {
   ArrowRight,
   Share2,
 } from "lucide-react";
-import { EventItem, isPastEvent } from "../types";
+import { EventItem, isPastEvent, tierDisplayName } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import {
   auth,
@@ -72,7 +72,7 @@ interface PersonalBooking {
   id: string;
   event: EventItem;
   quantity: number;
-  tier: "general" | "vip" | "elite";
+  tier: string;
   bookingDate: string;
   orderId: string;
   seat: string;
@@ -117,7 +117,7 @@ export default function UserDashboardPage({
       ? (initialTab as TabId)
       : "overview",
   );
-  const { format: formatPrice } = useLocalCurrency();
+  const { formatFrom } = useLocalCurrency();
 
   // Follow header-dropdown deep links while already on the dashboard
   useEffect(() => {
@@ -396,6 +396,7 @@ export default function UserDashboardPage({
     seat: pass.seat,
     quantity: pass.quantity,
     tier: pass.tier,
+    tierName: tierDisplayName(pass.tier, pass.event),
     code: `#${pass.barCode.substring(0, 4)}-${pass.barCode.substring(4, 8)}`,
   });
 
@@ -782,7 +783,7 @@ export default function UserDashboardPage({
                                 {evt.title}
                               </h4>
                               <span className="text-sm text-[#666] mt-0.5 block">
-                                From {formatPrice(evt.price)} · {evt.date}
+                                From {formatFrom(evt.price)} · {evt.date}
                               </span>
                             </div>
                             <button
@@ -830,11 +831,7 @@ export default function UserDashboardPage({
                                 <span
                                   className={`${overline} bg-[#ffed00] text-black px-3 py-1.5`}
                                 >
-                                  {pass.tier === "elite"
-                                    ? "Elite"
-                                    : pass.tier === "vip"
-                                      ? "VIP"
-                                      : "General admission"}
+                                  {tierDisplayName(pass.tier, pass.event)}
                                 </span>
                               </div>
 
@@ -1033,7 +1030,7 @@ export default function UserDashboardPage({
                                 {show.title}
                               </h4>
                               <span className="text-sm text-[#666]">
-                                From {formatPrice(show.price)} · {show.date}
+                                From {formatFrom(show.price)} · {show.date}
                               </span>
                             </div>
                             <div className="flex gap-2 shrink-0">

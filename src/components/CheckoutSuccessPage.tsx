@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, Loader2, Printer, ShieldCheck, AlertCircle } from 'lucide-react';
-import { EventItem } from '../types';
+import { EventItem, tierDisplayName } from '../types';
 import { auth } from '../firebase';
 import { createBooking } from '../services/backendService';
 import TicketPrintSheet from './TicketPrintSheet';
@@ -16,7 +16,8 @@ interface VerifiedSession {
   paid: boolean;
   orderId: string;
   eventId: string;
-  tier: 'general' | 'vip' | 'elite';
+  tier: string;
+  tierName?: string;
   quantity: number;
   seat: string;
   buyerUid: string;
@@ -187,7 +188,7 @@ export default function CheckoutSuccessPage({ sessionId, events, onGoToDashboard
                 <ShieldCheck className="w-4 h-4 text-[#ffed00]" /> JAZBA TICKETS
               </span>
               <span className={`${overline} bg-[#ffed00] text-black px-3 py-1.5`}>
-                {session.tier === 'elite' ? 'Elite' : session.tier === 'vip' ? 'VIP' : 'General admission'}
+                {session.tierName || tierDisplayName(session.tier, event)}
               </span>
             </div>
 
@@ -260,6 +261,7 @@ export default function CheckoutSuccessPage({ sessionId, events, onGoToDashboard
               seat: session.seat,
               quantity: session.quantity,
               tier: session.tier,
+              tierName: session.tierName || tierDisplayName(session.tier, event),
               code: session.orderId,
             }}
           />

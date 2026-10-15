@@ -1,4 +1,8 @@
 {
+  "functions": {
+    "api/wp-events.ts": { "maxDuration": 30 },
+    "api/create-checkout-session.ts": { "maxDuration": 30 }
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],

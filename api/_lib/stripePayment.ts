@@ -1,4 +1,7 @@
 import Stripe from 'stripe';
+// The .js extensions are required: Vercel runs these as native ESM.
+import { USD_RATES } from './currencyRates.js';
+import { WP_EVENT_PREFIX, fetchWordPressEvent, isWordPressEventOver } from './wordpressEvents.js';
 
 // Shared by the Vercel serverless functions (api/create-checkout-session.ts,
 // api/get-checkout-session.ts) and the Vite dev-server middleware
@@ -20,14 +23,6 @@ const FIREBASE = {
   projectId: 'gen-lang-client-0037466749',
   apiKey: 'AIzaSyBn7JXZLWICgJ4Bw6bNBUWfWQ5XAng6gdU',
   databaseId: 'ai-studio-3fd360dc-3f27-4806-97c6-a0dfddc09741',
-};
-
-// USD → local conversion rates. Must mirror src/currency.ts so the amount
-// charged always equals the total shown on screen.
-const USD_RATES: Record<string, number> = {
-  USD: 1,
-  GBP: 0.78,
-  PKR: 280,
 };
 
 // Must mirror the promo codes accepted in CheckoutPage.tsx (18% off).
@@ -84,9 +79,38 @@ function fsValue(v: any): any {
   return undefined;
 }
 
+interface EventPricing {
+  title: string;
+  /** Ticket packages on sale, keyed by tier id. */
+  tiers: Record<string, { price: number; name: string }>;
+}
+
+const DEFAULT_TIER_NAMES: Record<string, string> = { general: 'General admission', vip: 'VIP', elite: 'Elite' };
+
+/** Pricing for an event from jazbaentertainment.com, read live from WordPress
+ *  through the same mapper that builds the public listing. */
+async function fetchWordPressEventPricing(eventId: string): Promise<EventPricing> {
+  const event = await fetchWordPressEvent(eventId).catch((err) => {
+    console.error('WordPress event lookup failed:', err?.message || err);
+    throw new PaymentError('We could not load this event right now. Please try again in a moment.', 502);
+  });
+  if (!event) throw new PaymentError('This event could not be found.', 404);
+  if (event.externalTicketUrl) throw new PaymentError('Tickets for this event are sold by our partner — use the booking link on the event page.');
+  if (isWordPressEventOver(event)) throw new PaymentError('This event has ended.');
+
+  const tiers: EventPricing['tiers'] = {};
+  for (const option of event.ticketOptions || []) {
+    if (option.price > 0) tiers[option.id] = { price: option.price, name: option.name };
+  }
+  if (Object.keys(tiers).length === 0) throw new PaymentError('Tickets for this event are not on sale yet.');
+  return { title: event.title, tiers };
+}
+
 /** Fetch a published event's pricing straight from Firestore, reading as the
  *  verified buyer (their ID token) so security rules see a signed-in user. */
-async function fetchEventPricing(eventId: string, idToken: string): Promise<{ title: string; tierPrices: Record<string, number> }> {
+async function fetchEventPricing(eventId: string, idToken: string): Promise<EventPricing> {
+  if (eventId.startsWith(WP_EVENT_PREFIX)) return fetchWordPressEventPricing(eventId);
+
   const url =
     `https://firestore.googleapis.com/v1/projects/${FIREBASE.projectId}` +
     `/databases/${FIREBASE.databaseId}/documents/events/${encodeURIComponent(eventId)}` +
@@ -103,20 +127,23 @@ async function fetchEventPricing(eventId: string, idToken: string): Promise<{ ti
   const basePrice = Number(fsValue(f.price)) || 0;
   const tp = fsValue(f.tierPrices) || {};
   // Same tier availability logic as getAvailableTiers() in src/types.ts.
-  const tierPrices: Record<string, number> = {};
+  const tiers: EventPricing['tiers'] = {};
   const general = Number(tp.general) || basePrice;
-  if (general > 0) tierPrices.general = general;
-  if (Number(tp.vip) > 0) tierPrices.vip = Number(tp.vip);
-  if (Number(tp.elite) > 0) tierPrices.elite = Number(tp.elite);
+  if (general > 0) tiers.general = { price: general, name: DEFAULT_TIER_NAMES.general };
+  if (Number(tp.vip) > 0) tiers.vip = { price: Number(tp.vip), name: DEFAULT_TIER_NAMES.vip };
+  if (Number(tp.elite) > 0) tiers.elite = { price: Number(tp.elite), name: DEFAULT_TIER_NAMES.elite };
 
-  return { title: fsValue(f.title) || 'Event', tierPrices };
+  return { title: fsValue(f.title) || 'Event', tiers };
 }
 
-/** Compute the USD total exactly like the checkout page displays it. */
+/** Compute the USD total exactly like the checkout page displays it —
+ *  must stay identical to computeOrderTotals() in src/types.ts. No rounding
+ *  in USD: prices converted from PKR/GBP only come out exact in the buyer's
+ *  currency, and toChargeAmount() rounds once, at the end. */
 export function computeTotalUsd(tierPrice: number, quantity: number, promoApplied: boolean): number {
   const subtotal = tierPrice * quantity;
-  const discount = promoApplied ? Math.round(subtotal * 0.18) : 0;
-  const fees = Math.round((subtotal - discount) * 0.08);
+  const discount = promoApplied ? subtotal * 0.18 : 0;
+  const fees = (subtotal - discount) * 0.08;
   return subtotal - discount + fees;
 }
 
@@ -155,7 +182,7 @@ export async function createCheckoutSession(
   const fullName = typeof body.fullName === 'string' ? body.fullName.trim().slice(0, 200) : '';
 
   if (!eventId || !/^[a-zA-Z0-9_-]{1,128}$/.test(eventId)) throw new PaymentError('Invalid event.');
-  if (!['general', 'vip', 'elite'].includes(tier)) throw new PaymentError('Invalid ticket type.');
+  if (!/^[a-z0-9-]{1,64}$/.test(tier)) throw new PaymentError('Invalid ticket type.');
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 10) throw new PaymentError('Invalid ticket quantity.');
   if (!(currency in USD_RATES)) throw new PaymentError('Unsupported currency.');
   if (!idToken) throw new PaymentError('You must be signed in to pay. Please log in and try again.', 401);
@@ -163,11 +190,11 @@ export async function createCheckoutSession(
   const user = await verifyFirebaseUser(idToken);
   const event = await fetchEventPricing(eventId, idToken);
 
-  const tierPrice = event.tierPrices[tier];
-  if (!tierPrice) throw new PaymentError('That ticket package is not available for this event.');
+  const selected = Object.prototype.hasOwnProperty.call(event.tiers, tier) ? event.tiers[tier] : undefined;
+  if (!selected) throw new PaymentError('That ticket package is not available for this event.');
 
   const promoApplied = PROMO_CODES.has(promoCode);
-  const amountUsd = computeTotalUsd(tierPrice, quantity, promoApplied);
+  const amountUsd = computeTotalUsd(selected.price, quantity, promoApplied);
   if (amountUsd <= 0 || amountUsd > 10000) throw new PaymentError('Invalid payment amount.');
 
   const seat = `${String.fromCharCode(65 + Math.floor(Math.random() * 10))}-${Math.floor(1 + Math.random() * 24)}`;
@@ -175,7 +202,7 @@ export async function createCheckoutSession(
   // booking doc id — so a refreshed success page overwrites the same
   // document instead of creating a duplicate booking.
   const orderId = `TT-${Math.floor(100000 + Math.random() * 900000)}`;
-  const tierLabel = tier === 'elite' ? 'Elite' : tier === 'vip' ? 'VIP' : 'General admission';
+  const tierLabel = selected.name;
 
   const stripe = new Stripe(secretKey);
   const session = await stripe.checkout.sessions.create({
@@ -201,6 +228,7 @@ export async function createCheckoutSession(
       order_id: orderId,
       event_id: eventId,
       tier,
+      tier_name: tierLabel,
       quantity: String(quantity),
       promo: promoApplied ? promoCode : '',
       amount_usd: amountUsd.toFixed(2),
@@ -219,7 +247,8 @@ export interface VerifiedCheckoutSession {
   paid: boolean;
   orderId: string;
   eventId: string;
-  tier: 'general' | 'vip' | 'elite';
+  tier: string;
+  tierName: string;
   quantity: number;
   seat: string;
   buyerUid: string;
@@ -238,13 +267,14 @@ export async function getCheckoutSession(secretKey: string, sessionId: string): 
   const stripe = new Stripe(secretKey);
   const session = await stripe.checkout.sessions.retrieve(sessionId);
   const m = session.metadata || {};
-  const tier = m.tier === 'vip' || m.tier === 'elite' ? m.tier : 'general';
+  const tier = /^[a-z0-9-]{1,64}$/.test(m.tier || '') ? m.tier : 'general';
 
   return {
     paid: session.payment_status === 'paid',
     orderId: m.order_id || sessionId,
     eventId: m.event_id || '',
     tier,
+    tierName: m.tier_name || DEFAULT_TIER_NAMES[tier] || tier,
     quantity: Number(m.quantity) || 1,
     seat: m.seat || '',
     buyerUid: m.buyer_uid || '',

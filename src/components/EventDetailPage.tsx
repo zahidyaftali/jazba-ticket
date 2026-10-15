@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft, Calendar, MapPin, Clock, Ticket, Check, Star,
-  Share2, ShieldCheck, Heart, Plus, Minus, ChevronDown, ChevronUp, Image as ImageIcon, X, ArrowRight,
+  Share2, ShieldCheck, Heart, Plus, Minus, ChevronDown, ChevronUp, Image as ImageIcon, X, ArrowRight, ExternalLink,
 } from 'lucide-react';
-import { EventItem, TicketTier, getAvailableTiers, isPastEvent } from '../types';
+import { Link } from 'react-router-dom';
+import { EventItem, TicketTier, computeOrderTotals, getAvailableTiers, isPastEvent } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth } from '../firebase';
 import { getOrganizerProfile, followTarget, unfollowTarget, isFollowingTarget, getFollowerCount, OrganizerProfile } from '../services/backendService';
@@ -14,7 +15,7 @@ interface EventDetailPageProps {
   event: EventItem;
   allEvents: EventItem[];
   onBack: () => void;
-  onBook: (event: EventItem, quantity: number, tier: 'general' | 'vip' | 'elite') => void;
+  onBook: (event: EventItem, quantity: number, tier: TicketTier) => void;
   onSelectRelatedEvent: (event: EventItem) => void;
   onRequireLogin: () => void;
 }
@@ -31,7 +32,8 @@ export default function EventDetailPage({
 }: EventDetailPageProps) {
   const [isLiked, setIsLiked] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
-  const { format } = useLocalCurrency();
+  const { format, formatFrom } = useLocalCurrency();
+  const formatPrecise = (usd: number) => format(usd, { precise: true });
   const eventEnded = isPastEvent(event);
 
   // Booking rail
@@ -126,17 +128,11 @@ export default function EventDetailPage({
     setOpenFaqId(null);
   }, [event]);
 
-  // Pricing — admin-set package prices; only offered packages are shown
+  // Pricing — only the packages this event offers are shown. Totals use the
+  // same maths as the checkout and the payment server.
   const availableTiers = getAvailableTiers(event);
-  const tierPricing: Record<TicketTier, number> = {
-    general: availableTiers.find((t) => t.tier === 'general')?.price ?? event.price,
-    vip: availableTiers.find((t) => t.tier === 'vip')?.price ?? 0,
-    elite: availableTiers.find((t) => t.tier === 'elite')?.price ?? 0,
-  };
-  const getSubtotal = () => tierPricing[ticketTier] * quantity;
-  const getDiscount = () => (promoApplied ? Math.round(getSubtotal() * 0.18) : 0);
-  const getBookingServiceFee = () => Math.round(getSubtotal() * 0.05);
-  const getTotalPrice = () => getSubtotal() - getDiscount() + getBookingServiceFee();
+  const selectedTier = availableTiers.find((t) => t.tier === ticketTier) || availableTiers[0];
+  const totals = computeOrderTotals(selectedTier?.price ?? 0, quantity, promoApplied);
 
   const handleApplyPromo = (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,13 +203,29 @@ export default function EventDetailPage({
       }
     : null;
 
-  const relatedEvents = allEvents.filter((evt) => evt.id !== event.id).slice(0, 3);
+  // Upcoming shows first, so the suggestions are things you can still book.
+  const otherEvents = allEvents.filter((evt) => evt.id !== event.id);
+  const relatedEvents = [
+    ...otherEvents.filter((evt) => !isPastEvent(evt)),
+    ...otherEvents.filter((evt) => isPastEvent(evt)),
+  ].slice(0, 3);
 
-  const tierMeta = {
-    general: { name: 'General admission', note: 'Standard entry, open seating', tag: 'Available' },
-    vip: { name: 'VIP', note: 'Fast-track entry and reserved seats', tag: 'Popular' },
-    elite: { name: 'Elite', note: 'Front rows, lounge and artist meet', tag: 'Few left' },
-  } as const;
+  // Stock tags for the default packages only — events with their own ticket
+  // options (e.g. from jazbaentertainment.com) show just what the organiser wrote.
+  const tierTags: Record<string, string> = event.ticketOptions?.length
+    ? {}
+    : { general: 'Available', vip: 'Popular', elite: 'Few left' };
+
+  // Tours and partner-sold events list each date/city with its prices.
+  const shows = event.shows?.length ? event.shows : [];
+  const enquiryPackages = event.enquiryPackages?.length ? event.enquiryPackages : [];
+  const externalHost = (() => {
+    try {
+      return event.externalTicketUrl ? new URL(event.externalTicketUrl).hostname.replace(/^www\./, '') : '';
+    } catch {
+      return '';
+    }
+  })();
 
   return (
     <div className="jz-page bg-white min-h-screen text-black pb-24" id="event-detail-page">
@@ -273,7 +285,7 @@ export default function EventDetailPage({
           </h1>
           {artistsList.length > 0 && (
             <p className="text-white/70 text-base sm:text-lg mt-5 max-w-2xl leading-relaxed">
-              One night, one stage — featuring {artistsList.slice(0, 3).map((a) => a.name).join(', ')}.
+              {shows.length > 1 ? `${shows.length} cities, one tour` : 'One night, one stage'} — featuring {artistsList.slice(0, 3).map((a) => a.name).join(', ')}.
             </p>
           )}
 
@@ -314,6 +326,80 @@ export default function EventDetailPage({
                   ))}
                 </div>
               )}
+            </section>
+            )}
+
+            {/* Dates & venues — tours and partner-sold events, one row per city */}
+            {shows.length > 0 && (
+            <section>
+              <h2 className="font-display font-bold text-2xl leading-[0.95] border-b border-black pb-4">
+                {shows.length > 1 ? 'Dates & venues' : 'Tickets'}
+              </h2>
+              <div>
+                {shows.map((show, idx) => (
+                  <div key={idx} className="py-6 border-b border-[#f2f2f2]">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        {show.when && <span className={`${overline} text-[#8a8a8a]`}>{show.when}</span>}
+                        <h3 className="font-display font-bold text-xl mt-1.5">{show.name}</h3>
+                        {show.details.map((line, i) => (
+                          <p key={i} className="text-sm text-[#666] mt-1">{line}</p>
+                        ))}
+                      </div>
+                      {event.externalTicketUrl && show.ticketUrl && !eventEnded && (
+                        <a
+                          href={show.ticketUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="shrink-0 bg-black text-white px-5 py-3 text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2"
+                        >
+                          Book {show.name} <ExternalLink className="w-4 h-4" />
+                        </a>
+                      )}
+                    </div>
+                    {show.prices.length > 0 && (
+                      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-4">
+                        {show.prices.map((p, i) => (
+                          <li key={i} className="flex items-baseline justify-between gap-4 py-3 border-t border-[#f2f2f2] text-sm">
+                            <span className="min-w-0">
+                              <span className="font-bold">{p.name}</span>
+                              {p.note && <span className="block text-xs text-[#666] mt-0.5">{p.note}</span>}
+                            </span>
+                            <span className="font-display font-bold shrink-0">{p.price}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+            )}
+
+            {/* Packages booked by enquiry, e.g. student batches */}
+            {enquiryPackages.length > 0 && !eventEnded && (
+            <section>
+              <h2 className="font-display font-bold text-2xl leading-[0.95] border-b border-black pb-4">Group bookings</h2>
+              <p className="text-sm text-[#666] leading-relaxed mt-6">
+                These packages are booked directly with the Jazba team — get in touch and we'll reserve your places.
+              </p>
+              <ul className="mt-4">
+                {enquiryPackages.map((p, i) => (
+                  <li key={i} className="flex items-baseline justify-between gap-4 py-4 border-b border-[#f2f2f2] text-sm">
+                    <span className="min-w-0">
+                      <span className="font-bold">{p.name}</span>
+                      {p.note && <span className="block text-xs text-[#666] mt-0.5">{p.note}</span>}
+                    </span>
+                    <span className="font-display font-bold shrink-0">{p.price}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                to="/contact"
+                className="inline-flex items-center gap-2 bg-black text-white px-6 py-3.5 mt-6 text-sm font-bold hover:bg-neutral-800 transition-colors"
+              >
+                Enquire about group bookings <ArrowRight className="w-4 h-4" />
+              </Link>
             </section>
             )}
 
@@ -583,6 +669,37 @@ export default function EventDetailPage({
                 Browse upcoming events
               </button>
             </div>
+            ) : availableTiers.length === 0 ? (
+            <div className="border border-black p-8">
+              <span className={`${overline} bg-[#ffed00] text-black px-3 py-1.5 inline-block`}>
+                {event.externalTicketUrl ? 'Partner tickets' : 'On sale soon'}
+              </span>
+              <h3 className="font-display font-bold text-2xl leading-[0.95] mt-4">
+                {event.externalTicketUrl ? 'Book with our partner' : 'Tickets on sale soon'}
+              </h3>
+              <p className="text-sm text-[#666] leading-relaxed mt-3">
+                {event.externalTicketUrl
+                  ? `Tickets for ${event.title} are sold by ${externalHost || 'our partner'}${shows.length > 1 ? ', with a separate booking link for each city' : ''}.`
+                  : `Ticket prices for ${event.title} haven't been announced yet — check back soon.`}
+              </p>
+              {event.externalTicketUrl ? (
+                <a
+                  href={event.externalTicketUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-6 w-full bg-[#ffed00] text-black py-4 font-bold text-sm cursor-pointer hover:bg-[#e6d200] transition-colors flex items-center justify-center gap-2"
+                >
+                  <Ticket className="w-4 h-4" /> Book on {externalHost || 'partner site'} <ExternalLink className="w-4 h-4" />
+                </a>
+              ) : (
+                <button
+                  onClick={onBack}
+                  className="mt-6 w-full bg-black text-white py-4 font-bold text-sm cursor-pointer hover:bg-neutral-800 transition-colors"
+                >
+                  Browse upcoming events
+                </button>
+              )}
+            </div>
             ) : (
             <div className="border border-black">
 
@@ -592,7 +709,7 @@ export default function EventDetailPage({
 
               {/* Tier rows — only the packages this event offers */}
               <div className="px-6 border-b border-[#f2f2f2]">
-                {availableTiers.map(({ tier }) => (
+                {availableTiers.map(({ tier, name, note, price }) => (
                   <button
                     key={tier}
                     onClick={() => setTicketTier(tier)}
@@ -601,19 +718,19 @@ export default function EventDetailPage({
                     <div className="flex items-center gap-3.5 min-w-0">
                       <span
                         className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
-                          ticketTier === tier ? 'border-black bg-black' : 'border-[#c4c4c4] group-hover:border-black'
+                          selectedTier?.tier === tier ? 'border-black bg-black' : 'border-[#c4c4c4] group-hover:border-black'
                         }`}
                       >
-                        {ticketTier === tier && <span className="w-2 h-2 rounded-full bg-[#ffed00]" />}
+                        {selectedTier?.tier === tier && <span className="w-2 h-2 rounded-full bg-[#ffed00]" />}
                       </span>
                       <div className="min-w-0">
-                        <span className="font-bold text-sm block">{tierMeta[tier].name}</span>
-                        <span className="text-xs text-[#666] block">{tierMeta[tier].note}</span>
+                        <span className="font-bold text-sm block">{name}</span>
+                        {note && <span className="text-xs text-[#666] block">{note}</span>}
                       </div>
                     </div>
                     <div className="text-right shrink-0 pl-3">
-                      <span className="font-display font-bold text-base block">{format(tierPricing[tier])}</span>
-                      <span className={`${overline} text-[#8a8a8a]`}>{tierMeta[tier].tag}</span>
+                      <span className="font-display font-bold text-base block">{formatPrecise(price)}</span>
+                      {tierTags[tier] && <span className={`${overline} text-[#8a8a8a]`}>{tierTags[tier]}</span>}
                     </div>
                   </button>
                 ))}
@@ -675,28 +792,28 @@ export default function EventDetailPage({
               {/* Totals + CTA */}
               <div className="px-6 py-6">
                 <div className="space-y-2.5 text-sm">
-                  <div className="flex justify-between text-[#666]">
-                    <span>Subtotal ({quantity} × {tierMeta[ticketTier].name})</span>
-                    <span>{format(getSubtotal())}</span>
+                  <div className="flex justify-between gap-4 text-[#666]">
+                    <span>Subtotal ({quantity} × {selectedTier?.name})</span>
+                    <span className="shrink-0">{formatPrecise(totals.subtotal)}</span>
                   </div>
                   {promoApplied && (
                     <div className="flex justify-between text-[#666]">
                       <span>Discount (18%)</span>
-                      <span>−{format(getDiscount())}</span>
+                      <span>−{formatPrecise(totals.discount)}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-[#666]">
-                    <span>Service fee (5%)</span>
-                    <span>{format(getBookingServiceFee())}</span>
+                    <span>Service fee (8%)</span>
+                    <span>{formatPrecise(totals.fees)}</span>
                   </div>
                   <div className="flex justify-between items-baseline border-t border-black mt-4 pt-4">
                     <span className="font-display font-bold text-lg">Total</span>
-                    <span className="font-display font-bold text-2xl">{format(getTotalPrice())}</span>
+                    <span className="font-display font-bold text-2xl">{formatPrecise(totals.total)}</span>
                   </div>
                 </div>
 
                 <button
-                  onClick={() => onBook(event, quantity, ticketTier)}
+                  onClick={() => selectedTier && onBook(event, quantity, selectedTier.tier)}
                   className="w-full bg-[#ffed00] text-black py-4 mt-6 font-bold text-sm cursor-pointer hover:bg-[#e6d200] transition-colors flex items-center justify-center gap-2"
                   id="btn-confirm-reserve"
                 >
@@ -752,7 +869,7 @@ export default function EventDetailPage({
                       <MapPin className="w-3.5 h-3.5 shrink-0" /> {evt.location}
                     </span>
                     <span className="font-bold text-sm flex items-center gap-1.5 shrink-0 pl-3">
-                      From {format(evt.price)} <ArrowRight className="w-4 h-4" />
+                      From {formatFrom(evt.price)} <ArrowRight className="w-4 h-4" />
                     </span>
                   </div>
                 </div>

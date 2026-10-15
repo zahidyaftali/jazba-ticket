@@ -3,14 +3,14 @@ import {
   ArrowLeft, MapPin, Clock, Check,
   ShieldCheck, Globe, Calendar, Loader2, Minus, Plus, AlertCircle, Lock,
 } from 'lucide-react';
-import { EventItem, getAvailableTiers } from '../types';
+import { EventItem, TicketTier, computeOrderTotals, getAvailableTiers } from '../types';
 import { auth } from '../firebase';
 import { formatMoney as formatLocalMoney } from '../currency';
 
 interface CheckoutPageProps {
   event: EventItem;
   initialQuantity?: number;
-  initialTier?: 'general' | 'vip' | 'elite';
+  initialTier?: TicketTier;
   onBack: () => void;
 }
 
@@ -28,12 +28,6 @@ const REGION_PROFILES: Record<Region, RegionProfile> = {
   US: { currencyLabel: 'US Dollar (USD)' },
 };
 
-const TIER_META: Record<'general' | 'vip' | 'elite', { name: string; note: string }> = {
-  general: { name: 'General admission', note: 'Standard entry, unreserved seating' },
-  vip: { name: 'VIP', note: 'Reserved seating and priority entry' },
-  elite: { name: 'Elite', note: 'Front rows, lounge access and artist meet' },
-};
-
 export default function CheckoutPage({
   event,
   initialQuantity = 1,
@@ -43,10 +37,10 @@ export default function CheckoutPage({
   const [redirecting, setRedirecting] = useState(false);
   const [payError, setPayError] = useState('');
   const [ticketCount, setTicketCount] = useState(initialQuantity);
-  // Only packages the admin priced are offered; fall back to the first one
+  // Only packages the event offers are shown; fall back to the first one
   // if the requested tier isn't available for this event.
   const availableTiers = getAvailableTiers(event);
-  const [ticketTier, setTicketTier] = useState<'general' | 'vip' | 'elite'>(
+  const [ticketTier, setTicketTier] = useState<TicketTier>(
     availableTiers.some((t) => t.tier === initialTier) ? initialTier : (availableTiers[0]?.tier || 'general')
   );
   // Checkout is login-gated, so prefill from the signed-in account.
@@ -94,16 +88,9 @@ export default function CheckoutPage({
   const profile = REGION_PROFILES[paymentRegion];
   const currency = paymentRegion === 'PK' ? 'PKR' : paymentRegion === 'UK' ? 'GBP' : 'USD';
 
-  const tierPricing = {
-    general: availableTiers.find((t) => t.tier === 'general')?.price ?? event.price,
-    vip: availableTiers.find((t) => t.tier === 'vip')?.price ?? 0,
-    elite: availableTiers.find((t) => t.tier === 'elite')?.price ?? 0,
-  };
-
-  const getSubtotal = () => tierPricing[ticketTier] * ticketCount;
-  const getDiscount = () => (promoApplied ? Math.round(getSubtotal() * 0.18) : 0);
-  const getFees = () => Math.round((getSubtotal() - getDiscount()) * 0.08);
-  const getTotalInUsd = () => getSubtotal() - getDiscount() + getFees();
+  // Same maths as the payment server, so the total shown is the amount charged.
+  const unitPrice = availableTiers.find((t) => t.tier === ticketTier)?.price ?? 0;
+  const totals = computeOrderTotals(unitPrice, ticketCount, promoApplied);
 
   // Local pricing follows the detected region — same shared rates as the
   // rest of the site, so card prices and checkout totals always match.
@@ -300,7 +287,7 @@ export default function CheckoutPage({
                   onClick={handleStartStripeCheckout}
                   className="w-full mt-6 bg-black text-white py-4 font-bold text-sm cursor-pointer hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2"
                 >
-                  <Lock className="w-4 h-4" /> Continue to Stripe — pay {formatMoney(getTotalInUsd())}
+                  <Lock className="w-4 h-4" /> Continue to Stripe — pay {formatMoney(totals.total)}
                 </button>
 
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#e4e4e4] mt-6 pt-5 text-xs text-[#8a8a8a]">
@@ -343,14 +330,14 @@ export default function CheckoutPage({
               {/* Tier rows */}
               <div className="p-6 border-b border-[#f2f2f2]">
                 <span className={`${overline} text-[#666] block mb-1`}>Ticket type</span>
-                {availableTiers.map(({ tier }) => (
+                {availableTiers.map(({ tier, name, note, price }) => (
                   <button
                     key={tier}
                     type="button"
                     onClick={() => setTicketTier(tier)}
                     className="w-full flex items-center justify-between py-4 border-b border-[#f2f2f2] last:border-b-0 cursor-pointer text-left group"
                   >
-                    <div className="flex items-center gap-3.5">
+                    <div className="flex items-center gap-3.5 min-w-0">
                       <span
                         className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
                           ticketTier === tier ? 'border-black bg-black' : 'border-[#c4c4c4] group-hover:border-black'
@@ -358,12 +345,12 @@ export default function CheckoutPage({
                       >
                         {ticketTier === tier && <span className="w-2 h-2 rounded-full bg-[#ffed00]" />}
                       </span>
-                      <div>
-                        <span className="font-bold text-sm block">{TIER_META[tier].name}</span>
-                        <span className="text-xs text-[#666]">{TIER_META[tier].note}</span>
+                      <div className="min-w-0">
+                        <span className="font-bold text-sm block">{name}</span>
+                        {note && <span className="text-xs text-[#666]">{note}</span>}
                       </div>
                     </div>
-                    <span className="font-display font-bold text-base">{formatMoney(tierPricing[tier])}</span>
+                    <span className="font-display font-bold text-base shrink-0 pl-3">{formatMoney(price)}</span>
                   </button>
                 ))}
               </div>
@@ -427,21 +414,21 @@ export default function CheckoutPage({
                 <div className="space-y-2.5 text-sm">
                   <div className="flex justify-between text-[#666]">
                     <span>Subtotal</span>
-                    <span>{formatMoney(getSubtotal())}</span>
+                    <span>{formatMoney(totals.subtotal)}</span>
                   </div>
                   {promoApplied && (
                     <div className="flex justify-between text-[#666]">
                       <span>Discount (18%)</span>
-                      <span>−{formatMoney(getDiscount())}</span>
+                      <span>−{formatMoney(totals.discount)}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-[#666]">
                     <span>Service fee (8%)</span>
-                    <span>{formatMoney(getFees())}</span>
+                    <span>{formatMoney(totals.fees)}</span>
                   </div>
                   <div className="flex justify-between items-baseline border-t border-black mt-4 pt-4">
                     <span className="font-display font-bold text-lg">Total</span>
-                    <span className="font-display font-bold text-2xl">{formatMoney(getTotalInUsd())}</span>
+                    <span className="font-display font-bold text-2xl">{formatMoney(totals.total)}</span>
                   </div>
                 </div>
 

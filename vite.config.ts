@@ -4,6 +4,7 @@ import path from 'path';
 import {defineConfig, loadEnv, type Plugin} from 'vite';
 import {createCheckoutSession, getCheckoutSession, getOrigin} from './api/_lib/stripePayment';
 import {sendFormEmail, FormEmailError} from './api/_lib/formEmail';
+import {fetchWordPressEvents} from './api/_lib/wordpressEvents';
 
 function readJsonBody(req: any): Promise<any> {
   return new Promise((resolve) => {
@@ -90,6 +91,21 @@ const devApi = (secrets: { stripeSecretKey: string; resendApiKey: string }): Plu
           res.end(JSON.stringify({ error: err?.message || 'Could not send your message.' }));
         }
       });
+    });
+
+    server.middlewares.use('/api/wp-events', (req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method !== 'GET') {
+        res.statusCode = 405;
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
+      }
+      fetchWordPressEvents()
+        .then((events) => res.end(JSON.stringify({ events })))
+        .catch((err: any) => {
+          res.statusCode = 502;
+          res.end(JSON.stringify({ error: err?.message || 'Could not load events right now.' }));
+        });
     });
   },
 });

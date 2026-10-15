@@ -43,11 +43,11 @@ import TicketSafetyPage from './components/TicketSafetyPage';
 import PrivacyPolicyPage from './components/PrivacyPolicyPage';
 import OrganizersPage from './components/OrganizersPage';
 import OrganizerDetailPage from './components/OrganizerDetailPage';
-import ComingSoonPage from './components/ComingSoonPage';
 import { EventGridSkeleton, DetailPageSkeleton } from './components/Skeletons';
 import { categories, faqs } from './data';
-import { EventItem, isPastEvent } from './types';
+import { EventItem, TicketTier, getAvailableTiers, isPastEvent } from './types';
 import { getPublishedEvents, getAllArtists } from './services/backendService';
+import { getWordPressEvents } from './services/wordpressEventsService';
 
 type AuthUser = { email: string; name: string; profileImage?: string } | null;
 
@@ -86,7 +86,6 @@ const PAGE_TITLES: Array<{ match: (path: string) => boolean; title: string }> = 
   { match: (p) => p.startsWith('/organizers/'), title: 'Organiser Profile — Jazba Tickets' },
   { match: (p) => p === '/login', title: 'Sign In — Jazba Tickets' },
   { match: (p) => p === '/signup', title: 'Sign Up — Jazba Tickets' },
-  { match: (p) => p === '/coming-soon', title: 'Coming Soon — Jazba Tickets' },
 ];
 
 function PageTitle() {
@@ -218,7 +217,8 @@ function HomeView({ events, eventsLoaded }: { events: EventItem[]; eventsLoaded:
         <EventsForYou events={liveEvents} onBook={goCheckout} onViewDetail={goDetail} />
       )}
 
-      {/* NEAR BY */}
+      {/* NEAR BY — hidden while there are no local shows to list */}
+      {(!eventsLoaded || nearByEvents.length > 0) && (
       <section className="max-w-7xl mx-auto px-4 py-16 sm:px-6 md:px-8" id="near-by">
         <div className="flex items-end justify-between mb-10">
           <div>
@@ -235,12 +235,6 @@ function HomeView({ events, eventsLoaded }: { events: EventItem[]; eventsLoaded:
 
         {!eventsLoaded ? (
           <EventGridSkeleton />
-        ) : nearByEvents.length === 0 ? (
-          <div className="p-12 text-center bg-neutral-50 rounded-3xl max-w-lg mx-auto">
-            <Info className="w-10 h-10 text-neutral-400 mx-auto mb-3" />
-            <h4 className="font-extrabold text-[#E34718] text-lg">No Local Shows Available</h4>
-            <p className="text-xs text-neutral-500 font-bold mt-1">There are no city events matching your filter variables currently.</p>
-          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {nearByEvents.map((evt) => (
@@ -249,6 +243,7 @@ function HomeView({ events, eventsLoaded }: { events: EventItem[]; eventsLoaded:
           </div>
         )}
       </section>
+      )}
 
       {eventsLoaded && (
         <UpcomingRows
@@ -324,12 +319,15 @@ function EventDetailView({ events, eventsLoaded }: { events: EventItem[]; events
 function CheckoutView({ currentUser, authChecked }: { currentUser: AuthUser; authChecked: boolean }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as { event?: EventItem; quantity?: number; tier?: 'general' | 'vip' | 'elite' } | null;
+  const state = location.state as { event?: EventItem; quantity?: number; tier?: TicketTier } | null;
 
   if (!state?.event) return <Navigate to="/events" replace />;
 
-  // Past events can't be booked — send the visitor to the event page instead.
-  if (isPastEvent(state.event)) return <Navigate to={`/events/${state.event.id}`} replace />;
+  // Past events, partner-sold events and events with no tickets on sale yet
+  // can't be booked here — the event page explains where to get tickets.
+  if (isPastEvent(state.event) || getAvailableTiers(state.event).length === 0) {
+    return <Navigate to={`/events/${state.event.id}`} replace />;
+  }
 
   // Guest checkout is not allowed: wait for Firebase to resolve the session,
   // then send signed-out visitors to login and bring them straight back here.
@@ -517,10 +515,14 @@ function AppShell() {
   // login wait for this instead of treating "still checking" as "signed out".
   const [authChecked, setAuthChecked] = useState(false);
 
-  // Load published events once
+  // Load published events once — the site's own (Firestore) plus every event
+  // published on jazbaentertainment.com. Either source failing leaves the
+  // other one showing.
   useEffect(() => {
-    getPublishedEvents()
-      .then((list) => setEvents(list))
+    Promise.allSettled([getWordPressEvents(), getPublishedEvents()])
+      .then((results) =>
+        setEvents(results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []))),
+      )
       .finally(() => setEventsLoaded(true));
   }, []);
 
@@ -580,10 +582,6 @@ function AppShell() {
     }
   };
 
-  // The holding page is deliberately chrome-free — no navbar, no footer,
-  // nothing to click into while ticket sales are closed.
-  if (location.pathname === '/coming-soon') return <ComingSoonPage />;
-
   const isHome = location.pathname === '/';
 
   return (
@@ -618,7 +616,6 @@ function AppShell() {
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/login" element={<LoginView />} />
         <Route path="/signup" element={<SignupView />} />
-        <Route path="/coming-soon" element={<ComingSoonPage />} />
         <Route path="*" element={<NotFoundView />} />
       </Routes>
 

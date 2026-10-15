@@ -57,7 +57,7 @@ export default function EventsExplorerPage({
   initialTicketClass = '',
   initialDateOffset = null,
 }: EventsExplorerPageProps) {
-  const { format } = useLocalCurrency();
+  const { formatFrom } = useLocalCurrency();
 
   // Search
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
@@ -134,7 +134,7 @@ export default function EventsExplorerPage({
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { all: events.length };
     categories.forEach((cat) => {
-      counts[cat.id] = events.filter((e) => e.category === cat.id).length;
+      if (cat.id !== 'all') counts[cat.id] = events.filter((e) => e.category === cat.id).length;
     });
     return counts;
   }, [events, categories]);
@@ -524,7 +524,7 @@ export default function EventsExplorerPage({
                         <div className="flex items-center justify-between border-t border-[#f2f2f2] mt-4 pt-4">
                           <div>
                             <span className={`${overline} text-[#8a8a8a] block`}>From</span>
-                            <span className="font-display font-bold text-lg">{format(evt.price)}</span>
+                            <span className="font-display font-bold text-lg">{formatFrom(evt.price)}</span>
                           </div>
                           <button
                             onClick={(e) => { e.stopPropagation(); onBook(evt); }}
@@ -584,7 +584,7 @@ export default function EventsExplorerPage({
                       <div className="flex sm:flex-col items-center sm:items-end justify-between gap-3 shrink-0">
                         <div className="text-left sm:text-right">
                           <span className={`${overline} text-[#8a8a8a] block`}>From</span>
-                          <span className="font-display font-bold text-2xl leading-none">{format(evt.price)}</span>
+                          <span className="font-display font-bold text-2xl leading-none">{formatFrom(evt.price)}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           {likeButton(evt)}
