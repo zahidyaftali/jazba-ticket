@@ -24,6 +24,10 @@ export default async function handler(req: any, res: any) {
     res.status(200).json(result);
   } catch (err: any) {
     console.error('easypaisa-order failed:', err?.message || err);
-    res.status(err?.status || 502).json({ error: err?.status ? err.message : 'Could not submit your payment. Please try again.' });
+    res.status(err?.status || 502).json({
+      error: err?.status
+        ? err.message
+        : 'Could not submit your payment. Please try again, or email your screenshot and order details to info@jazbatickets.com.',
+    });
   }
 }

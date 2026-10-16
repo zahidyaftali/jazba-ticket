@@ -95,7 +95,7 @@ export async function submitEasypaisaOrder(
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.orderRef) {
-    throw new Error(data.error || 'Could not submit your payment. Please try again.');
+    throw new Error(data.error || 'Could not submit your payment. Please try again, or email your screenshot and order details to info@jazbatickets.com.');
   }
   return data;
 }

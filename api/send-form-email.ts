@@ -28,7 +28,7 @@ export default async function handler(req: any, res: any) {
     if (err instanceof FormEmailError) {
       res.status(err.status).json({ error: err.message });
     } else {
-      res.status(502).json({ error: 'Could not send your message. Please try again.' });
+      res.status(502).json({ error: 'Could not send your message. Please try again, or email us directly at info@jazbatickets.com.' });
     }
   }
 }
