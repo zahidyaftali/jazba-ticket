@@ -24,7 +24,11 @@ export default async function handler(req: any, res: any) {
     res.status(200).json({ ok: true });
   } catch (err: any) {
     console.error('send-form-email failed:', err?.message || err);
-    const status = err instanceof FormEmailError ? err.status : 502;
-    res.status(status).json({ error: err?.message || 'Could not send your message. Please try again.' });
+    // Only validation messages are shown to visitors — provider errors stay in the logs.
+    if (err instanceof FormEmailError) {
+      res.status(err.status).json({ error: err.message });
+    } else {
+      res.status(502).json({ error: 'Could not send your message. Please try again.' });
+    }
   }
 }
