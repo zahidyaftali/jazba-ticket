@@ -385,6 +385,8 @@ export function mapWordPressEvent(post: any): EventItem {
     price: fromPrice,
     type: 'upcoming',
     organizerName: 'Jazba Entertainment',
+    // Served from public/images — the gold emblem from the jazbaentertainment.com theme.
+    organizerImage: '/images/jazba-entertainment-logo.png',
     ...(first ? { endsOn: isoDate(last || first) } : {}),
   };
 

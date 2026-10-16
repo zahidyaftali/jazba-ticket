@@ -22,8 +22,32 @@ export {
   GoogleAuthProvider,
   FacebookAuthProvider,
   signInWithPopup,
+  getAdditionalUserInfo,
 } from 'firebase/auth';
 export type { User } from 'firebase/auth';
+
+/** A visitor-friendly message for a failed Google/Facebook popup sign-in,
+ *  or '' when the visitor simply closed the popup. */
+export function socialSignInErrorMessage(err: any, provider: 'Google' | 'Facebook'): string {
+  const code: string = err?.code || '';
+  if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return '';
+  console.error(`${provider} sign-in failed:`, code, err?.message);
+  switch (code) {
+    case 'auth/popup-blocked':
+      return `Your browser blocked the ${provider} sign-in window. Allow pop-ups for this site and try again.`;
+    // This web address isn't on the Firebase authorized-domains list, or the
+    // provider isn't switched on in Firebase Authentication → Sign-in method.
+    case 'auth/unauthorized-domain':
+    case 'auth/operation-not-allowed':
+      return `${provider} sign-in isn't available right now. Please use your email and password instead.`;
+    case 'auth/account-exists-with-different-credential':
+      return `You already have an account with this email. Sign in the way you did before — with your email and password, or with ${provider === 'Google' ? 'Facebook' : 'Google'}.`;
+    case 'auth/network-request-failed':
+      return 'Network problem — check your connection and try again.';
+    default:
+      return `${provider} sign-in didn't work. Please try again, or use your email and password.`;
+  }
+}
 
 async function testConnection() {
   try {

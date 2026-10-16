@@ -10,7 +10,7 @@ import {
   ArrowRight,
   AlertCircle
 } from 'lucide-react';
-import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, FacebookAuthProvider, signInWithPopup, auth } from '../firebase';
+import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, FacebookAuthProvider, signInWithPopup, getAdditionalUserInfo, auth, socialSignInErrorMessage } from '../firebase';
 import { createUserProfile } from '../services/backendService';
 
 interface SignupPageProps {
@@ -89,67 +89,44 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  // Google and Facebook share one flow. The member profile is only created
+  // for a brand-new account — an existing member who signs in here again
+  // must keep their profile (role, join date, city) untouched.
+  const handleSocialSignIn = async (providerName: 'Google' | 'Facebook') => {
     setErrorMessage('');
     setLoading(true);
     try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      
-      // Complete the profile on the backend if needed
-      try {
-        await createUserProfile(user.uid, {
-          name: user.displayName || user.email?.split('@')[0] || 'Google Guest',
-          city: 'London',
-        });
-      } catch (dbErr) {
-        console.error("Failed to save google profile:", dbErr);
-      }
-      
-      setLoading(false);
-      onSuccess({
-        email: user.email || '',
-        name: user.displayName || 'Google Guest'
-      });
-    } catch (err: any) {
-      setLoading(false);
-      if (err.code !== 'auth/popup-closed-by-user') {
-        setErrorMessage(err.message || 'Google sign up failed.');
-      }
-    }
-  };
-
-  const handleFacebookSignIn = async () => {
-    setErrorMessage('');
-    setLoading(true);
-    try {
-      const provider = new FacebookAuthProvider();
+      const provider = providerName === 'Google' ? new GoogleAuthProvider() : new FacebookAuthProvider();
+      if (provider instanceof GoogleAuthProvider) provider.setCustomParameters({ prompt: 'select_account' });
+      if (provider instanceof FacebookAuthProvider) provider.addScope('email');
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      // Complete the profile on the backend if needed
-      try {
-        await createUserProfile(user.uid, {
-          name: user.displayName || user.email?.split('@')[0] || 'Facebook Guest',
-          city: 'London',
-        });
-      } catch (dbErr) {
-        console.error("Failed to save facebook profile:", dbErr);
+      if (getAdditionalUserInfo(result)?.isNewUser) {
+        try {
+          await createUserProfile(user.uid, {
+            name: user.displayName || user.email?.split('@')[0] || 'Member',
+            profileImage: user.photoURL || '',
+            city: 'London',
+          });
+        } catch (dbErr) {
+          console.error(`Failed to save ${providerName} profile:`, dbErr);
+        }
       }
 
       setLoading(false);
       onSuccess({
         email: user.email || '',
-        name: user.displayName || 'Facebook Guest'
+        name: user.displayName || user.email?.split('@')[0] || 'Member',
       });
     } catch (err: any) {
       setLoading(false);
-      if (err.code !== 'auth/popup-closed-by-user') {
-        setErrorMessage(err.message || 'Facebook sign up failed.');
-      }
+      setErrorMessage(socialSignInErrorMessage(err, providerName));
     }
   };
+
+  const handleGoogleSignIn = () => handleSocialSignIn('Google');
+  const handleFacebookSignIn = () => handleSocialSignIn('Facebook');
 
   return (
     <div className="jz-page min-h-[85vh] bg-[#FAFBFD] text-neutral-900 font-sans relative flex items-center justify-center py-16 px-4 sm:px-6 overflow-hidden" id="signup-page-root">

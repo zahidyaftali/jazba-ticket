@@ -9,7 +9,8 @@ import {
   ArrowRight,
   AlertCircle
 } from 'lucide-react';
-import { signInWithEmailAndPassword, GoogleAuthProvider, FacebookAuthProvider, signInWithPopup, sendPasswordResetEmail, auth } from '../firebase';
+import { signInWithEmailAndPassword, GoogleAuthProvider, FacebookAuthProvider, signInWithPopup, getAdditionalUserInfo, sendPasswordResetEmail, auth, socialSignInErrorMessage } from '../firebase';
+import { createUserProfile } from '../services/backendService';
 
 interface LoginPageProps {
   onBack: () => void;
@@ -105,43 +106,41 @@ export default function LoginPage({ onBack, onSuccess, onSwitchToSignup }: Login
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  // Google and Facebook share one flow. A first-time social sign-in also
+  // creates the member profile, exactly like signing up does.
+  const handleSocialSignIn = async (providerName: 'Google' | 'Facebook') => {
     setErrorMessage('');
     setLoading(true);
     try {
-      const provider = new GoogleAuthProvider();
+      const provider = providerName === 'Google' ? new GoogleAuthProvider() : new FacebookAuthProvider();
+      if (provider instanceof GoogleAuthProvider) provider.setCustomParameters({ prompt: 'select_account' });
+      if (provider instanceof FacebookAuthProvider) provider.addScope('email');
       const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      if (getAdditionalUserInfo(result)?.isNewUser) {
+        try {
+          await createUserProfile(user.uid, {
+            name: user.displayName || user.email?.split('@')[0] || 'Member',
+            profileImage: user.photoURL || '',
+            city: 'London',
+          });
+        } catch (dbErr) {
+          console.error(`Failed to save ${providerName} profile:`, dbErr);
+        }
+      }
       setLoading(false);
       onSuccess({
-        email: result.user.email || 'google.guest@jazba.live',
-        name: result.user.displayName || 'Google Guest'
+        email: user.email || '',
+        name: user.displayName || user.email?.split('@')[0] || 'Member',
       });
     } catch (err: any) {
       setLoading(false);
-      if (err.code !== 'auth/popup-closed-by-user') {
-        setErrorMessage(err.message || 'Google sign-in failed.');
-      }
+      setErrorMessage(socialSignInErrorMessage(err, providerName));
     }
   };
 
-  const handleFacebookSignIn = async () => {
-    setErrorMessage('');
-    setLoading(true);
-    try {
-      const provider = new FacebookAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      setLoading(false);
-      onSuccess({
-        email: result.user.email || 'facebook.guest@jazba.live',
-        name: result.user.displayName || 'Facebook Guest'
-      });
-    } catch (err: any) {
-      setLoading(false);
-      if (err.code !== 'auth/popup-closed-by-user') {
-        setErrorMessage(err.message || 'Facebook sign-in failed.');
-      }
-    }
-  };
+  const handleGoogleSignIn = () => handleSocialSignIn('Google');
+  const handleFacebookSignIn = () => handleSocialSignIn('Facebook');
 
   return (
     <div className="jz-page min-h-[85vh] bg-[#FAFBFD] text-neutral-900 font-sans relative flex items-center justify-center py-16 px-4 sm:px-6 overflow-hidden" id="login-page-root">

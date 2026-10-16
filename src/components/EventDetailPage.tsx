@@ -532,13 +532,18 @@ export default function EventDetailPage({
               <div className="border border-[#e4e4e4] p-6 sm:p-8 mt-8">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                   <div className="flex items-center gap-5">
-                    <div className="w-14 h-14 rounded-full overflow-hidden shrink-0 bg-[#f2f2f2] flex items-center justify-center">
+                    <div
+                      className={`overflow-hidden shrink-0 flex items-center justify-center ${
+                        organizerDetails.imageUrl ? 'w-20 h-20 bg-black' : 'w-14 h-14 rounded-full bg-[#f2f2f2]'
+                      }`}
+                    >
                       {organizerDetails.imageUrl ? (
+                        // Logos are rarely square — fit the whole mark instead of cropping it.
                         <img
                           src={organizerDetails.imageUrl}
                           alt={organizerDetails.name}
                           referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain p-2"
                         />
                       ) : (
                         <span className="font-bold text-lg">{organizerDetails.name.charAt(0)}</span>
