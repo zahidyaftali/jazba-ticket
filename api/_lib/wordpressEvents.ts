@@ -1,4 +1,6 @@
-import type { EventItem, EventShow, LineupEntry, PriceLine, TicketOption } from '../../src/types';
+import type {
+  ContentBlock, ContentPackage, ContentSection, EventItem, EventShow, LineupEntry, PriceLine, TextRun, TicketOption,
+} from '../../src/types';
 // The .js extension is required: Vercel runs these as native ESM.
 import { USD_RATES } from './currencyRates.js';
 
@@ -228,69 +230,241 @@ function buildTicketOptions(shows: ParsedShow[]): (TicketOption & { group: boole
 
 const toPriceLine = (t: ParsedTier): PriceLine => ({ name: t.name, ...(t.note ? { note: t.note } : {}), price: t.price.label });
 
-// ── Body content: description, highlights, line-up ─────────────────────────
+// ── Body content: the whole post, as structured sections ───────────────────
+// Every part of the post is kept, in order, as plain data (see ContentBlock in
+// src/types.ts). Two parts are pulled out to drive the page itself: the
+// Tickets block (booking rail / dates & venues) and the line-up cards — a
+// placeholder block marks where each sat in the post.
 
 interface ParsedBody {
-  paragraphs: string[];
-  highlights: string[];
+  /** Plain text of the opening paragraphs — a short fallback description. */
+  intro: string[];
+  sections: ContentSection[];
   lineup: LineupEntry[];
   shows: ParsedShow[];
   firstImage: string;
 }
 
-// Facts already shown in the event header — no need to repeat them as highlights.
-const HEADER_FACTS = new Set(['date', 'venue', 'dates', 'venues']);
+const innerHtml = (outer: string) => outer.replace(/^<[^>]*>/, '').replace(/<\/[a-z][a-z0-9]*>\s*$/i, '');
 
-// Event posts double as sponsorship pitches ("Audience & Reach", "Partners",
-// sponsorship tiers…). That copy is for sponsors, not ticket buyers.
-const SPONSOR_HEADINGS = /audience|reach|sponsor|partner|government|promoter/i;
+/** Links inside a post: jazbaentertainment.com event pages map to the same
+ *  event here (both sites share slugs); otherwise only http(s), mailto: and
+ *  tel: links are kept. */
+function safeHref(raw: string): string | undefined {
+  const href = decodeEntities(raw.trim());
+  const event = href.match(/^https?:\/\/(?:www\.)?jazbaentertainment\.com\/events\/([^/?#]+)\/?(?:[?#].*)?$/i);
+  if (event) return `/events/${event[1]}`;
+  return /^(https?:|mailto:|tel:)/i.test(href) ? href : undefined;
+}
 
-function parseBody(html: string): ParsedBody {
-  const body: ParsedBody = { paragraphs: [], highlights: [], lineup: [], shows: [], firstImage: '' };
-  let heading = '';
+/** Inline HTML → text runs, keeping bold, italics and links. */
+function parseInline(html: string): TextRun[] {
+  const runs: TextRun[] = [];
+  let bold = 0;
+  let italic = 0;
+  const links: (string | undefined)[] = [];
 
-  for (const block of topLevelBlocks(html)) {
-    if (!body.firstImage) body.firstImage = block.html.match(/<img\b[^>]*\bsrc="([^"]+)"/i)?.[1] ?? '';
+  const push = (raw: string) => {
+    const prev = runs[runs.length - 1];
+    // Collapse the space between runs, and drop spaces at the start of a line.
+    const text = !prev || /[\s]$/.test(prev.text) ? raw.replace(/^ +/, '') : raw;
+    if (!text) return;
+    if (text === '\n' && prev) prev.text = prev.text.replace(/ +$/, '');
+    const run: TextRun = { text };
+    if (bold > 0) run.bold = true;
+    if (italic > 0) run.italic = true;
+    const href = links[links.length - 1];
+    if (href) run.href = href;
+    if (prev && prev.bold === run.bold && prev.italic === run.italic && prev.href === run.href) prev.text += text;
+    else runs.push(run);
+  };
 
-    if (/^h[1-6]$/.test(block.tag)) {
-      heading = toText(block.html);
-    } else if (block.tag === 'section' && hasClass(block.html, 'jz-tickets')) {
-      body.shows.push(...parseTicketShows(block.html));
-    } else if (SPONSOR_HEADINGS.test(heading)) {
+  for (const m of html.matchAll(/<(\/?)([a-z][a-z0-9]*)\b([^>]*)>|([^<]+)/gi)) {
+    if (m[4] !== undefined) {
+      push(decodeEntities(m[4]).replace(/\s+/g, ' '));
       continue;
-    } else if (block.tag === 'div' && hasClass(block.html, 'jz-lineup')) {
-      for (const card of allOfClass(block.html, 'jz-artist-card', 'article')) {
-        const name = toText(innerOfClass(card, 'jz-artist-card__name'));
-        if (!name) continue;
-        body.lineup.push({
-          name,
-          role: toText(innerOfClass(card, 'jz-artist-card__role')),
-          avatar: card.match(/<img\b[^>]*\bsrc="([^"]+)"/i)?.[1] ?? '',
-          bio: toText(innerOfClass(card, 'jz-artist-card__badge')),
-        });
-      }
-    } else if (block.tag === 'ul' || block.tag === 'ol') {
-      for (const li of block.html.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)) {
-        const keyed = li[1].match(/^\s*<strong>([^<]*?):\s*<\/strong>([\s\S]*)$/i);
-        if (keyed) {
-          // "<strong>Doors open:</strong> 6:00 pm" → a highlight
-          const key = toText(keyed[1]);
-          if (!HEADER_FACTS.has(key.toLowerCase())) body.highlights.push(`${key}: ${toText(keyed[2])}`);
-        } else if (/line-?up/i.test(heading)) {
-          // "<strong>Mohamed Tarek</strong> · Munshid · Egypt" → a performer
-          const name = toText(li[1].match(/<strong>([\s\S]*?)<\/strong>/i)?.[1] ?? li[1].split('·')[0]);
-          const role = toText(li[1].replace(/<strong>[\s\S]*?<\/strong>/i, '')).replace(/^·\s*/, '');
-          if (name) body.lineup.push({ name, role, avatar: '', bio: '' });
-        } else {
-          const text = toText(li[1]);
-          if (text) body.paragraphs.push(`• ${text}`);
-        }
-      }
-    } else if (block.tag === 'p') {
-      const text = toText(block.html);
-      if (text) body.paragraphs.push(text);
+    }
+    const closing = m[1] === '/';
+    const tag = m[2].toLowerCase();
+    if (tag === 'br') push('\n');
+    else if (tag === 'strong' || tag === 'b') bold = Math.max(0, bold + (closing ? -1 : 1));
+    else if (tag === 'em' || tag === 'i') italic = Math.max(0, italic + (closing ? -1 : 1));
+    else if (tag === 'a') {
+      if (closing) links.pop();
+      else links.push(safeHref(m[3].match(/\bhref="([^"]*)"/i)?.[1] ?? ''));
     }
   }
+
+  const last = runs[runs.length - 1];
+  if (last) last.text = last.text.replace(/\s+$/, '');
+  return runs.filter((r) => r.text);
+}
+
+const runsText = (runs: TextRun[]) => runs.map((r) => r.text).join('');
+
+function parseList(html: string): ContentBlock | null {
+  const items: TextRun[][] = [];
+  let facts = true;
+  for (const li of html.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)) {
+    const runs = parseInline(li[1]);
+    if (!runs.length) continue;
+    items.push(runs);
+    // "<strong>Doors open:</strong> 6:00 pm"
+    if (!/^\s*<strong>[^<]*:\s*<\/strong>/i.test(li[1])) facts = false;
+  }
+  return items.length ? { type: 'list', items, ...(facts ? { facts: true } : {}) } : null;
+}
+
+function parseTable(html: string): ContentBlock | null {
+  const cells = (row: string) => Array.from(row.matchAll(/<t[hd]\b[^>]*>([\s\S]*?)<\/t[hd]>/gi), (c) => toText(c[1]));
+  const head = cells(html.match(/<thead\b[^>]*>([\s\S]*?)<\/thead>/i)?.[1] ?? '');
+  const tbody = html.match(/<tbody\b[^>]*>([\s\S]*?)<\/tbody>/i)?.[1] ?? html.replace(/<thead\b[\s\S]*?<\/thead>/i, '');
+  const rows = Array.from(tbody.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi), (r) => cells(r[1])).filter((r) => r.length);
+  return rows.length || head.length ? { type: 'table', head, rows } : null;
+}
+
+function parseImage(html: string): ContentBlock | null {
+  const img = html.match(/<img\b[^>]*>/i)?.[0] ?? '';
+  const src = decodeEntities(img.match(/\bsrc="([^"]+)"/i)?.[1] ?? '');
+  if (!/^https?:\/\//i.test(src)) return null;
+  const alt = decodeEntities(img.match(/\balt="([^"]*)"/i)?.[1] ?? '');
+  const caption = toText(html.match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/i)?.[1] ?? '');
+  return { type: 'image', src, alt, ...(caption ? { caption } : {}) };
+}
+
+function parsePartners(html: string): ContentBlock | null {
+  const items = allOfClass(html, 'jz-partner', 'figure')
+    .map((figure) => {
+      const caption = figure.match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/i)?.[1] ?? '';
+      const logo = decodeEntities(figure.match(/<img\b[^>]*\bsrc="([^"]+)"/i)?.[1] ?? '');
+      return {
+        name: toText(caption.match(/<strong>([\s\S]*?)<\/strong>/i)?.[1] ?? ''),
+        role: toText(caption.replace(/<strong>[\s\S]*?<\/strong>/i, '')),
+        logo: /^https?:\/\//i.test(logo) ? logo : '',
+      };
+    })
+    .filter((p) => p.name || p.logo);
+  return items.length ? { type: 'partners', items } : null;
+}
+
+/** A <section class="jz-tiers"> that isn't the Tickets block — e.g. the
+ *  sponsorship packages. It becomes a section of its own. */
+function parsePackages(html: string): ContentSection {
+  const items: ContentPackage[] = [];
+  for (const m of html.matchAll(/<article\b[^>]*class="([^"]*\bjz-tier\b[^"]*)"[^>]*>([\s\S]*?)<\/article>/gi)) {
+    const [, className, card] = m;
+    const nameHtml = innerOfClass(card, 'jz-tier__name', 'h3');
+    const badge = toText(innerOfClass(nameHtml, 'jz-tier__badge', 'span'));
+    const price = toText(innerOfClass(card, 'jz-tier__price', 'p'));
+    items.push({
+      name: toText(nameHtml.replace(/<span\b[^>]*class="[^"]*\bjz-tier__badge\b[^"]*"[^>]*>[\s\S]*?<\/span>/i, '')),
+      ...(badge ? { badge } : {}),
+      ...(price ? { price } : {}),
+      points: Array.from(card.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi), (li) => toText(li[1])).filter(Boolean),
+      ...(/\bjz-tier--featured\b/.test(className) ? { featured: true } : {}),
+    });
+  }
+  const actionLink = innerOfClass(html, 'jz-tiers__actions', 'p').match(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
+  const actionHref = actionLink ? safeHref(actionLink[1]) : undefined;
+  const lead = toText(innerOfClass(html, 'jz-tiers__lead', 'p'));
+  const note = toText(innerOfClass(html, 'jz-tiers__note', 'p'));
+  const eyebrow = toText(innerOfClass(html, 'jz-eyebrow', 'p'));
+  return {
+    heading: toText(innerOfClass(html, 'jz-tiers__title')) || eyebrow || 'Packages',
+    ...(eyebrow ? { eyebrow } : {}),
+    blocks: [
+      {
+        type: 'packages',
+        ...(lead ? { lead } : {}),
+        items,
+        ...(note ? { note } : {}),
+        ...(actionLink && actionHref ? { action: { label: toText(actionLink[2]) || 'Find out more', href: actionHref } } : {}),
+      },
+    ],
+  };
+}
+
+function parseBody(html: string): ParsedBody {
+  const body: ParsedBody = { intro: [], sections: [], lineup: [], shows: [], firstImage: '' };
+  let section: ContentSection = { blocks: [] };
+  body.sections.push(section);
+  let heading = '';
+  let lineupPlaced = false;
+
+  const add = (block: ContentBlock | null) => {
+    if (block) section.blocks.push(block);
+  };
+  const startSection = (next: ContentSection) => {
+    section = next;
+    body.sections.push(section);
+  };
+  const placeLineup = () => {
+    if (!lineupPlaced) add({ type: 'lineup' });
+    lineupPlaced = true;
+  };
+
+  const walk = (fragment: string) => {
+    for (const block of topLevelBlocks(fragment)) {
+      if (!body.firstImage) body.firstImage = block.html.match(/<img\b[^>]*\bsrc="([^"]+)"/i)?.[1] ?? '';
+      const { tag } = block;
+
+      if (tag === 'h1' || tag === 'h2') {
+        heading = toText(block.html);
+        startSection({ heading, blocks: [] });
+      } else if (/^h[3-6]$/.test(tag)) {
+        const text = toText(block.html);
+        if (text) add({ type: 'subheading', text });
+      } else if (tag === 'section' && hasClass(block.html, 'jz-tickets')) {
+        body.shows.push(...parseTicketShows(block.html));
+        add({ type: 'tickets' });
+      } else if (tag === 'section' && hasClass(block.html, 'jz-tiers')) {
+        startSection(parsePackages(block.html));
+      } else if (tag === 'div' && hasClass(block.html, 'jz-lineup')) {
+        for (const card of allOfClass(block.html, 'jz-artist-card', 'article')) {
+          const name = toText(innerOfClass(card, 'jz-artist-card__name'));
+          if (!name) continue;
+          body.lineup.push({
+            name,
+            role: toText(innerOfClass(card, 'jz-artist-card__role')),
+            avatar: card.match(/<img\b[^>]*\bsrc="([^"]+)"/i)?.[1] ?? '',
+            bio: toText(innerOfClass(card, 'jz-artist-card__badge')),
+          });
+        }
+        placeLineup();
+      } else if (tag === 'div' && hasClass(block.html, 'jz-partners')) {
+        add(parsePartners(block.html));
+      } else if (tag === 'figure' || tag === 'table') {
+        add(/<table\b/i.test(block.html) ? parseTable(block.html) : parseImage(block.html));
+      } else if (tag === 'ul' || tag === 'ol') {
+        const list = parseList(block.html);
+        if (list && list.type === 'list' && !list.facts && /line-?up/i.test(heading)) {
+          // "<strong>Mohamed Tarek</strong> · Munshid · Egypt" → performer cards
+          for (const li of block.html.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)) {
+            const name = toText(li[1].match(/<strong>([\s\S]*?)<\/strong>/i)?.[1] ?? li[1].split('·')[0]);
+            const role = toText(li[1].replace(/<strong>[\s\S]*?<\/strong>/i, '')).replace(/^·\s*/, '');
+            if (name) body.lineup.push({ name, role, avatar: '', bio: '' });
+          }
+          placeLineup();
+        } else {
+          add(list);
+        }
+      } else if (tag === 'p' || tag === 'blockquote' || tag === 'pre') {
+        if (/<img\b/i.test(block.html) && !toText(block.html)) {
+          add(parseImage(block.html));
+        } else {
+          const runs = parseInline(innerHtml(block.html));
+          if (runs.length) add({ type: 'paragraph', runs });
+        }
+      } else if (['div', 'section', 'article', 'header', 'footer', 'main', 'aside'].includes(tag)) {
+        walk(innerHtml(block.html)); // layout wrappers (groups, columns…)
+      }
+    }
+  };
+
+  walk(html);
+  body.sections = body.sections.filter((s) => s.blocks.length > 0);
+  const opening = body.sections[0] && !body.sections[0].heading ? body.sections[0].blocks : [];
+  body.intro = opening.flatMap((b) => (b.type === 'paragraph' ? [runsText(b.runs)] : []));
   return body;
 }
 
@@ -400,9 +574,18 @@ export function mapWordPressEvent(post: any): EventItem {
     ...(first ? { endsOn: isoDate(last || first) } : {}),
   };
 
-  const description = (body.paragraphs.length ? body.paragraphs : [toText(post?.excerpt?.rendered || '')]).filter(Boolean).join('\n');
+  // The full post, section by section — the event page renders all of it.
+  // `description` is just the opening text, for places that want a summary.
+  const description = (body.intro.length ? body.intro : [toText(post?.excerpt?.rendered || '')]).filter(Boolean).join('\n');
   if (description) event.description = description;
-  if (body.highlights.length) event.highlights = body.highlights;
+  const sections = body.sections;
+  // The event's PDF (e.g. a sponsorship pack), unless the post already links it.
+  const pdf = String(meta._jazba_event_pdf || '').trim();
+  if (/^https?:\/\//i.test(pdf) && !JSON.stringify(sections).includes(pdf)) {
+    const label = toText(meta._jazba_event_pdf_label || '') || 'Event information';
+    sections.push({ heading: 'Downloads', blocks: [{ type: 'link', label: `${label} (PDF)`, href: pdf }] });
+  }
+  if (sections.length) event.content = sections;
   if (body.lineup.length) event.lineup = body.lineup;
   if (venue && body.shows.length <= 1) event.venueInfo = { mapUrl: location };
 

@@ -4,6 +4,7 @@ import {
   Share2, ShieldCheck, Heart, Plus, Minus, ChevronDown, ChevronUp, Image as ImageIcon, X, ArrowRight, ExternalLink,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { ContentSectionView } from './EventContent';
 import { EventItem, TicketTier, computeOrderTotals, getAvailableTiers, isPastEvent } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth } from '../firebase';
@@ -227,6 +228,115 @@ export default function EventDetailPage({
     }
   })();
 
+  // Full post content (jazbaentertainment.com events) and where its ticket
+  // block and line-up sat, so the page can follow the post's own order.
+  const content = event.content?.length ? event.content : [];
+  const ticketsAfter = content.findIndex((section) => section.blocks.some((b) => b.type === 'tickets'));
+  const lineupInContent = content.some((section) => section.blocks.some((b) => b.type === 'lineup'));
+
+  const lineupGrid = artistsList.length > 0 ? (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-[#f2f2f2] border border-[#f2f2f2]">
+      {artistsList.map((artist, idx) => (
+        <div key={idx} className="bg-white p-6 text-center">
+          <div className="w-16 h-16 rounded-full overflow-hidden mx-auto bg-[#f2f2f2] flex items-center justify-center">
+            {artist.avatar ? (
+              <img
+                src={artist.avatar}
+                alt={artist.name}
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="font-bold text-lg">{artist.name.charAt(0)}</span>
+            )}
+          </div>
+          <h4 className="font-display font-bold text-base mt-4">{artist.name}</h4>
+          <span className={`${overline} text-[#8a8a8a] block mt-1`}>{artist.role}</span>
+          <p className="text-sm text-[#666] leading-relaxed mt-3">{artist.bio}</p>
+        </div>
+      ))}
+    </div>
+  ) : null;
+
+  // Dates & venues (tours, partner-sold events) and enquiry-only packages.
+  const ticketSections = (
+    <>
+      {/* Dates & venues — tours and partner-sold events, one row per city */}
+      {shows.length > 0 && (
+      <section>
+        <h2 className="font-display font-bold text-2xl leading-[0.95] border-b border-black pb-4">
+          {shows.length > 1 ? 'Dates & venues' : 'Tickets'}
+        </h2>
+        <div>
+          {shows.map((show, idx) => (
+            <div key={idx} className="py-6 border-b border-[#f2f2f2]">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                <div className="min-w-0">
+                  {show.when && <span className={`${overline} text-[#8a8a8a]`}>{show.when}</span>}
+                  <h3 className="font-display font-bold text-xl mt-1.5">{show.name}</h3>
+                  {show.details.map((line, i) => (
+                    <p key={i} className="text-sm text-[#666] mt-1">{line}</p>
+                  ))}
+                </div>
+                {event.externalTicketUrl && show.ticketUrl && !eventEnded && (
+                  <a
+                    href={show.ticketUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 bg-black text-white px-5 py-3 text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2"
+                  >
+                    Book {show.name} <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
+              </div>
+              {show.prices.length > 0 && (
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-4">
+                  {show.prices.map((p, i) => (
+                    <li key={i} className="flex items-baseline justify-between gap-4 py-3 border-t border-[#f2f2f2] text-sm">
+                      <span className="min-w-0">
+                        <span className="font-bold">{p.name}</span>
+                        {p.note && <span className="block text-xs text-[#666] mt-0.5">{p.note}</span>}
+                      </span>
+                      <span className="font-display font-bold shrink-0">{p.price}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+      )}
+
+      {/* Packages booked by enquiry, e.g. student batches */}
+      {enquiryPackages.length > 0 && !eventEnded && (
+      <section>
+        <h2 className="font-display font-bold text-2xl leading-[0.95] border-b border-black pb-4">Group bookings</h2>
+        <p className="text-sm text-[#666] leading-relaxed mt-6">
+          These packages are booked directly with the Jazba team — get in touch and we'll reserve your places.
+        </p>
+        <ul className="mt-4">
+          {enquiryPackages.map((p, i) => (
+            <li key={i} className="flex items-baseline justify-between gap-4 py-4 border-b border-[#f2f2f2] text-sm">
+              <span className="min-w-0">
+                <span className="font-bold">{p.name}</span>
+                {p.note && <span className="block text-xs text-[#666] mt-0.5">{p.note}</span>}
+              </span>
+              <span className="font-display font-bold shrink-0">{p.price}</span>
+            </li>
+          ))}
+        </ul>
+        <Link
+          to="/contact"
+          className="inline-flex items-center gap-2 bg-black text-white px-6 py-3.5 mt-6 text-sm font-bold hover:bg-neutral-800 transition-colors"
+        >
+          Enquire about group bookings <ArrowRight className="w-4 h-4" />
+        </Link>
+      </section>
+      )}
+    </>
+  );
+
   return (
     <div className="jz-page bg-white min-h-screen text-black pb-24" id="event-detail-page">
 
@@ -304,6 +414,22 @@ export default function EventDetailPage({
           {/* LEFT — content sections */}
           <div className="lg:col-span-7 space-y-16">
 
+            {content.length > 0 ? (
+              // Events from jazbaentertainment.com: the whole post, section by
+              // section, in its own order. The ticket boxes go where the post had
+              // its Tickets block, the performer cards where it had its line-up.
+              content.map((section, idx) => (
+                <React.Fragment key={idx}>
+                  <ContentSectionView
+                    section={section}
+                    heading={idx === 0 && !section.heading ? 'About this event' : undefined}
+                    lineup={lineupGrid}
+                  />
+                  {idx === ticketsAfter && ticketSections}
+                </React.Fragment>
+              ))
+            ) : (
+            <>
             {/* About — only when a description or highlights were added */}
             {(description || highlights.length > 0) && (
             <section>
@@ -328,81 +454,10 @@ export default function EventDetailPage({
               )}
             </section>
             )}
-
-            {/* Dates & venues — tours and partner-sold events, one row per city */}
-            {shows.length > 0 && (
-            <section>
-              <h2 className="font-display font-bold text-2xl leading-[0.95] border-b border-black pb-4">
-                {shows.length > 1 ? 'Dates & venues' : 'Tickets'}
-              </h2>
-              <div>
-                {shows.map((show, idx) => (
-                  <div key={idx} className="py-6 border-b border-[#f2f2f2]">
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        {show.when && <span className={`${overline} text-[#8a8a8a]`}>{show.when}</span>}
-                        <h3 className="font-display font-bold text-xl mt-1.5">{show.name}</h3>
-                        {show.details.map((line, i) => (
-                          <p key={i} className="text-sm text-[#666] mt-1">{line}</p>
-                        ))}
-                      </div>
-                      {event.externalTicketUrl && show.ticketUrl && !eventEnded && (
-                        <a
-                          href={show.ticketUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="shrink-0 bg-black text-white px-5 py-3 text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2"
-                        >
-                          Book {show.name} <ExternalLink className="w-4 h-4" />
-                        </a>
-                      )}
-                    </div>
-                    {show.prices.length > 0 && (
-                      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-4">
-                        {show.prices.map((p, i) => (
-                          <li key={i} className="flex items-baseline justify-between gap-4 py-3 border-t border-[#f2f2f2] text-sm">
-                            <span className="min-w-0">
-                              <span className="font-bold">{p.name}</span>
-                              {p.note && <span className="block text-xs text-[#666] mt-0.5">{p.note}</span>}
-                            </span>
-                            <span className="font-display font-bold shrink-0">{p.price}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
+            </>
             )}
 
-            {/* Packages booked by enquiry, e.g. student batches */}
-            {enquiryPackages.length > 0 && !eventEnded && (
-            <section>
-              <h2 className="font-display font-bold text-2xl leading-[0.95] border-b border-black pb-4">Group bookings</h2>
-              <p className="text-sm text-[#666] leading-relaxed mt-6">
-                These packages are booked directly with the Jazba team — get in touch and we'll reserve your places.
-              </p>
-              <ul className="mt-4">
-                {enquiryPackages.map((p, i) => (
-                  <li key={i} className="flex items-baseline justify-between gap-4 py-4 border-b border-[#f2f2f2] text-sm">
-                    <span className="min-w-0">
-                      <span className="font-bold">{p.name}</span>
-                      {p.note && <span className="block text-xs text-[#666] mt-0.5">{p.note}</span>}
-                    </span>
-                    <span className="font-display font-bold shrink-0">{p.price}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link
-                to="/contact"
-                className="inline-flex items-center gap-2 bg-black text-white px-6 py-3.5 mt-6 text-sm font-bold hover:bg-neutral-800 transition-colors"
-              >
-                Enquire about group bookings <ArrowRight className="w-4 h-4" />
-              </Link>
-            </section>
-            )}
-
+            {ticketsAfter === -1 && ticketSections}
             {/* Schedule — only when a running order was added */}
             {agendaSchedule.length > 0 && (
             <section>
@@ -450,31 +505,11 @@ export default function EventDetailPage({
             </section>
             )}
 
-            {/* Lineup — only when performers were added */}
-            {artistsList.length > 0 && (
+            {/* Lineup — when performers were added and the post didn't already place them */}
+            {lineupGrid && !lineupInContent && (
             <section>
               <h2 className="font-display font-bold text-2xl leading-[0.95] border-b border-black pb-4">On stage</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-[#f2f2f2] border border-[#f2f2f2] mt-8">
-                {artistsList.map((artist, idx) => (
-                  <div key={idx} className="bg-white p-6 text-center">
-                    <div className="w-16 h-16 rounded-full overflow-hidden mx-auto bg-[#f2f2f2] flex items-center justify-center">
-                      {artist.avatar ? (
-                        <img
-                          src={artist.avatar}
-                          alt={artist.name}
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="font-bold text-lg">{artist.name.charAt(0)}</span>
-                      )}
-                    </div>
-                    <h4 className="font-display font-bold text-base mt-4">{artist.name}</h4>
-                    <span className={`${overline} text-[#8a8a8a] block mt-1`}>{artist.role}</span>
-                    <p className="text-sm text-[#666] leading-relaxed mt-3">{artist.bio}</p>
-                  </div>
-                ))}
-              </div>
+              <div className="mt-8">{lineupGrid}</div>
             </section>
             )}
 

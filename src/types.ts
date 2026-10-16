@@ -58,6 +58,48 @@ export interface PriceLine {
   price: string; // as written by the organiser, e.g. "PKR 2,200 each"
 }
 
+// ---- Rich event content (the full body of a jazbaentertainment.com post) ----
+// Parsed into plain data on the server — never raw HTML — so a post can't
+// inject markup or scripts into the page.
+
+/** A run of text, optionally bold/italic and/or a link. A link starting
+ *  with "/" is a page on this site; others are http(s), mailto: or tel:. */
+export interface TextRun {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  href?: string;
+}
+
+export interface ContentPackage {
+  name: string;
+  badge?: string;
+  price?: string;
+  points: string[];
+  featured?: boolean;
+}
+
+export type ContentBlock =
+  | { type: 'paragraph'; runs: TextRun[] }
+  | { type: 'subheading'; text: string }
+  /** facts: every item is "Label: value" — shown as a checklist grid. */
+  | { type: 'list'; items: TextRun[][]; facts?: boolean }
+  | { type: 'table'; head: string[]; rows: string[][] }
+  | { type: 'image'; src: string; alt: string; caption?: string }
+  | { type: 'partners'; items: { name: string; role: string; logo: string }[] }
+  | { type: 'packages'; lead?: string; items: ContentPackage[]; note?: string; action?: { label: string; href: string } }
+  | { type: 'link'; label: string; href: string }
+  /** Where the post shows its performers — the line-up cards render here. */
+  | { type: 'lineup' }
+  /** Where the post shows its ticket block — dates/venues and group packages render after this section. */
+  | { type: 'tickets' };
+
+export interface ContentSection {
+  heading?: string;
+  eyebrow?: string;
+  blocks: ContentBlock[];
+}
+
 /** One date/city of a multi-show listing. */
 export interface EventShow {
   name: string;
@@ -154,6 +196,8 @@ export interface EventItem {
   organizerImage?: string;
 
   // ---- Set on events from jazbaentertainment.com (api/_lib/wordpressEvents.ts)
+  /** The whole post body, in order. When present it replaces description/highlights. */
+  content?: ContentSection[];
   ticketOptions?: TicketOption[];
   /** Tickets are sold on a partner's site, not through this checkout. */
   externalTicketUrl?: string;
