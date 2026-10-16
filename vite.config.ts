@@ -4,7 +4,7 @@ import path from 'path';
 import {defineConfig, loadEnv, type Plugin} from 'vite';
 import {createCheckoutSession, getCheckoutSession, getOrigin} from './api/_lib/stripePayment';
 import {sendFormEmail, FormEmailError} from './api/_lib/formEmail';
-import {fetchWordPressEvents} from './api/_lib/wordpressEvents';
+import {fetchWordPressEvents, fetchWordPressSlug} from './api/_lib/wordpressEvents';
 
 function readJsonBody(req: any): Promise<any> {
   return new Promise((resolve) => {
@@ -91,6 +91,23 @@ const devApi = (secrets: { stripeSecretKey: string; resendApiKey: string }): Plu
           res.end(JSON.stringify({ error: err?.message || 'Could not send your message.' }));
         }
       });
+    });
+
+    // Mirrors the vercel.json rewrite: /events/wp-700 → /events/<slug>.
+    server.middlewares.use((req, res, next) => {
+      const match = (req.url || '').match(/^\/events\/wp-(\d+)\/?(?:\?.*)?$/);
+      if (!match) return next();
+      fetchWordPressSlug(match[1])
+        .then((slug) => {
+          res.statusCode = slug ? 308 : 307;
+          res.setHeader('Location', slug ? `/events/${encodeURIComponent(slug)}` : '/events');
+          res.end();
+        })
+        .catch(() => {
+          res.statusCode = 307;
+          res.setHeader('Location', '/events');
+          res.end();
+        });
     });
 
     server.middlewares.use('/api/wp-events', (req, res) => {

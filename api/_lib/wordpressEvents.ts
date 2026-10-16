@@ -458,6 +458,22 @@ export async function fetchWordPressEvents(): Promise<EventItem[]> {
   return events;
 }
 
+/** Just the URL slug of a published WordPress event (post id "700"), or null.
+ *  Used to redirect old /events/wp-700 links to /events/<slug>. */
+export async function fetchWordPressSlug(wpId: string): Promise<string | null> {
+  if (!/^\d{1,10}$/.test(wpId)) return null;
+  const res = await wpFetch(`${WP_API}/${wpId}?_fields=slug,status`);
+  if (res.status === 404 || res.status === 401 || res.status === 403) return null;
+  if (!res.ok) throw new Error(`WordPress event request failed (${res.status})`);
+  const post = await res.json();
+  if (post?.status !== 'publish' || !post?.slug) return null;
+  try {
+    return decodeURIComponent(post.slug);
+  } catch {
+    return String(post.slug);
+  }
+}
+
 /** One event by its id on this site ("wp-700"), or null if it isn't published. */
 export async function fetchWordPressEvent(eventId: string): Promise<EventItem | null> {
   const wpId = eventId.startsWith(WP_EVENT_PREFIX) ? eventId.slice(WP_EVENT_PREFIX.length) : '';
