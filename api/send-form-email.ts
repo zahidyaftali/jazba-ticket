@@ -1,6 +1,7 @@
 // The .js extension is required: this repo is ESM ("type": "module") and
 // Vercel compiles each TS file separately, so Node needs the exact path.
 import { sendFormEmail, FormEmailError } from './_lib/formEmail.js';
+import { mailConfigFromEnv } from './_lib/sendEmail.js';
 
 // Vercel serverless function: POST /api/send-form-email
 // Body: { formName, name?, email, phone?, subject?, message? }
@@ -13,14 +14,14 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    res.status(500).json({ error: 'Email delivery is not configured on the server.' });
+  const mail = mailConfigFromEnv(process.env);
+  if (!mail) {
+    res.status(500).json({ error: 'Could not send your message right now. Please email us directly at info@jazbatickets.com.' });
     return;
   }
 
   try {
-    await sendFormEmail(apiKey, req.body ?? {});
+    await sendFormEmail(mail, req.body ?? {});
     res.status(200).json({ ok: true });
   } catch (err: any) {
     console.error('send-form-email failed:', err?.message || err);

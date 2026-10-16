@@ -1,4 +1,4 @@
-import { sendEmail, escapeHtml } from './sendEmail.js';
+import { sendEmail, escapeHtml, type MailConfig } from './sendEmail.js';
 
 // Every form on the site (Contact, Book-an-artist, Help centre, Newsletter)
 // notifies the same inbox — this is the one place that decides the subject
@@ -42,7 +42,7 @@ function row(label: string, value: string): string {
   return `<tr><td style="padding:6px 12px 6px 0;color:#666;font-size:13px;white-space:nowrap;vertical-align:top">${escapeHtml(label)}</td><td style="padding:6px 0;font-size:14px;color:#111">${escapeHtml(value).replace(/\n/g, '<br/>')}</td></tr>`;
 }
 
-export async function sendFormEmail(apiKey: string, body: FormEmailBody): Promise<void> {
+export async function sendFormEmail(mail: MailConfig, body: FormEmailBody): Promise<void> {
   const formName = str(body.formName, 40) || 'contact';
   const name = str(body.name, 200);
   const email = str(body.email, 200);
@@ -81,7 +81,7 @@ export async function sendFormEmail(apiKey: string, body: FormEmailBody): Promis
       <p style="margin-top:24px;font-size:11px;color:#999">Sent from the Jazba Tickets website.</p>
     </div>`;
 
-  await sendEmail(apiKey, {
+  await sendEmail(mail, {
     to: NOTIFY_TO,
     subject: emailSubject,
     html,

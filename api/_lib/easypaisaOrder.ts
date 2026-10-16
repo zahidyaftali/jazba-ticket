@@ -1,4 +1,4 @@
-import { sendEmail, escapeHtml } from './sendEmail.js';
+import { sendEmail, escapeHtml, type MailConfig } from './sendEmail.js';
 import {
   PaymentError,
   PROMO_CODES,
@@ -47,7 +47,7 @@ function row(label: string, value: string): string {
 }
 
 export async function submitEasypaisaOrder(
-  apiKey: string,
+  mail: MailConfig,
   body: EasypaisaOrderBody,
 ): Promise<{ orderRef: string; amountPkr: number }> {
   const eventId = str(body.eventId, 128);
@@ -114,7 +114,7 @@ export async function submitEasypaisaOrder(
       <p style="margin-top:24px;font-size:11px;color:#999">Submitted from the Jazba Tickets checkout.</p>
     </div>`;
 
-  await sendEmail(apiKey, {
+  await sendEmail(mail, {
     to: NOTIFY_TO,
     subject: `Easypaisa payment ${orderRef} — ${amountLabel} — ${event.title} — ${fullName}`,
     html,

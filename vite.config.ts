@@ -5,6 +5,7 @@ import {defineConfig, loadEnv, type Plugin} from 'vite';
 import {createCheckoutSession, getCheckoutSession, getOrigin} from './api/_lib/stripePayment';
 import {sendFormEmail, FormEmailError} from './api/_lib/formEmail';
 import {submitEasypaisaOrder} from './api/_lib/easypaisaOrder';
+import {mailConfigFromEnv, type MailConfig} from './api/_lib/sendEmail';
 import {fetchWordPressEvents, fetchWordPressSlug} from './api/_lib/wordpressEvents';
 
 function readJsonBody(req: any): Promise<any> {
@@ -23,7 +24,7 @@ function readJsonBody(req: any): Promise<any> {
 
 // Serves the same API routes Vercel runs in production during `npm run dev`,
 // so Stripe checkout and form emails both work locally too.
-const devApi = (secrets: { stripeSecretKey: string; resendApiKey: string }): Plugin => ({
+const devApi = (secrets: { stripeSecretKey: string; mail: MailConfig | null }): Plugin => ({
   name: 'jazba-dev-api',
   configureServer(server) {
     server.middlewares.use('/api/create-checkout-session', (req, res) => {
@@ -78,14 +79,14 @@ const devApi = (secrets: { stripeSecretKey: string; resendApiKey: string }): Plu
         res.end(JSON.stringify({ error: 'Method not allowed' }));
         return;
       }
-      if (!secrets.resendApiKey) {
+      if (!secrets.mail) {
         res.statusCode = 500;
-        res.end(JSON.stringify({ error: 'RESEND_API_KEY is not set in .env' }));
+        res.end(JSON.stringify({ error: 'ZOHO_SMTP_PASSWORD is not set in .env' }));
         return;
       }
       readJsonBody(req).then(async (body) => {
         try {
-          await sendFormEmail(secrets.resendApiKey, body);
+          await sendFormEmail(secrets.mail!, body);
           res.end(JSON.stringify({ ok: true }));
         } catch (err: any) {
           res.statusCode = err instanceof FormEmailError ? err.status : 502;
@@ -101,14 +102,14 @@ const devApi = (secrets: { stripeSecretKey: string; resendApiKey: string }): Plu
         res.end(JSON.stringify({ error: 'Method not allowed' }));
         return;
       }
-      if (!secrets.resendApiKey) {
+      if (!secrets.mail) {
         res.statusCode = 500;
-        res.end(JSON.stringify({ error: 'RESEND_API_KEY is not set in .env' }));
+        res.end(JSON.stringify({ error: 'ZOHO_SMTP_PASSWORD is not set in .env' }));
         return;
       }
       readJsonBody(req).then(async (body) => {
         try {
-          const result = await submitEasypaisaOrder(secrets.resendApiKey, body);
+          const result = await submitEasypaisaOrder(secrets.mail!, body);
           res.end(JSON.stringify(result));
         } catch (err: any) {
           res.statusCode = err?.status || 502;
@@ -159,7 +160,7 @@ export default defineConfig(({mode}) => {
       tailwindcss(),
       devApi({
         stripeSecretKey: env.STRIPE_SECRET_KEY || '',
-        resendApiKey: env.RESEND_API_KEY || '',
+        mail: mailConfigFromEnv(env),
       }),
     ],
     resolve: {

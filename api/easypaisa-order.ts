@@ -1,6 +1,7 @@
 // The .js extension is required: this repo is ESM ("type": "module") and
 // Vercel compiles each TS file separately, so Node needs the exact path.
 import { submitEasypaisaOrder } from './_lib/easypaisaOrder.js';
+import { mailConfigFromEnv } from './_lib/sendEmail.js';
 
 // Vercel serverless function: POST /api/easypaisa-order
 // Body: { eventId, tier, quantity, promoCode?, idToken, fullName, email, phone,
@@ -13,14 +14,14 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    res.status(500).json({ error: 'Easypaisa orders are not configured on the server.' });
+  const mail = mailConfigFromEnv(process.env);
+  if (!mail) {
+    res.status(500).json({ error: 'Could not submit your payment right now. Please email your screenshot and order details to info@jazbatickets.com.' });
     return;
   }
 
   try {
-    const result = await submitEasypaisaOrder(apiKey, req.body ?? {});
+    const result = await submitEasypaisaOrder(mail, req.body ?? {});
     res.status(200).json(result);
   } catch (err: any) {
     console.error('easypaisa-order failed:', err?.message || err);

@@ -1,7 +1,9 @@
-// Thin wrapper around the Resend REST API — no SDK dependency needed, just
-// fetch (available natively in both Vercel's Node runtime and the Vite dev
-// middleware). Shared by every form on the site that needs to notify
-// info@jazbatickets.com.
+import nodemailer from 'nodemailer';
+
+// Sends the site's notification emails through the info@jazbatickets.com
+// Zoho mailbox over SMTP — no third-party email service. Shared by every
+// form on the site and the Easypaisa checkout, in both the Vercel functions
+// and the Vite dev middleware.
 
 export interface SendEmailInput {
   to: string;
@@ -9,38 +11,49 @@ export interface SendEmailInput {
   html: string;
   /** Lets the admin hit "Reply" and land straight in the sender's inbox. */
   replyTo?: string;
-  from?: string;
   /** Files to attach — content is the file's bytes as a base64 string. */
   attachments?: { filename: string; content: string }[];
 }
 
-// Sends from the site's own domain, which must be verified at
-// resend.com/domains — Resend's shared onboarding@resend.dev sender can only
-// reach the Resend account owner, never info@jazbatickets.com.
-// RESEND_FROM_EMAIL overrides this if a different sender is ever needed.
-const DEFAULT_FROM = 'Jazba Tickets <no-reply@jazbatickets.com>';
+export interface MailConfig {
+  host: string;
+  user: string;
+  pass: string;
+}
 
-export async function sendEmail(apiKey: string, input: SendEmailInput): Promise<void> {
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      from: input.from || process.env.RESEND_FROM_EMAIL || DEFAULT_FROM,
-      to: [input.to],
-      subject: input.subject,
-      html: input.html,
-      reply_to: input.replyTo || undefined,
-      attachments: input.attachments?.length ? input.attachments : undefined,
-    }),
+/** SMTP settings from the environment, or null when no password is set. */
+export function mailConfigFromEnv(env: Record<string, string | undefined>): MailConfig | null {
+  const pass = env.ZOHO_SMTP_PASSWORD || '';
+  if (!pass) return null;
+  return {
+    // Zoho's server for custom-domain mailboxes in its US region (jazbatickets.com's MX is mx.zoho.com).
+    host: env.ZOHO_SMTP_HOST || 'smtppro.zoho.com',
+    user: env.ZOHO_SMTP_USER || 'info@jazbatickets.com',
+    pass,
+  };
+}
+
+export async function sendEmail(config: MailConfig, input: SendEmailInput): Promise<void> {
+  const transport = nodemailer.createTransport({
+    host: config.host,
+    port: 465,
+    secure: true,
+    auth: { user: config.user, pass: config.pass },
+    // Fail inside the serverless time limit rather than hanging.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
   });
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`Resend API error (${res.status}): ${body || 'unknown error'}`);
-  }
+  await transport.sendMail({
+    // Zoho only relays mail sent from the signed-in mailbox itself.
+    from: { name: 'Jazba Tickets', address: config.user },
+    to: input.to,
+    replyTo: input.replyTo || undefined,
+    subject: input.subject,
+    html: input.html,
+    attachments: input.attachments?.map((a) => ({ filename: a.filename, content: a.content, encoding: 'base64' })),
+  });
 }
 
 /** Escape user-supplied text before dropping it into an HTML email body. */
