@@ -372,8 +372,18 @@ export function mapWordPressEvent(post: any): EventItem {
     .filter((c: string) => typeof c === 'string' && c.startsWith('jazba_event_type-'))
     .map((c: string) => c.slice('jazba_event_type-'.length));
 
+  // The WordPress slug doubles as this site's URL, so an event lives at the
+  // same path on both sites: /events/aa-tenu-moaj-karawan-live-lahore.
+  let slug = String(post?.slug || '');
+  try {
+    slug = decodeURIComponent(slug);
+  } catch {
+    // keep the raw slug
+  }
+
   const event: EventItem = {
     id: `${WP_EVENT_PREFIX}${post.id}`,
+    ...(slug ? { slug } : {}),
     title: toText(post?.title?.rendered || '') || 'Untitled event',
     image: featuredImage(post) || body.firstImage || FALLBACK_IMAGE,
     category: categoryFor(typeSlugs),

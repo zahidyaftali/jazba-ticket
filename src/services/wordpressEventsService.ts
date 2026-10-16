@@ -6,9 +6,7 @@ import { EventItem } from '../types';
 
 const LOAD_TIMEOUT_MS = 20000;
 
-/** Every jazbaentertainment.com event, or [] if they can't be loaded — the
- *  rest of the site keeps working with its own events either way. */
-export async function getWordPressEvents(): Promise<EventItem[]> {
+async function fetchOnce(): Promise<EventItem[]> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), LOAD_TIMEOUT_MS);
   try {
@@ -16,10 +14,25 @@ export async function getWordPressEvents(): Promise<EventItem[]> {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     return Array.isArray(data.events) ? data.events : [];
-  } catch (err) {
-    console.error('getWordPressEvents failed:', err);
-    return [];
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/** Every jazbaentertainment.com event, or [] if they can't be loaded — the
+ *  rest of the site keeps working with its own events either way. One retry
+ *  covers a momentary WordPress hiccup. */
+export async function getWordPressEvents(): Promise<EventItem[]> {
+  try {
+    return await fetchOnce();
+  } catch (err) {
+    console.warn('getWordPressEvents failed, retrying once:', err);
+    try {
+      await new Promise((r) => setTimeout(r, 1000));
+      return await fetchOnce();
+    } catch (retryErr) {
+      console.error('getWordPressEvents failed:', retryErr);
+      return [];
+    }
   }
 }

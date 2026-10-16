@@ -45,7 +45,7 @@ import OrganizersPage from './components/OrganizersPage';
 import OrganizerDetailPage from './components/OrganizerDetailPage';
 import { EventGridSkeleton, DetailPageSkeleton } from './components/Skeletons';
 import { categories, faqs } from './data';
-import { EventItem, TicketTier, getAvailableTiers, isPastEvent } from './types';
+import { EventItem, TicketTier, eventPath, getAvailableTiers, isPastEvent, withEventSlugs } from './types';
 import { getPublishedEvents, getAllArtists } from './services/backendService';
 import { getWordPressEvents } from './services/wordpressEventsService';
 
@@ -150,7 +150,7 @@ function HomeView({ events, eventsLoaded }: { events: EventItem[]; eventsLoaded:
   const topEvents = useMemo(() => liveEvents.filter((e) => e.type === 'top'), [liveEvents]);
   const nearByEvents = useMemo(() => liveEvents.filter((e) => e.type === 'near-by'), [liveEvents]);
 
-  const goDetail = (evt: EventItem) => navigate(`/events/${evt.id}`);
+  const goDetail = (evt: EventItem) => navigate(eventPath(evt));
   const goCheckout = (evt: EventItem) =>
     navigate('/checkout', { state: { event: evt, quantity: 1, tier: 'general' } });
 
@@ -286,16 +286,18 @@ function ExplorerView({ events, eventsLoaded }: { events: EventItem[]; eventsLoa
       initialTicketClass={params.get('class') || ''}
       initialDateOffset={dateParam !== null ? Number(dateParam) : null}
       onBook={(evt) => navigate('/checkout', { state: { event: evt, quantity: 1, tier: 'general' } })}
-      onViewDetail={(evt) => navigate(`/events/${evt.id}`)}
+      onViewDetail={(evt) => navigate(eventPath(evt))}
       onBackToHome={() => navigate('/')}
     />
   );
 }
 
 function EventDetailView({ events, eventsLoaded }: { events: EventItem[]; eventsLoaded: boolean }) {
-  const { id } = useParams();
+  const { slug = '' } = useParams();
   const navigate = useNavigate();
-  const event = events.find((e) => e.id === id);
+  // Readable slug first; the raw id still resolves so older links
+  // (e.g. /events/wp-700, Stripe's cancel link) keep working.
+  const event = events.find((e) => e.slug === slug) || events.find((e) => e.id === slug);
 
   useEffect(() => {
     if (event) document.title = `${event.title} — Tickets | Jazba Tickets`;
@@ -303,6 +305,7 @@ function EventDetailView({ events, eventsLoaded }: { events: EventItem[]; events
 
   if (!eventsLoaded) return <DetailPageSkeleton />;
   if (!event) return <NotFoundView />;
+  if (event.slug && event.slug !== slug) return <Navigate to={eventPath(event)} replace />;
 
   return (
     <EventDetailPage
@@ -310,7 +313,7 @@ function EventDetailView({ events, eventsLoaded }: { events: EventItem[]; events
       allEvents={events}
       onBack={() => navigate('/events')}
       onBook={(evt, quantity, tier) => navigate('/checkout', { state: { event: evt, quantity, tier } })}
-      onSelectRelatedEvent={(evt) => navigate(`/events/${evt.id}`)}
+      onSelectRelatedEvent={(evt) => navigate(eventPath(evt))}
       onRequireLogin={() => navigate('/login')}
     />
   );
@@ -326,7 +329,7 @@ function CheckoutView({ currentUser, authChecked }: { currentUser: AuthUser; aut
   // Past events, partner-sold events and events with no tickets on sale yet
   // can't be booked here — the event page explains where to get tickets.
   if (isPastEvent(state.event) || getAvailableTiers(state.event).length === 0) {
-    return <Navigate to={`/events/${state.event.id}`} replace />;
+    return <Navigate to={eventPath(state.event)} replace />;
   }
 
   // Guest checkout is not allowed: wait for Firebase to resolve the session,
@@ -371,7 +374,7 @@ function ArtistsView({ events }: { events: EventItem[] }) {
       onBackToHome={() => navigate('/')}
       onViewShowDetail={(showTitle) => {
         const matched = events.find((e) => e.title.toLowerCase().includes(showTitle.toLowerCase()));
-        navigate(matched ? `/events/${matched.id}` : `/events?q=${encodeURIComponent(showTitle)}`);
+        navigate(matched ? eventPath(matched) : `/events?q=${encodeURIComponent(showTitle)}`);
       }}
       onSelectArtist={(artist) => navigate(`/artists/${artist.id}`, { state: { artist } })}
       onRequireLogin={() => navigate('/login')}
@@ -419,7 +422,7 @@ function ArtistDetailView({ events }: { events: EventItem[] }) {
       onBack={() => navigate('/artists')}
       onViewShowDetail={(showTitle) => {
         const matched = events.find((e) => e.title.toLowerCase().includes(showTitle.toLowerCase()));
-        navigate(matched ? `/events/${matched.id}` : `/events?q=${encodeURIComponent(showTitle)}`);
+        navigate(matched ? eventPath(matched) : `/events?q=${encodeURIComponent(showTitle)}`);
       }}
       onBookEvent={(evt) => navigate('/checkout', { state: { event: evt, quantity: 1, tier: 'general' } })}
       onRequireLogin={() => navigate('/login')}
@@ -444,7 +447,7 @@ function DashboardView({
       allEvents={events}
       onLogout={onLogout}
       onBackToHome={() => navigate('/')}
-      onViewShowDetail={(evt) => navigate(`/events/${evt.id}`)}
+      onViewShowDetail={(evt) => navigate(eventPath(evt))}
       onExploreEvents={() => navigate('/events')}
       initialTab={searchParams.get('tab') || undefined}
     />
@@ -521,7 +524,7 @@ function AppShell() {
   useEffect(() => {
     Promise.allSettled([getWordPressEvents(), getPublishedEvents()])
       .then((results) =>
-        setEvents(results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []))),
+        setEvents(withEventSlugs(results.flatMap((r) => (r.status === 'fulfilled' ? r.value : [])))),
       )
       .finally(() => setEventsLoaded(true));
   }, []);
@@ -598,7 +601,7 @@ function AppShell() {
       <Routes>
         <Route path="/" element={<HomeView events={events} eventsLoaded={eventsLoaded} />} />
         <Route path="/events" element={<ExplorerView events={events} eventsLoaded={eventsLoaded} />} />
-        <Route path="/events/:id" element={<EventDetailView events={events} eventsLoaded={eventsLoaded} />} />
+        <Route path="/events/:slug" element={<EventDetailView events={events} eventsLoaded={eventsLoaded} />} />
         <Route path="/checkout" element={<CheckoutView currentUser={currentUser} authChecked={authChecked} />} />
         <Route path="/checkout/success" element={<CheckoutSuccessView events={events} eventsLoaded={eventsLoaded} />} />
         <Route path="/artists" element={<ArtistsView events={events} />} />

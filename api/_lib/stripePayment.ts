@@ -81,6 +81,8 @@ function fsValue(v: any): any {
 
 interface EventPricing {
   title: string;
+  /** The event page on this site — where Stripe's "back" link returns to. */
+  path: string;
   /** Ticket packages on sale, keyed by tier id. */
   tiers: Record<string, { price: number; name: string }>;
 }
@@ -103,7 +105,7 @@ async function fetchWordPressEventPricing(eventId: string): Promise<EventPricing
     if (option.price > 0) tiers[option.id] = { price: option.price, name: option.name };
   }
   if (Object.keys(tiers).length === 0) throw new PaymentError('Tickets for this event are not on sale yet.');
-  return { title: event.title, tiers };
+  return { title: event.title, path: `/events/${encodeURIComponent(event.slug || eventId)}`, tiers };
 }
 
 /** Fetch a published event's pricing straight from Firestore, reading as the
@@ -133,7 +135,8 @@ async function fetchEventPricing(eventId: string, idToken: string): Promise<Even
   if (Number(tp.vip) > 0) tiers.vip = { price: Number(tp.vip), name: DEFAULT_TIER_NAMES.vip };
   if (Number(tp.elite) > 0) tiers.elite = { price: Number(tp.elite), name: DEFAULT_TIER_NAMES.elite };
 
-  return { title: fsValue(f.title) || 'Event', tiers };
+  // The page redirects an id link to its readable /events/<slug> URL.
+  return { title: fsValue(f.title) || 'Event', path: `/events/${encodeURIComponent(eventId)}`, tiers };
 }
 
 /** Compute the USD total exactly like the checkout page displays it —
@@ -223,7 +226,7 @@ export async function createCheckoutSession(
     ],
     customer_email: user.email || undefined,
     success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${origin}/events/${encodeURIComponent(eventId)}`,
+    cancel_url: `${origin}${event.path}`,
     metadata: {
       order_id: orderId,
       event_id: eventId,

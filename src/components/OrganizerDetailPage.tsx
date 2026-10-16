@@ -4,7 +4,7 @@ import { shareOrCopy } from '../share';
 import {
   ArrowLeft, Check, Share2, Globe, MapPin, Mail, PhoneCall, Building2, Loader2,
 } from 'lucide-react';
-import { EventItem } from '../types';
+import { EventItem, eventPath } from '../types';
 import EventCard from './EventCard';
 import { auth } from '../firebase';
 import {
@@ -285,7 +285,7 @@ export default function OrganizerDetailPage({ allEvents, onRequireLogin }: Organ
                       key={evt.id}
                       event={evt}
                       onBook={(e) => navigate('/checkout', { state: { event: e, quantity: 1, tier: 'general' } })}
-                      onViewDetail={(e) => navigate(`/events/${e.id}`)}
+                      onViewDetail={(e) => navigate(eventPath(e))}
                     />
                   ))}
                 </div>

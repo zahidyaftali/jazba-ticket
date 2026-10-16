@@ -163,6 +163,44 @@ export interface EventItem {
   enquiryPackages?: PriceLine[];
   /** ISO date (yyyy-mm-dd) of the event's last day. */
   endsOn?: string;
+  /** Readable URL segment: /events/<slug>. See withEventSlugs(). */
+  slug?: string;
+}
+
+// ---- Readable event URLs ---------------------------------------------------
+
+/** The event page URL, e.g. /events/aa-tenu-moaj-karawan-live-lahore. */
+export function eventPath(event: EventItem): string {
+  return `/events/${encodeURIComponent(event.slug || event.id)}`;
+}
+
+function slugifyTitle(title: string): string {
+  return title
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80)
+    .replace(/-+$/, '');
+}
+
+/** Give every event a unique, readable URL slug. Events that bring their own
+ *  (jazbaentertainment.com events keep their WordPress slug, so both sites
+ *  share the same URL) come first in the list and keep it; the rest get one
+ *  from their title, with a short id suffix when two events share a title.
+ *  The event id is untouched — checkout and bookings still use it. */
+export function withEventSlugs(events: EventItem[]): EventItem[] {
+  const taken = new Set<string>();
+  return events.map((event) => {
+    const base = event.slug || slugifyTitle(event.title) || event.id.toLowerCase();
+    let slug = base;
+    if (taken.has(slug)) slug = `${base}-${event.id.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 6)}`;
+    if (taken.has(slug)) slug = `${base}-${event.id}`;
+    taken.add(slug);
+    return slug === event.slug ? event : { ...event, slug };
+  });
 }
 
 // ---- Past / upcoming detection ------------------------------------------
