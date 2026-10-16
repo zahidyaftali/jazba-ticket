@@ -26,7 +26,7 @@ const FIREBASE = {
 };
 
 // Must mirror the promo codes accepted in CheckoutPage.tsx (18% off).
-const PROMO_CODES = new Set(['JAZBA18', 'EVENT18', 'HAMILTON18']);
+export const PROMO_CODES = new Set(['JAZBA18', 'EVENT18', 'HAMILTON18']);
 
 export class PaymentError extends Error {
   status: number;
@@ -46,7 +46,7 @@ export function getOrigin(req: any): string {
 }
 
 /** Verify a Firebase ID token and return the signed-in user. */
-async function verifyFirebaseUser(idToken: string): Promise<{ uid: string; email: string }> {
+export async function verifyFirebaseUser(idToken: string): Promise<{ uid: string; email: string }> {
   const res = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE.apiKey}`,
     {
@@ -110,7 +110,7 @@ async function fetchWordPressEventPricing(eventId: string): Promise<EventPricing
 
 /** Fetch a published event's pricing straight from Firestore, reading as the
  *  verified buyer (their ID token) so security rules see a signed-in user. */
-async function fetchEventPricing(eventId: string, idToken: string): Promise<EventPricing> {
+export async function fetchEventPricing(eventId: string, idToken: string): Promise<EventPricing> {
   if (eventId.startsWith(WP_EVENT_PREFIX)) return fetchWordPressEventPricing(eventId);
 
   const url =

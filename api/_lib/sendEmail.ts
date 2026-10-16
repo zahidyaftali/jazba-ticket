@@ -10,6 +10,8 @@ export interface SendEmailInput {
   /** Lets the admin hit "Reply" and land straight in the sender's inbox. */
   replyTo?: string;
   from?: string;
+  /** Files to attach — content is the file's bytes as a base64 string. */
+  attachments?: { filename: string; content: string }[];
 }
 
 const DEFAULT_FROM = 'Jazba Tickets <onboarding@resend.dev>';
@@ -27,6 +29,7 @@ export async function sendEmail(apiKey: string, input: SendEmailInput): Promise<
       subject: input.subject,
       html: input.html,
       reply_to: input.replyTo || undefined,
+      attachments: input.attachments?.length ? input.attachments : undefined,
     }),
   });
 

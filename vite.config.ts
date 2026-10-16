@@ -4,6 +4,7 @@ import path from 'path';
 import {defineConfig, loadEnv, type Plugin} from 'vite';
 import {createCheckoutSession, getCheckoutSession, getOrigin} from './api/_lib/stripePayment';
 import {sendFormEmail, FormEmailError} from './api/_lib/formEmail';
+import {submitEasypaisaOrder} from './api/_lib/easypaisaOrder';
 import {fetchWordPressEvents, fetchWordPressSlug} from './api/_lib/wordpressEvents';
 
 function readJsonBody(req: any): Promise<any> {
@@ -89,6 +90,29 @@ const devApi = (secrets: { stripeSecretKey: string; resendApiKey: string }): Plu
         } catch (err: any) {
           res.statusCode = err instanceof FormEmailError ? err.status : 502;
           res.end(JSON.stringify({ error: err?.message || 'Could not send your message.' }));
+        }
+      });
+    });
+
+    server.middlewares.use('/api/easypaisa-order', (req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method !== 'POST') {
+        res.statusCode = 405;
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
+      }
+      if (!secrets.resendApiKey) {
+        res.statusCode = 500;
+        res.end(JSON.stringify({ error: 'RESEND_API_KEY is not set in .env' }));
+        return;
+      }
+      readJsonBody(req).then(async (body) => {
+        try {
+          const result = await submitEasypaisaOrder(secrets.resendApiKey, body);
+          res.end(JSON.stringify(result));
+        } catch (err: any) {
+          res.statusCode = err?.status || 502;
+          res.end(JSON.stringify({ error: err?.message || 'Could not submit your payment.' }));
         }
       });
     });
