@@ -749,7 +749,7 @@ export default function EventDetailPage({
 
               {/* Tier rows — only the packages this event offers */}
               <div className="px-6 border-b border-[#f2f2f2]">
-                {availableTiers.map(({ tier, name, note, price }) => (
+                {availableTiers.map(({ tier, name, price }) => (
                   <button
                     key={tier}
                     onClick={() => setTicketTier(tier)}
@@ -765,7 +765,6 @@ export default function EventDetailPage({
                       </span>
                       <div className="min-w-0">
                         <span className="font-bold text-sm block">{name}</span>
-                        {note && <span className="text-xs text-[#666] block">{note}</span>}
                       </div>
                     </div>
                     <div className="text-right shrink-0 pl-3">
@@ -780,7 +779,6 @@ export default function EventDetailPage({
               <div className="px-6 py-5 border-b border-[#f2f2f2] flex items-center justify-between">
                 <div>
                   <span className="font-bold text-sm block">Tickets</span>
-                  <span className="text-xs text-[#666]">Up to 10 per order</span>
                 </div>
                 <div className="flex items-center gap-4">
                   <button

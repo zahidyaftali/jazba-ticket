@@ -627,7 +627,7 @@ export default function CheckoutPage({
               {/* Tier rows */}
               <div className="p-6 border-b border-[#f2f2f2]">
                 <span className={`${overline} text-[#666] block mb-1`}>Ticket type</span>
-                {availableTiers.map(({ tier, name, note, price }) => (
+                {availableTiers.map(({ tier, name, price }) => (
                   <button
                     key={tier}
                     type="button"
@@ -644,7 +644,6 @@ export default function CheckoutPage({
                       </span>
                       <div className="min-w-0">
                         <span className="font-bold text-sm block">{name}</span>
-                        {note && <span className="text-xs text-[#666]">{note}</span>}
                       </div>
                     </div>
                     <span className="font-display font-bold text-base shrink-0 pl-3">{formatMoney(price)}</span>
@@ -656,7 +655,6 @@ export default function CheckoutPage({
               <div className="p-6 border-b border-[#f2f2f2] flex items-center justify-between">
                 <div>
                   <span className="font-bold text-sm block">Tickets</span>
-                  <span className="text-xs text-[#666]">Up to 10 per order</span>
                 </div>
                 <div className="flex items-center gap-4">
                   <button
