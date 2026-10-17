@@ -319,31 +319,63 @@ function EventDetailView({ events, eventsLoaded }: { events: EventItem[]; events
   );
 }
 
-function CheckoutView({ currentUser, authChecked }: { currentUser: AuthUser; authChecked: boolean }) {
+function CheckoutView({
+  events,
+  eventsLoaded,
+  currentUser,
+  authChecked,
+}: {
+  events: EventItem[];
+  eventsLoaded: boolean;
+  currentUser: AuthUser;
+  authChecked: boolean;
+}) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const state = location.state as { event?: EventItem; quantity?: number; tier?: TicketTier } | null;
 
-  if (!state?.event) return <Navigate to="/events" replace />;
+  // Direct links from other sites carry no router state, only the URL:
+  // /checkout?event=<slug or id>&qty=1&tier=general
+  const eventParam = searchParams.get('event') || '';
+  const linkedEvent = state?.event
+    ? undefined
+    : events.find((e) => e.slug === eventParam) || events.find((e) => e.id === eventParam);
+  const event = state?.event || linkedEvent;
+  const qtyParam = Number(searchParams.get('qty'));
+  const quantity = state?.quantity || (Number.isInteger(qtyParam) && qtyParam >= 1 && qtyParam <= 10 ? qtyParam : 1);
+  const tier = state?.tier || searchParams.get('tier') || 'general';
+
+  if (!event) {
+    if (!eventParam) return <Navigate to="/events" replace />;
+    if (!eventsLoaded) return <PageLoading />;
+    return <Navigate to={`/events/${encodeURIComponent(eventParam)}`} replace />;
+  }
 
   // Past events, partner-sold events and events with no tickets on sale yet
   // can't be booked here — the event page explains where to get tickets.
-  if (isPastEvent(state.event) || getAvailableTiers(state.event).length === 0) {
-    return <Navigate to={eventPath(state.event)} replace />;
+  if (isPastEvent(event) || getAvailableTiers(event).length === 0) {
+    return <Navigate to={eventPath(event)} replace />;
   }
 
   // Guest checkout is not allowed: wait for Firebase to resolve the session,
   // then send signed-out visitors to login and bring them straight back here.
   if (!authChecked) return <PageLoading />;
   if (!currentUser) {
-    return <Navigate to="/login" state={{ redirectTo: '/checkout', checkoutState: state }} replace />;
+    return (
+      <Navigate
+        to="/login"
+        state={{ redirectTo: `/checkout${location.search}`, checkoutState: { event, quantity, tier } }}
+        replace
+      />
+    );
   }
 
   return (
     <CheckoutPage
-      event={state.event}
-      initialQuantity={state.quantity || 1}
-      initialTier={state.tier || 'general'}
+      event={event}
+      initialQuantity={quantity}
+      initialTier={tier}
       onBack={() => navigate(-1)}
     />
   );
@@ -602,7 +634,10 @@ function AppShell() {
         <Route path="/" element={<HomeView events={events} eventsLoaded={eventsLoaded} />} />
         <Route path="/events" element={<ExplorerView events={events} eventsLoaded={eventsLoaded} />} />
         <Route path="/events/:slug" element={<EventDetailView events={events} eventsLoaded={eventsLoaded} />} />
-        <Route path="/checkout" element={<CheckoutView currentUser={currentUser} authChecked={authChecked} />} />
+        <Route
+          path="/checkout"
+          element={<CheckoutView events={events} eventsLoaded={eventsLoaded} currentUser={currentUser} authChecked={authChecked} />}
+        />
         <Route path="/checkout/success" element={<CheckoutSuccessView events={events} eventsLoaded={eventsLoaded} />} />
         <Route path="/artists" element={<ArtistsView events={events} />} />
         <Route path="/artists/:id" element={<ArtistDetailView events={events} />} />
