@@ -146,8 +146,7 @@ export async function fetchEventPricing(eventId: string, idToken: string): Promi
 export function computeTotalUsd(tierPrice: number, quantity: number, promoApplied: boolean): number {
   const subtotal = tierPrice * quantity;
   const discount = promoApplied ? subtotal * 0.18 : 0;
-  const fees = (subtotal - discount) * 0.08;
-  return subtotal - discount + fees;
+  return subtotal - discount;
 }
 
 /** Convert a USD order total to the smallest unit of the charge currency. */
@@ -219,7 +218,7 @@ export async function createCheckoutSession(
           unit_amount: toChargeAmount(amountUsd, currency),
           product_data: {
             name: `${event.title} — ${tierLabel} × ${quantity}`,
-            description: `Jazba Tickets order${promoApplied ? ' — promo applied' : ''}, includes service fee`,
+            description: `Jazba Tickets order${promoApplied ? ' — promo applied' : ''}`,
           },
         },
       },

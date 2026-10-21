@@ -156,8 +156,7 @@ export function getAvailableTiers(event: EventItem): AvailableTier[] {
 export function computeOrderTotals(unitPrice: number, quantity: number, promoApplied: boolean) {
   const subtotal = unitPrice * quantity;
   const discount = promoApplied ? subtotal * 0.18 : 0;
-  const fees = (subtotal - discount) * 0.08;
-  return { subtotal, discount, fees, total: subtotal - discount + fees };
+  return { subtotal, discount, total: subtotal - discount };
 }
 
 export interface EventItem {

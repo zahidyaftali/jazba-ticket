@@ -840,10 +840,6 @@ export default function EventDetailPage({
                       <span>−{formatPrecise(totals.discount)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-[#666]">
-                    <span>Service fee (8%)</span>
-                    <span>{formatPrecise(totals.fees)}</span>
-                  </div>
                   <div className="flex justify-between items-baseline border-t border-black mt-4 pt-4">
                     <span className="font-display font-bold text-lg">Total</span>
                     <span className="font-display font-bold text-2xl">{formatPrecise(totals.total)}</span>

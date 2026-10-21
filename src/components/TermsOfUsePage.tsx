@@ -63,9 +63,9 @@ const SECTIONS: Array<{ id: string; title: string; body: React.ReactNode }> = [
     body: (
       <>
         <p>
-          All prices are shown in GBP and include VAT where applicable. A
-          booking/service fee is added at checkout and shown before you confirm
-          payment.
+          All prices are shown in GBP and include VAT where applicable. No
+          booking or service fee is added at checkout — the ticket price shown
+          is the price you pay.
         </p>
         <p className="mt-3">
           Any administration or booking fee charged by a third-party payment or
