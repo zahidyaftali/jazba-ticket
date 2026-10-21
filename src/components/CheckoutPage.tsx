@@ -4,7 +4,7 @@ import {
   ShieldCheck, Globe, Calendar, Loader2, Minus, Plus, AlertCircle, Lock,
   Copy, ImageUp, Smartphone,
 } from 'lucide-react';
-import { EventItem, TicketTier, computeOrderTotals, getAvailableTiers } from '../types';
+import { EventItem, TicketTier, computeOrderTotals, defaultTier, getAvailableTiers } from '../types';
 import { auth } from '../firebase';
 import { formatMoney as formatLocalMoney } from '../currency';
 import {
@@ -51,11 +51,11 @@ export default function CheckoutPage({
   const [redirecting, setRedirecting] = useState(false);
   const [payError, setPayError] = useState('');
   const [ticketCount, setTicketCount] = useState(initialQuantity);
-  // Only packages the event offers are shown; fall back to the first one
+  // Only packages the event offers are shown; fall back to the default pick
   // if the requested tier isn't available for this event.
   const availableTiers = getAvailableTiers(event);
   const [ticketTier, setTicketTier] = useState<TicketTier>(
-    availableTiers.some((t) => t.tier === initialTier) ? initialTier : (availableTiers[0]?.tier || 'general')
+    availableTiers.some((t) => t.tier === initialTier) ? initialTier : defaultTier(availableTiers)
   );
   // Checkout is login-gated, so prefill from the signed-in account.
   const [fullName, setFullName] = useState(auth.currentUser?.displayName || '');
@@ -627,7 +627,7 @@ export default function CheckoutPage({
               {/* Tier rows */}
               <div className="p-6 border-b border-[#f2f2f2]">
                 <span className={`${overline} text-[#666] block mb-1`}>Ticket type</span>
-                {availableTiers.map(({ tier, name, price }) => (
+                {availableTiers.map(({ tier, name, price, groupSize }) => (
                   <button
                     key={tier}
                     type="button"
@@ -644,6 +644,7 @@ export default function CheckoutPage({
                       </span>
                       <div className="min-w-0">
                         <span className="font-bold text-sm block">{name}</span>
+                        {!!groupSize && <span className="text-xs text-[#666] block">Number of people: {groupSize}</span>}
                       </div>
                     </div>
                     <span className="font-display font-bold text-base shrink-0 pl-3">{formatMoney(price)}</span>

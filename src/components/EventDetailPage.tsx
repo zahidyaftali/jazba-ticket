@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ContentSectionView } from './EventContent';
-import { EventItem, TicketTier, computeOrderTotals, getAvailableTiers, isPastEvent } from '../types';
+import { EventItem, TicketTier, computeOrderTotals, defaultTier, getAvailableTiers, isPastEvent } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth } from '../firebase';
 import { getOrganizerProfile, followTarget, unfollowTarget, isFollowingTarget, getFollowerCount, OrganizerProfile } from '../services/backendService';
@@ -122,7 +122,7 @@ export default function EventDetailPage({
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     setQuantity(1);
-    setTicketTier(getAvailableTiers(event)[0]?.tier || 'general');
+    setTicketTier(defaultTier(getAvailableTiers(event)));
     setPromoApplied(false);
     setPromoCode('');
     setPromoError('');
@@ -749,7 +749,7 @@ export default function EventDetailPage({
 
               {/* Tier rows — only the packages this event offers */}
               <div className="px-6 border-b border-[#f2f2f2]">
-                {availableTiers.map(({ tier, name, price }) => (
+                {availableTiers.map(({ tier, name, price, groupSize }) => (
                   <button
                     key={tier}
                     onClick={() => setTicketTier(tier)}
@@ -765,6 +765,7 @@ export default function EventDetailPage({
                       </span>
                       <div className="min-w-0">
                         <span className="font-bold text-sm block">{name}</span>
+                        {!!groupSize && <span className="text-xs text-[#666] block">Number of people: {groupSize}</span>}
                       </div>
                     </div>
                     <div className="text-right shrink-0 pl-3">

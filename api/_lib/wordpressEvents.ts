@@ -155,10 +155,17 @@ function to24Hour(text: string): string {
 
 // ── Tickets block ──────────────────────────────────────────────────────────
 
-interface ParsedTier { name: string; note: string; price: ParsedPrice; group: boolean }
+interface ParsedTier {
+  name: string;
+  note: string;
+  price: ParsedPrice;
+  group: boolean;
+  /** People admitted on one group ticket, e.g. 4; 0 if not a group or not stated. */
+  groupSize: number;
+}
 interface ParsedShow { name: string; when: string; details: string[]; tiers: ParsedTier[]; ticketUrl: string }
 
-function parseTierList(listHtml: string, group: boolean): ParsedTier[] {
+function parseTierList(listHtml: string, group: boolean, defaultGroupSize: number): ParsedTier[] {
   const tiers: ParsedTier[] = [];
   for (const li of listHtml.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)) {
     const label = li[1].match(/<span\b[^>]*>([\s\S]*)<\/span>/i)?.[1] ?? '';
@@ -166,7 +173,9 @@ function parseTierList(listHtml: string, group: boolean): ParsedTier[] {
     const name = toText(label.split(/<small\b/i)[0]);
     if (!name || !price) continue;
     const note = Array.from(label.matchAll(/<small\b[^>]*>([\s\S]*?)<\/small>/gi), (s) => toText(s[1])).filter(Boolean).join(' · ');
-    tiers.push({ name, note, price, group });
+    // "Group of 4" in the package's own note, else the list's "Groups of 4 or more".
+    const groupSize = group ? Number(note.match(/\bgroups? of (\d+)/i)?.[1]) || defaultGroupSize : 0;
+    tiers.push({ name, note, price, group, groupSize });
   }
   return tiers;
 }
@@ -177,9 +186,10 @@ function parseTicketShows(sectionHtml: string): ParsedShow[] {
     const whenParts = innerOfClass(article, 'jz-tickets__when', 'p').split(/<small\b[^>]*>/i);
     // Lists after the "Groups of 4 or more" line are group packages.
     const groupAt = article.search(/class="[^"]*\bjz-tickets__group\b/i);
+    const groupSize = Number(toText(innerOfClass(article, 'jz-tickets__group', 'p')).match(/\d+/)?.[0]) || 0;
     const tiers: ParsedTier[] = [];
     for (const list of article.matchAll(/<ul\b[^>]*class="[^"]*\bjz-tickets__list\b[^"]*"[^>]*>([\s\S]*?)<\/ul>/gi)) {
-      tiers.push(...parseTierList(list[1], groupAt !== -1 && list.index! > groupAt));
+      tiers.push(...parseTierList(list[1], groupAt !== -1 && list.index! > groupAt, groupSize));
     }
     const href = innerOfClass(article, 'jz-tiers__actions', 'p').match(/<a\b[^>]*href="([^"]+)"/i)?.[1] ?? '';
     return {
@@ -204,25 +214,46 @@ function slugify(text: string): string {
   return text.toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'ticket';
 }
 
-/** The packages sold through this site's checkout, cheapest first (single
- *  tickets before group packages, so the default pick is a single ticket). */
+/** Ticket order on this site: VIP, Standard, Student, any others, then Meet &
+ *  Greet last — each single ticket followed by its group package. */
+function ticketRank(t: ParsedTier): number {
+  const name = t.name.toLowerCase();
+  const family = /meet\s*(?:&|and)\s*greet/.test(name)
+    ? 4
+    : /\bvip\b/.test(name)
+      ? 0
+      : /\b(?:standard|general|regular)\b/.test(name)
+        ? 1
+        : /\bstudents?\b/.test(name)
+          ? 2
+          : 3;
+  return family * 2 + (t.group ? 1 : 0);
+}
+
+/** The packages sold through this site's checkout, in ticketRank() order
+ *  (cheapest first within a rank). */
 function buildTicketOptions(shows: ParsedShow[]): (TicketOption & { group: boolean })[] {
   const multiCity = shows.length > 1;
   const used = new Set<string>();
   const options: (TicketOption & { group: boolean })[] = [];
   for (const show of shows) {
-    const sellable = show.tiers.filter((t) => !t.price.perPerson);
-    const ordered = [
-      ...sellable.filter((t) => !t.group).sort((a, b) => toUsd(a.price) - toUsd(b.price)),
-      ...sellable.filter((t) => t.group).sort((a, b) => toUsd(a.price) - toUsd(b.price)),
-    ];
+    const ordered = show.tiers
+      .filter((t) => !t.price.perPerson)
+      .sort((a, b) => ticketRank(a) - ticketRank(b) || toUsd(a.price) - toUsd(b.price));
     for (const t of ordered) {
       const name = multiCity && show.name ? `${show.name} · ${t.name}` : t.name;
       let id = slugify(name);
       for (let n = 2; used.has(id); n++) id = `${slugify(name)}-${n}`;
       used.add(id);
       const note = [t.note, multiCity ? show.when : ''].filter(Boolean).join(' · ');
-      options.push({ id, name, ...(note ? { note } : {}), price: toUsd(t.price), group: t.group });
+      options.push({
+        id,
+        name,
+        ...(note ? { note } : {}),
+        price: toUsd(t.price),
+        ...(t.groupSize ? { groupSize: t.groupSize } : {}),
+        group: t.group,
+      });
     }
   }
   return options;

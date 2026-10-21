@@ -49,6 +49,8 @@ export interface TicketOption {
   name: string;
   note?: string;
   price: number; // USD, like every stored price
+  /** Group package: people admitted on one ticket, e.g. 4. */
+  groupSize?: number;
 }
 
 /** A price listed for information only (booked by enquiry or on a partner site). */
@@ -130,6 +132,7 @@ export interface AvailableTier {
   price: number;
   name: string;
   note: string;
+  groupSize?: number;
 }
 
 /** The ticket packages this site's checkout sells for the event, in display
@@ -140,7 +143,13 @@ export function getAvailableTiers(event: EventItem): AvailableTier[] {
   if (event.ticketOptions?.length) {
     return event.ticketOptions
       .filter((o) => o.price > 0)
-      .map((o) => ({ tier: o.id, price: o.price, name: o.name, note: o.note || '' }));
+      .map((o) => ({
+        tier: o.id,
+        price: o.price,
+        name: o.name,
+        note: o.note || '',
+        ...(o.groupSize ? { groupSize: o.groupSize } : {}),
+      }));
   }
   const tp = event.tierPrices;
   const list: AvailableTier[] = [];
@@ -149,6 +158,14 @@ export function getAvailableTiers(event: EventItem): AvailableTier[] {
   if (tp?.vip && tp.vip > 0) list.push({ tier: 'vip', price: tp.vip, ...DEFAULT_TIER_META.vip });
   if (tp?.elite && tp.elite > 0) list.push({ tier: 'elite', price: tp.elite, ...DEFAULT_TIER_META.elite });
   return list;
+}
+
+/** The ticket picked before the buyer chooses one: the cheapest single
+ *  ticket, so the opening total matches the event's "from" price. */
+export function defaultTier(tiers: AvailableTier[]): TicketTier {
+  const singles = tiers.filter((t) => !t.groupSize);
+  const pool = singles.length ? singles : tiers;
+  return pool.reduce<AvailableTier | undefined>((best, t) => (!best || t.price < best.price ? t : best), undefined)?.tier || 'general';
 }
 
 /** Order maths, in USD. Must stay identical to computeTotalUsd() in
