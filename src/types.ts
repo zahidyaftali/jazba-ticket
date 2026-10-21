@@ -160,12 +160,14 @@ export function getAvailableTiers(event: EventItem): AvailableTier[] {
   return list;
 }
 
-/** The ticket picked before the buyer chooses one: the cheapest single
- *  ticket, so the opening total matches the event's "from" price. */
+/** The ticket picked before the buyer chooses one: the standard single
+ *  ticket (not a concession like Student), else the cheapest single ticket. */
 export function defaultTier(tiers: AvailableTier[]): TicketTier {
   const singles = tiers.filter((t) => !t.groupSize);
   const pool = singles.length ? singles : tiers;
-  return pool.reduce<AvailableTier | undefined>((best, t) => (!best || t.price < best.price ? t : best), undefined)?.tier || 'general';
+  const standard = pool.find((t) => /\b(?:standard|general)\b/i.test(t.name) && !/\bstudents?\b/i.test(t.name));
+  const cheapest = pool.reduce<AvailableTier | undefined>((best, t) => (!best || t.price < best.price ? t : best), undefined);
+  return (standard || cheapest)?.tier || 'general';
 }
 
 /** Order maths, in USD. Must stay identical to computeTotalUsd() in

@@ -222,10 +222,10 @@ function ticketRank(t: ParsedTier): number {
     ? 4
     : /\bvip\b/.test(name)
       ? 0
-      : /\b(?:standard|general|regular)\b/.test(name)
-        ? 1
-        : /\bstudents?\b/.test(name)
-          ? 2
+      : /\bstudents?\b/.test(name) // before Standard: "Student Standard" is a student ticket
+        ? 2
+        : /\b(?:standard|general|regular)\b/.test(name)
+          ? 1
           : 3;
   return family * 2 + (t.group ? 1 : 0);
 }
