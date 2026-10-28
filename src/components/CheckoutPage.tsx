@@ -4,7 +4,7 @@ import {
   ShieldCheck, Globe, Calendar, Loader2, Minus, Plus, AlertCircle, Lock,
   Copy, ImageUp, Smartphone,
 } from 'lucide-react';
-import { EventItem, TicketTier, computeOrderTotals, defaultTier, getAvailableTiers } from '../types';
+import { EventItem, TicketTier, computeOrderTotals, defaultTier, getAvailableTiers, promoRate } from '../types';
 import { auth } from '../firebase';
 import { formatMoney as formatLocalMoney } from '../currency';
 import {
@@ -73,9 +73,9 @@ export default function CheckoutPage({
   const [epResult, setEpResult] = useState<{ orderRef: string; amountPkr: number } | null>(null);
   const [copied, setCopied] = useState<'amount' | 'account' | ''>('');
 
-  // Promo
+  // Promo — appliedPromo is the code that passed the check ('' when none)
   const [promoCode, setPromoCode] = useState('');
-  const [promoApplied, setPromoApplied] = useState(false);
+  const [appliedPromo, setAppliedPromo] = useState('');
   const [promoError, setPromoError] = useState('');
 
   // Region is resolved from the visitor's IP — the checkout adapts automatically.
@@ -116,7 +116,9 @@ export default function CheckoutPage({
 
   // Same maths as the payment server, so the total shown is the amount charged.
   const unitPrice = availableTiers.find((t) => t.tier === ticketTier)?.price ?? 0;
-  const totals = computeOrderTotals(unitPrice, ticketCount, promoApplied);
+  const discountRate = promoRate(appliedPromo, event.id);
+  const discountPercent = Math.round(discountRate * 100);
+  const totals = computeOrderTotals(unitPrice, ticketCount, discountRate);
 
   // Local pricing follows the detected region — same shared rates as the
   // rest of the site, so card prices and checkout totals always match.
@@ -124,12 +126,12 @@ export default function CheckoutPage({
 
   const handleApplyPromo = () => {
     const clean = promoCode.trim().toUpperCase();
-    if (clean === 'JAZBA18' || clean === 'EVENT18' || clean === 'HAMILTON18') {
-      setPromoApplied(true);
+    if (promoRate(clean, event.id) > 0) {
+      setAppliedPromo(clean);
       setPromoError('');
     } else {
-      setPromoError('That code isn\'t valid. Try JAZBA18 for 18% off.');
-      setPromoApplied(false);
+      setPromoError('That code isn\'t valid.');
+      setAppliedPromo('');
     }
   };
 
@@ -161,7 +163,7 @@ export default function CheckoutPage({
           eventId: event.id,
           tier: ticketTier,
           quantity: ticketCount,
-          promoCode: promoApplied ? promoCode.trim().toUpperCase() : '',
+          promoCode: appliedPromo,
           currency,
           idToken,
           fullName,
@@ -242,7 +244,7 @@ export default function CheckoutPage({
         eventId: event.id,
         tier: ticketTier,
         quantity: ticketCount,
-        promoCode: promoApplied ? promoCode.trim().toUpperCase() : '',
+        promoCode: appliedPromo,
         idToken,
         fullName,
         email: emailAddress,
@@ -684,7 +686,7 @@ export default function CheckoutPage({
                     type="text"
                     value={promoCode}
                     onChange={(e) => setPromoCode(e.target.value)}
-                    placeholder="JAZBA18"
+                    placeholder="Enter code"
                     className="flex-1 bg-white px-0 py-2.5 text-sm text-black placeholder-[#8a8a8a]"
                   />
                   <button
@@ -695,9 +697,9 @@ export default function CheckoutPage({
                     Apply
                   </button>
                 </div>
-                {promoApplied && (
+                {discountRate > 0 && (
                   <span className="flex items-center gap-1.5 text-sm font-bold mt-3">
-                    <Check className="w-4 h-4" /> 18% discount applied
+                    <Check className="w-4 h-4" /> {discountPercent}% discount applied
                   </span>
                 )}
                 {promoError && (
@@ -712,9 +714,9 @@ export default function CheckoutPage({
                     <span>Subtotal</span>
                     <span>{formatMoney(totals.subtotal)}</span>
                   </div>
-                  {promoApplied && (
+                  {discountRate > 0 && (
                     <div className="flex justify-between text-[#666]">
-                      <span>Discount (18%)</span>
+                      <span>Discount ({discountPercent}%)</span>
                       <span>−{formatMoney(totals.discount)}</span>
                     </div>
                   )}

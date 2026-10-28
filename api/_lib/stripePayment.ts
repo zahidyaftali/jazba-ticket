@@ -25,8 +25,23 @@ const FIREBASE = {
   databaseId: 'ai-studio-3fd360dc-3f27-4806-97c6-a0dfddc09741',
 };
 
-// Must mirror the promo codes accepted in CheckoutPage.tsx (18% off).
-export const PROMO_CODES = new Set(['JAZBA18', 'EVENT18', 'HAMILTON18']);
+// Promo codes: the share taken off the order and, when set, the only events
+// the code works on. Must stay identical to PROMO_CODES in src/types.ts.
+export const PROMO_CODES = new Map<string, { rate: number; eventIds?: string[] }>([
+  ['JAZBA18', { rate: 0.18 }],
+  ['EVENT18', { rate: 0.18 }],
+  ['HAMILTON18', { rate: 0.18 }],
+  // Aa – Tenu Moaj Karawan Live: Islamabad (wp-607) and Lahore (wp-700).
+  ['DAKHLAY26', { rate: 0.4, eventIds: ['wp-607', 'wp-700'] }],
+]);
+
+/** The discount a code gives on an event (0.18 = 18%), or 0 when the code is
+ *  unknown or doesn't cover that event. Same as promoRate() in src/types.ts. */
+export function promoRate(code: string, eventId: string): number {
+  const promo = PROMO_CODES.get(code.trim().toUpperCase());
+  if (!promo || (promo.eventIds && !promo.eventIds.includes(eventId))) return 0;
+  return promo.rate;
+}
 
 export class PaymentError extends Error {
   status: number;
@@ -143,9 +158,9 @@ export async function fetchEventPricing(eventId: string, idToken: string): Promi
  *  must stay identical to computeOrderTotals() in src/types.ts. No rounding
  *  in USD: prices converted from PKR/GBP only come out exact in the buyer's
  *  currency, and toChargeAmount() rounds once, at the end. */
-export function computeTotalUsd(tierPrice: number, quantity: number, promoApplied: boolean): number {
+export function computeTotalUsd(tierPrice: number, quantity: number, discountRate: number): number {
   const subtotal = tierPrice * quantity;
-  const discount = promoApplied ? subtotal * 0.18 : 0;
+  const discount = subtotal * discountRate;
   return subtotal - discount;
 }
 
@@ -195,8 +210,9 @@ export async function createCheckoutSession(
   const selected = Object.prototype.hasOwnProperty.call(event.tiers, tier) ? event.tiers[tier] : undefined;
   if (!selected) throw new PaymentError('That ticket package is not available for this event.');
 
-  const promoApplied = PROMO_CODES.has(promoCode);
-  const amountUsd = computeTotalUsd(selected.price, quantity, promoApplied);
+  const discountRate = promoRate(promoCode, eventId);
+  const promoApplied = discountRate > 0;
+  const amountUsd = computeTotalUsd(selected.price, quantity, discountRate);
   if (amountUsd <= 0 || amountUsd > 10000) throw new PaymentError('Invalid payment amount.');
 
   const seat = `${String.fromCharCode(65 + Math.floor(Math.random() * 10))}-${Math.floor(1 + Math.random() * 24)}`;

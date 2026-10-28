@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ContentSectionView } from './EventContent';
-import { EventItem, TicketTier, computeOrderTotals, defaultTier, getAvailableTiers, isPastEvent } from '../types';
+import { EventItem, TicketTier, computeOrderTotals, defaultTier, getAvailableTiers, isPastEvent, promoRate } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth } from '../firebase';
 import { getOrganizerProfile, followTarget, unfollowTarget, isFollowingTarget, getFollowerCount, OrganizerProfile } from '../services/backendService';
@@ -41,7 +41,7 @@ export default function EventDetailPage({
   const [ticketTier, setTicketTier] = useState<TicketTier>('general');
   const [quantity, setQuantity] = useState(1);
   const [promoCode, setPromoCode] = useState('');
-  const [promoApplied, setPromoApplied] = useState(false);
+  const [appliedPromo, setAppliedPromo] = useState(''); // '' when none
   const [promoError, setPromoError] = useState('');
 
   // Agenda accordion
@@ -123,7 +123,7 @@ export default function EventDetailPage({
     window.scrollTo({ top: 0, behavior: 'instant' });
     setQuantity(1);
     setTicketTier(defaultTier(getAvailableTiers(event)));
-    setPromoApplied(false);
+    setAppliedPromo('');
     setPromoCode('');
     setPromoError('');
     setOpenFaqId(null);
@@ -133,17 +133,20 @@ export default function EventDetailPage({
   // same maths as the checkout and the payment server.
   const availableTiers = getAvailableTiers(event);
   const selectedTier = availableTiers.find((t) => t.tier === ticketTier) || availableTiers[0];
-  const totals = computeOrderTotals(selectedTier?.price ?? 0, quantity, promoApplied);
+  const discountRate = promoRate(appliedPromo, event.id);
+  const discountPercent = Math.round(discountRate * 100);
+  const promoApplied = discountRate > 0;
+  const totals = computeOrderTotals(selectedTier?.price ?? 0, quantity, discountRate);
 
   const handleApplyPromo = (e: React.FormEvent) => {
     e.preventDefault();
     const clean = promoCode.trim().toUpperCase();
-    if (clean === 'JAZBA18' || clean === 'EVENT18') {
-      setPromoApplied(true);
+    if (promoRate(clean, event.id) > 0) {
+      setAppliedPromo(clean);
       setPromoError('');
     } else {
-      setPromoError('That code isn\'t valid. Try JAZBA18 for 18% off.');
-      setPromoApplied(false);
+      setPromoError('That code isn\'t valid.');
+      setAppliedPromo('');
     }
   };
 
@@ -809,7 +812,7 @@ export default function EventDetailPage({
                     value={promoCode}
                     onChange={(e) => setPromoCode(e.target.value)}
                     disabled={promoApplied}
-                    placeholder="JAZBA18"
+                    placeholder="Enter code"
                     className="flex-1 bg-white px-0 py-2.5 text-sm text-black placeholder-[#8a8a8a] disabled:text-[#8a8a8a]"
                   />
                   <button
@@ -822,7 +825,7 @@ export default function EventDetailPage({
                 </div>
                 {promoApplied && (
                   <span className="flex items-center gap-1.5 text-sm font-bold mt-3">
-                    <Check className="w-4 h-4" /> 18% discount applied
+                    <Check className="w-4 h-4" /> {discountPercent}% discount applied
                   </span>
                 )}
                 {promoError && <span className="block text-sm text-[#be6464] mt-3">{promoError}</span>}
@@ -837,7 +840,7 @@ export default function EventDetailPage({
                   </div>
                   {promoApplied && (
                     <div className="flex justify-between text-[#666]">
-                      <span>Discount (18%)</span>
+                      <span>Discount ({discountPercent}%)</span>
                       <span>−{formatPrecise(totals.discount)}</span>
                     </div>
                   )}
