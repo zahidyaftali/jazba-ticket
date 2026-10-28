@@ -1,9 +1,9 @@
 import { sendEmail, escapeHtml, type MailConfig } from './sendEmail.js';
 import {
   PaymentError,
-  PROMO_CODES,
   computeTotalUsd,
   fetchEventPricing,
+  promoRate,
   toChargeAmount,
   verifyFirebaseUser,
 } from './stripePayment.js';
@@ -84,8 +84,9 @@ export async function submitEasypaisaOrder(
   const selected = Object.prototype.hasOwnProperty.call(event.tiers, tier) ? event.tiers[tier] : undefined;
   if (!selected) throw new PaymentError('That ticket package is not available for this event.');
 
-  const promoApplied = PROMO_CODES.has(promoCode);
-  const amountUsd = computeTotalUsd(selected.price, quantity, promoApplied);
+  const discountRate = promoRate(promoCode, eventId);
+  const promoApplied = discountRate > 0;
+  const amountUsd = computeTotalUsd(selected.price, quantity, discountRate);
   if (amountUsd <= 0 || amountUsd > 10000) throw new PaymentError('Invalid payment amount.');
   // Same rupee figure the checkout shows and a PKR Stripe charge would take.
   const amountPkr = toChargeAmount(amountUsd, 'PKR') / 100;
