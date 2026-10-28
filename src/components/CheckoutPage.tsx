@@ -4,7 +4,7 @@ import {
   ShieldCheck, Globe, Calendar, Loader2, Minus, Plus, AlertCircle, Lock,
   Copy, ImageUp, Smartphone,
 } from 'lucide-react';
-import { EventItem, TicketTier, computeOrderTotals, defaultTier, getAvailableTiers, promoRate } from '../types';
+import { EventItem, TicketTier, computeOrderTotals, defaultTier, getAvailableTiers, findPromo, promoRate, promoPackagesNote } from '../types';
 import { auth } from '../firebase';
 import { formatMoney as formatLocalMoney } from '../currency';
 import {
@@ -116,8 +116,11 @@ export default function CheckoutPage({
 
   // Same maths as the payment server, so the total shown is the amount charged.
   const unitPrice = availableTiers.find((t) => t.tier === ticketTier)?.price ?? 0;
-  const discountRate = promoRate(appliedPromo, event.id);
+  // A code can be accepted yet give no discount on the chosen package; the
+  // note then names the packages it does cover.
+  const discountRate = promoRate(appliedPromo, event.id, ticketTier);
   const discountPercent = Math.round(discountRate * 100);
+  const promoNote = promoPackagesNote(appliedPromo, event, ticketTier);
   const totals = computeOrderTotals(unitPrice, ticketCount, discountRate);
 
   // Local pricing follows the detected region — same shared rates as the
@@ -126,7 +129,7 @@ export default function CheckoutPage({
 
   const handleApplyPromo = () => {
     const clean = promoCode.trim().toUpperCase();
-    if (promoRate(clean, event.id) > 0) {
+    if (findPromo(clean, event.id)) {
       setAppliedPromo(clean);
       setPromoError('');
     } else {
@@ -701,6 +704,9 @@ export default function CheckoutPage({
                   <span className="flex items-center gap-1.5 text-sm font-bold mt-3">
                     <Check className="w-4 h-4" /> {discountPercent}% discount applied
                   </span>
+                )}
+                {promoNote && (
+                  <span className="block text-sm text-[#666] mt-3">{promoNote}</span>
                 )}
                 {promoError && (
                   <span className="block text-sm text-[#be6464] mt-3">{promoError}</span>

@@ -170,23 +170,49 @@ export function defaultTier(tiers: AvailableTier[]): TicketTier {
   return (standard || cheapest)?.tier || 'general';
 }
 
-/** Promo codes: the share taken off the order and, when set, the only events
- *  the code works on. Must stay identical to PROMO_CODES in
- *  api/_lib/stripePayment.ts, which sets the price actually charged. */
-export const PROMO_CODES = new Map<string, { rate: number; eventIds?: string[] }>([
+/** A promo code: the share taken off the order and, when set, the only events
+ *  and ticket packages (tier ids) it works on. */
+export interface PromoCode {
+  rate: number;
+  eventIds?: string[];
+  tiers?: TicketTier[];
+}
+
+/** Must stay identical to PROMO_CODES in api/_lib/stripePayment.ts, which
+ *  sets the price actually charged. */
+export const PROMO_CODES = new Map<string, PromoCode>([
   ['JAZBA18', { rate: 0.18 }],
   ['EVENT18', { rate: 0.18 }],
   ['HAMILTON18', { rate: 0.18 }],
-  // Aa – Tenu Moaj Karawan Live: Islamabad (wp-607) and Lahore (wp-700).
-  ['DAKHLAY26', { rate: 0.4, eventIds: ['wp-607', 'wp-700'] }],
+  // Aa – Tenu Moaj Karawan Live: Islamabad (wp-607) and Lahore (wp-700),
+  // Standard (PKR 3,000) and Standard Group (PKR 11,000) only.
+  ['DAKHLAY26', { rate: 0.4, eventIds: ['wp-607', 'wp-700'], tiers: ['standard', 'standard-group'] }],
 ]);
 
-/** The discount a code gives on an event (0.18 = 18%), or 0 when the code is
- *  unknown or doesn't cover that event. */
-export function promoRate(code: string, eventId: string): number {
+/** The promo behind a code when it works on this event (on any package). */
+export function findPromo(code: string, eventId: string): PromoCode | undefined {
   const promo = PROMO_CODES.get(code.trim().toUpperCase());
-  if (!promo || (promo.eventIds && !promo.eventIds.includes(eventId))) return 0;
+  if (!promo || (promo.eventIds && !promo.eventIds.includes(eventId))) return undefined;
+  return promo;
+}
+
+/** The discount a code gives on an event's package (0.18 = 18%), or 0 when
+ *  the code is unknown or doesn't cover that event or package. */
+export function promoRate(code: string, eventId: string, tier: TicketTier): number {
+  const promo = findPromo(code, eventId);
+  if (!promo || (promo.tiers && !promo.tiers.includes(tier))) return 0;
   return promo.rate;
+}
+
+/** When an accepted code doesn't cover the chosen package, a note naming the
+ *  packages it does cover (e.g. "…Standard and Standard Group tickets only."). */
+export function promoPackagesNote(code: string, event: EventItem, tier: TicketTier): string {
+  const promo = findPromo(code, event.id);
+  if (!promo?.tiers || promo.tiers.includes(tier)) return '';
+  const names = getAvailableTiers(event)
+    .filter((t) => promo.tiers!.includes(t.tier))
+    .map((t) => t.name);
+  return names.length ? `This code works on ${names.join(' and ')} tickets only.` : '';
 }
 
 /** Order maths, in USD. Must stay identical to computeTotalUsd() in

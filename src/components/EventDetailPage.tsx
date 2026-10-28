@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ContentSectionView } from './EventContent';
-import { EventItem, TicketTier, computeOrderTotals, defaultTier, getAvailableTiers, isPastEvent, promoRate } from '../types';
+import { EventItem, TicketTier, computeOrderTotals, defaultTier, getAvailableTiers, isPastEvent, findPromo, promoRate, promoPackagesNote } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth } from '../firebase';
 import { getOrganizerProfile, followTarget, unfollowTarget, isFollowingTarget, getFollowerCount, OrganizerProfile } from '../services/backendService';
@@ -133,15 +133,19 @@ export default function EventDetailPage({
   // same maths as the checkout and the payment server.
   const availableTiers = getAvailableTiers(event);
   const selectedTier = availableTiers.find((t) => t.tier === ticketTier) || availableTiers[0];
-  const discountRate = promoRate(appliedPromo, event.id);
+  // A code can be accepted yet give no discount on the chosen package; the
+  // note then names the packages it does cover.
+  const codeAccepted = appliedPromo !== '';
+  const discountRate = promoRate(appliedPromo, event.id, selectedTier?.tier ?? '');
   const discountPercent = Math.round(discountRate * 100);
   const promoApplied = discountRate > 0;
+  const promoNote = promoPackagesNote(appliedPromo, event, selectedTier?.tier ?? '');
   const totals = computeOrderTotals(selectedTier?.price ?? 0, quantity, discountRate);
 
   const handleApplyPromo = (e: React.FormEvent) => {
     e.preventDefault();
     const clean = promoCode.trim().toUpperCase();
-    if (promoRate(clean, event.id) > 0) {
+    if (findPromo(clean, event.id)) {
       setAppliedPromo(clean);
       setPromoError('');
     } else {
@@ -811,16 +815,16 @@ export default function EventDetailPage({
                     type="text"
                     value={promoCode}
                     onChange={(e) => setPromoCode(e.target.value)}
-                    disabled={promoApplied}
+                    disabled={codeAccepted}
                     placeholder="Enter code"
                     className="flex-1 bg-white px-0 py-2.5 text-sm text-black placeholder-[#8a8a8a] disabled:text-[#8a8a8a]"
                   />
                   <button
                     type="submit"
-                    disabled={promoApplied || !promoCode}
+                    disabled={codeAccepted || !promoCode}
                     className="bg-black text-white text-sm font-bold px-5 cursor-pointer hover:bg-neutral-800 disabled:opacity-30 transition-colors"
                   >
-                    {promoApplied ? 'Applied' : 'Apply'}
+                    {codeAccepted ? 'Applied' : 'Apply'}
                   </button>
                 </div>
                 {promoApplied && (
@@ -828,6 +832,7 @@ export default function EventDetailPage({
                     <Check className="w-4 h-4" /> {discountPercent}% discount applied
                   </span>
                 )}
+                {promoNote && <span className="block text-sm text-[#666] mt-3">{promoNote}</span>}
                 {promoError && <span className="block text-sm text-[#be6464] mt-3">{promoError}</span>}
               </form>
 

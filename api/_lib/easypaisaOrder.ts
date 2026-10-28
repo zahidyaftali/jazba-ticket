@@ -84,7 +84,7 @@ export async function submitEasypaisaOrder(
   const selected = Object.prototype.hasOwnProperty.call(event.tiers, tier) ? event.tiers[tier] : undefined;
   if (!selected) throw new PaymentError('That ticket package is not available for this event.');
 
-  const discountRate = promoRate(promoCode, eventId);
+  const discountRate = promoRate(promoCode, eventId, tier);
   const promoApplied = discountRate > 0;
   const amountUsd = computeTotalUsd(selected.price, quantity, discountRate);
   if (amountUsd <= 0 || amountUsd > 10000) throw new PaymentError('Invalid payment amount.');

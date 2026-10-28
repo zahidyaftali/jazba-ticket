@@ -26,20 +26,24 @@ const FIREBASE = {
 };
 
 // Promo codes: the share taken off the order and, when set, the only events
-// the code works on. Must stay identical to PROMO_CODES in src/types.ts.
-export const PROMO_CODES = new Map<string, { rate: number; eventIds?: string[] }>([
+// and ticket packages (tier ids) the code works on. Must stay identical to
+// PROMO_CODES in src/types.ts.
+export const PROMO_CODES = new Map<string, { rate: number; eventIds?: string[]; tiers?: string[] }>([
   ['JAZBA18', { rate: 0.18 }],
   ['EVENT18', { rate: 0.18 }],
   ['HAMILTON18', { rate: 0.18 }],
-  // Aa – Tenu Moaj Karawan Live: Islamabad (wp-607) and Lahore (wp-700).
-  ['DAKHLAY26', { rate: 0.4, eventIds: ['wp-607', 'wp-700'] }],
+  // Aa – Tenu Moaj Karawan Live: Islamabad (wp-607) and Lahore (wp-700),
+  // Standard (PKR 3,000) and Standard Group (PKR 11,000) only.
+  ['DAKHLAY26', { rate: 0.4, eventIds: ['wp-607', 'wp-700'], tiers: ['standard', 'standard-group'] }],
 ]);
 
-/** The discount a code gives on an event (0.18 = 18%), or 0 when the code is
- *  unknown or doesn't cover that event. Same as promoRate() in src/types.ts. */
-export function promoRate(code: string, eventId: string): number {
+/** The discount a code gives on an event's package (0.18 = 18%), or 0 when
+ *  the code is unknown or doesn't cover that event or package. Same as
+ *  promoRate() in src/types.ts. */
+export function promoRate(code: string, eventId: string, tier: string): number {
   const promo = PROMO_CODES.get(code.trim().toUpperCase());
   if (!promo || (promo.eventIds && !promo.eventIds.includes(eventId))) return 0;
+  if (promo.tiers && !promo.tiers.includes(tier)) return 0;
   return promo.rate;
 }
 
@@ -210,7 +214,7 @@ export async function createCheckoutSession(
   const selected = Object.prototype.hasOwnProperty.call(event.tiers, tier) ? event.tiers[tier] : undefined;
   if (!selected) throw new PaymentError('That ticket package is not available for this event.');
 
-  const discountRate = promoRate(promoCode, eventId);
+  const discountRate = promoRate(promoCode, eventId, tier);
   const promoApplied = discountRate > 0;
   const amountUsd = computeTotalUsd(selected.price, quantity, discountRate);
   if (amountUsd <= 0 || amountUsd > 10000) throw new PaymentError('Invalid payment amount.');
