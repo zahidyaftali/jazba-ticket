@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Send, Printer, Eye, Download, Mail, ScanLine, Loader2, CircleCheck, TriangleAlert } from "lucide-react";
+import { Send, Printer, Eye, Download, Mail, ScanLine, Loader2, CircleCheck, TriangleAlert, FileDown } from "lucide-react";
 import { Booking, TicketPass, updateTicketStatus } from "../../../services/backendService";
 import { useAdmin, byNewest } from "../AdminContext";
 import { useEmailTicket } from "../BookingDrawer";
@@ -39,8 +39,9 @@ export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [source, setSource] = useState<"all" | "online" | "admin">("all");
   const [eventFilter, setEventFilter] = useState(route.query.get("event") || "");
-  const { send, sending } = useEmailTicket();
+  const { send, sending, download, downloading } = useEmailTicket();
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [downloadId, setDownloadId] = useState<string | null>(null);
 
   // Rows with their resolved event + customer, scoped to the view.
   const rows = useMemo(() => {
@@ -105,6 +106,13 @@ export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
     setSendingId(null);
     if (res.ok) notify(`Ticket emailed to ${email}.`);
     else fail(res.error || "The email could not be sent.");
+  };
+
+  const quickDownload = async (b: Booking) => {
+    setDownloadId(b.id || null);
+    const res = await download(b);
+    setDownloadId(null);
+    if (!res.ok) fail(res.error || "The PDF could not be created.");
   };
 
   const exportCsv = () => {
@@ -287,6 +295,9 @@ export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
                   )}
                   <IconButton title={c.email ? `Email ticket to ${c.email}` : "Email ticket"} onClick={() => quickEmail(b, c.email)} disabled={sending && sendingId === b.id}>
                     {sending && sendingId === b.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  </IconButton>
+                  <IconButton title="Download PDF ticket" onClick={() => quickDownload(b)} disabled={downloading && downloadId === b.id}>
+                    {downloading && downloadId === b.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
                   </IconButton>
                   <IconButton title="Print ticket" onClick={() => printTicket(ticketDataFor(b))}>
                     <Printer className="w-4 h-4" />

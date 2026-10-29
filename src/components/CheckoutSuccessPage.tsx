@@ -3,7 +3,7 @@ import { Check, Loader2, Printer, ShieldCheck, AlertCircle } from 'lucide-react'
 import { EventItem, tierDisplayName } from '../types';
 import { auth } from '../firebase';
 import { createBooking } from '../services/backendService';
-import TicketPrintSheet from './TicketPrintSheet';
+import TicketPrintSheet, { printWhenReady } from './TicketPrintSheet';
 
 interface CheckoutSuccessPageProps {
   sessionId: string;
@@ -232,7 +232,7 @@ export default function CheckoutSuccessPage({ sessionId, events, onGoToDashboard
             type="button"
             onClick={() => {
               if (redirectTimer.current) clearTimeout(redirectTimer.current);
-              window.print();
+              printWhenReady();
             }}
             className="flex items-center justify-center gap-2 bg-black text-white py-4 font-bold text-sm cursor-pointer hover:bg-neutral-800 transition-colors"
           >
@@ -263,6 +263,7 @@ export default function CheckoutSuccessPage({ sessionId, events, onGoToDashboard
               tier: session.tier,
               tierName: session.tierName || tierDisplayName(session.tier, event),
               code: session.orderId,
+              image: event.image,
             }}
           />
         )}

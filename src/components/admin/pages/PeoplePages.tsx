@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Download, Eye, Send, Trash2, UserCheck, UserMinus, Mail, Phone, UserRound } from "lucide-react";
 import { deleteUserAccount, updateUserRoleAndStatus, UserProfile } from "../../../services/backendService";
-import { useAdmin, Client, signInMethod, byNewest } from "../AdminContext";
+import { useAdmin, Client, byNewest } from "../AdminContext";
 import {
   Avatar,
   Badge,
@@ -22,6 +22,7 @@ import {
   fmtDate,
   money,
   overline,
+  timeAgo,
   selectCls,
   tdCls,
   thCls,
@@ -240,9 +241,74 @@ export function ClientsPage() {
 
 type RoleTab = "all" | "admin" | "organizer" | "artist" | "user" | "suspended";
 
+/** Explains missing emails — and the one-time setup that recovers them. */
+function EmailStatusBanner({
+  status,
+  error,
+  missing,
+  blankProfiles,
+}: {
+  status: "loading" | "ready" | "not-configured" | "error";
+  error: string;
+  missing: number;
+  blankProfiles: number;
+}) {
+  const [open, setOpen] = useState(false);
+  if (status === "loading") return null;
+  if (status === "ready") {
+    if (!missing) return null;
+    return (
+      <div className="mb-4 bg-white border border-[#e4e4e4] border-l-2 border-l-[#8a8a8a] px-4 py-3 text-xs text-[#555]">
+        <span className="font-bold text-black">
+          {missing} account{missing === 1 ? " has" : "s have"} no email at all.
+        </span>{" "}
+        Their sign-in carries none either — usually a Facebook account registered with a phone number instead of an email.
+      </div>
+    );
+  }
+  if (status === "error") {
+    return (
+      <div className="mb-4 bg-white border border-[#e4e4e4] border-l-2 border-l-[#be6464] px-4 py-3 text-xs text-[#555]">
+        <span className="font-bold text-black">Couldn&rsquo;t read sign-in emails:</span> {error}
+      </div>
+    );
+  }
+  if (!blankProfiles) return null;
+  return (
+    <div className="mb-4 bg-white border border-[#e4e4e4] border-l-2 border-l-[#e0952b] px-4 py-3 text-xs text-[#555]">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
+        <p>
+          <span className="font-bold text-black">
+            {blankProfiles} account{blankProfiles === 1 ? " was" : "s were"} saved without an email
+          </span>{" "}
+          (older Google / Facebook sign-ups). Each fills in when that person next visits — or connect Firebase once to show them all now.
+        </p>
+        <button type="button" onClick={() => setOpen((o) => !o)} className="text-xs font-bold underline shrink-0 cursor-pointer text-left">
+          {open ? "Hide setup" : "How to connect"}
+        </button>
+      </div>
+      {open && (
+        <ol className="list-decimal pl-5 mt-3 space-y-1.5 text-[#333]">
+          <li>
+            Open the <span className="font-bold">Firebase console</span> → your project → <span className="font-bold">Project settings</span> →{" "}
+            <span className="font-bold">Service accounts</span> → <span className="font-bold">Generate new private key</span>. A .json file downloads.
+          </li>
+          <li>
+            In <span className="font-bold">Vercel</span> → this project → Settings → <span className="font-bold">Environment Variables</span>, add{" "}
+            <code className="bg-[#f2f2f2] px-1">FIREBASE_SERVICE_ACCOUNT</code> and paste the whole contents of that file as the value.
+          </li>
+          <li>Redeploy the site, then reopen this page — missing emails are filled in automatically.</li>
+          <li className="text-[#8a8a8a]">Keep that file private: never email it or paste it into a chat.</li>
+        </ol>
+      )}
+    </div>
+  );
+}
+
+
 /** Users — registered accounts, roles and access. */
 export function UsersPage() {
-  const { data, clients, userEmail, admin, notify, fail, reload } = useAdmin();
+  const { data, clients, userEmail, signInMethodsFor, authUserFor, authStatus, authError, admin, notify, fail, reload } = useAdmin();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<RoleTab>("all");
   const [open, setOpen] = useState<Client | null>(null);
@@ -304,14 +370,16 @@ export function UsersPage() {
 
   const exportCsv = () =>
     downloadCsv(`jazba-users-${new Date().toISOString().slice(0, 10)}.csv`, [
-      ["Name", "Email", "Phone", "City", "Role", "Status", "Joined", "Orders", "Spent (USD)", "User ID"],
+      ["Name", "Email", "Sign-in", "Phone", "City", "Role", "Status", "Joined", "Last sign-in", "Orders", "Spent (USD)", "User ID"],
       ...filtered.map((u) => {
         const s = statsByUid.get(u.uid);
-        return [u.name, userEmail(u).email, u.phone, u.city, ROLE_LABELS[u.role] || u.role, u.status || "active", fmtDate(u.createdAt), s?.orders.length || 0, (s?.spentUsd || 0).toFixed(2), u.uid];
+        const login = authUserFor(u.uid);
+        return [u.name, userEmail(u).email, signInMethodsFor(u).join(" / "), u.phone, u.city, ROLE_LABELS[u.role] || u.role, u.status || "active", fmtDate(u.createdAt), login?.lastLoginAt ? fmtDate(login.lastLoginAt) : "", s?.orders.length || 0, (s?.spentUsd || 0).toFixed(2), u.uid];
       }),
     ]);
 
   const missingEmails = users.filter((u) => !userEmail(u).email).length;
+  const blankProfiles = users.filter((u) => !u.email).length;
 
   return (
     <div>
@@ -324,12 +392,7 @@ export function UsersPage() {
           </button>
         }
       />
-      {missingEmails > 0 && (
-        <div className="mb-4 bg-white border border-[#e4e4e4] border-l-2 border-l-[#e0952b] px-4 py-3 text-xs text-[#555]">
-          <span className="font-bold text-black">{missingEmails} account{missingEmails === 1 ? " has" : "s have"} no email saved yet.</span>{" "}
-          Older Google / Facebook sign-ups were saved without one — it's filled in automatically the next time they visit the site.
-        </div>
-      )}
+      <EmailStatusBanner status={authStatus} error={authError} missing={missingEmails} blankProfiles={blankProfiles} />
       <div className="bg-white border border-[#e4e4e4]">
         <FilterTabs
           tabs={[
@@ -360,8 +423,9 @@ export function UsersPage() {
           }
         >
           {filtered.map((u) => {
-            const { email, fromOrders } = userEmail(u);
-            const method = signInMethod(u);
+            const { email, source } = userEmail(u);
+            const methods = signInMethodsFor(u);
+            const login = authUserFor(u.uid);
             const stats = statsByUid.get(u.uid);
             const isMe = u.uid === admin.uid;
             return (
@@ -378,7 +442,10 @@ export function UsersPage() {
                         {u.name}
                         {isMe && <span className="text-[#8a8a8a] font-medium"> (you)</span>}
                       </span>
-                      <span className="block text-[11px] text-[#8a8a8a]">Joined {fmtDate(u.createdAt)}</span>
+                      <span className="block text-[11px] text-[#8a8a8a]">
+                        Joined {fmtDate(u.createdAt)}
+                        {login?.lastLoginAt ? ` · last sign-in ${timeAgo(login.lastLoginAt)}` : ""}
+                      </span>
                     </span>
                   </button>
                 </td>
@@ -388,11 +455,22 @@ export function UsersPage() {
                       {email}
                     </a>
                   ) : (
-                    <span className="text-[#8a8a8a]">No email saved yet</span>
+                    <span className="text-[#8a8a8a]">{authStatus === "ready" ? "No email on this account" : "No email saved yet"}</span>
                   )}
-                  <span className="flex flex-wrap gap-1 mt-1">
-                    {method && <Badge tone="neutral" dot={false}>{method}</Badge>}
-                    {fromOrders && (
+                  <span className="flex flex-wrap items-center gap-1 mt-1">
+                    {methods.map((m) => (
+                      <span key={m}>
+                        <Badge tone="neutral" dot={false}>
+                          {m}
+                        </Badge>
+                      </span>
+                    ))}
+                    {source === "login" && (
+                      <span className="text-[10px] text-[#8a8a8a]" title="Taken from their Google / Facebook sign-in">
+                        from their sign-in
+                      </span>
+                    )}
+                    {source === "orders" && (
                       <span className="text-[10px] text-[#8a8a8a]" title="Taken from this member's orders">
                         from their orders
                       </span>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Mail, Printer, Send, Loader2, Phone, UserRound, ExternalLink } from "lucide-react";
+import { Mail, Printer, Send, Loader2, Phone, UserRound, ExternalLink, FileDown } from "lucide-react";
 import { Booking, updateBookingDetails, updateBookingStatus, updateTicketStatus } from "../../services/backendService";
-import { sendTicketEmail } from "../../services/ticketEmailService";
+import { sendTicketEmail, downloadTicketPdf, TicketEmailPayload } from "../../services/ticketEmailService";
 import { eventPath } from "../../types";
 import { useAdmin } from "./AdminContext";
 import {
@@ -36,15 +36,16 @@ const METHOD_LABELS: Record<string, string> = {
 };
 export const paymentMethodLabel = (m?: string) => (m ? METHOD_LABELS[m] || m : "—");
 
-/** Send a booking's e-ticket and record when/where it went. */
+/** Email a booking's e-ticket (PDF attached) or download that PDF. Sending
+ *  also records when and where the ticket went. */
 export function useEmailTicket() {
   const { ticketDataFor, amountLabel, reload } = useAdmin();
   const [sending, setSending] = useState(false);
-  const send = async (b: Booking, to: string, message = ""): Promise<{ ok: boolean; error?: string }> => {
-    setSending(true);
+  const [downloading, setDownloading] = useState(false);
+
+  const payloadFor = (b: Booking, to = "", message = ""): TicketEmailPayload => {
     const t = ticketDataFor(b);
-    const amount = b.paymentMethod === "complimentary" || !(Number(b.amount) > 0) ? "" : amountLabel(b);
-    const res = await sendTicketEmail({
+    return {
       to: to.trim(),
       holderName: t.holderName,
       eventTitle: t.eventTitle,
@@ -57,9 +58,15 @@ export function useEmailTicket() {
       orderId: t.orderId,
       seat: t.seat,
       code: t.code,
-      amount,
+      amount: b.paymentMethod === "complimentary" || !(Number(b.amount) > 0) ? "" : amountLabel(b),
       message: message.trim(),
-    });
+      image: t.image,
+    };
+  };
+
+  const send = async (b: Booking, to: string, message = ""): Promise<{ ok: boolean; error?: string }> => {
+    setSending(true);
+    const res = await sendTicketEmail(payloadFor(b, to, message));
     if (res.ok && b.id) {
       try {
         await updateBookingDetails(b.id, { emailedAt: new Date().toISOString(), emailedTo: to.trim() });
@@ -71,7 +78,15 @@ export function useEmailTicket() {
     setSending(false);
     return res;
   };
-  return { send, sending };
+
+  const download = async (b: Booking): Promise<{ ok: boolean; error?: string }> => {
+    setDownloading(true);
+    const res = await downloadTicketPdf(payloadFor(b, b.billingEmail || ""));
+    setDownloading(false);
+    return res;
+  };
+
+  return { send, sending, download, downloading };
 }
 
 export default function BookingDrawer() {
@@ -95,7 +110,7 @@ export default function BookingDrawer() {
   const [to, setTo] = useState("");
   const [message, setMessage] = useState("");
   const [busyPass, setBusyPass] = useState<string | null>(null);
-  const { send, sending } = useEmailTicket();
+  const { send, sending, download, downloading } = useEmailTicket();
 
   const customer = b ? customerFor(b) : null;
   useEffect(() => {
@@ -170,6 +185,17 @@ export default function BookingDrawer() {
         <>
           <button type="button" className={btnDark} onClick={() => printTicket(ticketDataFor(b))}>
             <Printer className="w-4 h-4" /> Print ticket
+          </button>
+          <button
+            type="button"
+            className={btnOutline}
+            disabled={downloading}
+            onClick={async () => {
+              const res = await download(b);
+              if (!res.ok) fail(res.error || "The PDF could not be created.");
+            }}
+          >
+            {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />} Download PDF
           </button>
           {info.event && (
             <a href={eventPath(info.event)} target="_blank" rel="noopener noreferrer" className={btnOutline}>
@@ -356,6 +382,7 @@ export default function BookingDrawer() {
         <span className={`${overline} text-[#8a8a8a] flex items-center gap-1.5`}>
           <Mail className="w-3.5 h-3.5" /> Email the ticket
         </span>
+        <p className="text-[11px] text-[#8a8a8a] mt-1">The PDF ticket is attached, ready to save on their phone and show at the gate.</p>
         <div className="mt-3 space-y-3">
           <div>
             <label className={labelCls}>Send to</label>

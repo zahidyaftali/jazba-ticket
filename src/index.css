@@ -390,7 +390,14 @@ button:active { transform: scale(0.985); }
   }
   #print-ticket {
     display: block !important;
-    padding: 24px;
+    padding: 8px 0 0;
+  }
+  /* Browsers drop background colours when printing by default — that would
+     print the white logo on white. Force the ticket's real colours. */
+  #print-ticket,
+  #print-ticket * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   @page {
     margin: 12mm;

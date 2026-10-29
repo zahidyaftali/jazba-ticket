@@ -5,7 +5,9 @@ import {defineConfig, loadEnv, type Plugin} from 'vite';
 import {createCheckoutSession, getCheckoutSession, getOrigin} from './api/_lib/stripePayment';
 import {sendFormEmail, FormEmailError} from './api/_lib/formEmail';
 import {submitEasypaisaOrder} from './api/_lib/easypaisaOrder';
-import {sendTicketEmail, TicketEmailError} from './api/_lib/ticketEmail';
+import {sendTicketEmail, ticketPdfForAdmin, TicketEmailError} from './api/_lib/ticketEmail';
+import {HttpError, verifyAdmin} from './api/_lib/adminAuth';
+import {listAuthUsers, serviceAccountFromEnv} from './api/_lib/firebaseAuthUsers';
 import {mailConfigFromEnv, type MailConfig} from './api/_lib/sendEmail';
 import {fetchWordPressEvents, fetchWordPressSlug} from './api/_lib/wordpressEvents';
 
@@ -25,7 +27,7 @@ function readJsonBody(req: any): Promise<any> {
 
 // Serves the same API routes Vercel runs in production during `npm run dev`,
 // so Stripe checkout and form emails both work locally too.
-const devApi = (secrets: { stripeSecretKey: string; mail: MailConfig | null }): Plugin => ({
+const devApi = (secrets: { stripeSecretKey: string; mail: MailConfig | null; env: Record<string, string> }): Plugin => ({
   name: 'jazba-dev-api',
   configureServer(server) {
     server.middlewares.use('/api/create-checkout-session', (req, res) => {
@@ -96,11 +98,42 @@ const devApi = (secrets: { stripeSecretKey: string; mail: MailConfig | null }): 
       });
     });
 
-    server.middlewares.use('/api/send-ticket-email', (req, res) => {
+    server.middlewares.use('/api/admin-users', async (req, res) => {
       res.setHeader('Content-Type', 'application/json');
       if (req.method !== 'POST') {
         res.statusCode = 405;
         res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
+      }
+      try {
+        const body = await readJsonBody(req);
+        await verifyAdmin(typeof body.idToken === 'string' ? body.idToken : '', 'Only admins can see accounts.');
+        const sa = serviceAccountFromEnv(secrets.env);
+        res.end(JSON.stringify(sa ? { configured: true, users: await listAuthUsers(sa) } : { configured: false, users: [] }));
+      } catch (err: any) {
+        res.statusCode = err instanceof HttpError ? err.status : 502;
+        res.end(JSON.stringify({ error: err?.message || 'Could not load sign-in accounts.' }));
+      }
+    });
+
+    server.middlewares.use('/api/send-ticket-email', async (req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method !== 'POST') {
+        res.statusCode = 405;
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
+      }
+      const body = await readJsonBody(req);
+      if (body.download) {
+        try {
+          const { bytes, filename } = await ticketPdfForAdmin(body);
+          res.setHeader('Content-Type', 'application/pdf');
+          res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+          res.end(Buffer.from(bytes));
+        } catch (err: any) {
+          res.statusCode = err instanceof TicketEmailError ? err.status : 502;
+          res.end(JSON.stringify({ error: err?.message || 'The PDF could not be created.' }));
+        }
         return;
       }
       if (!secrets.mail) {
@@ -108,15 +141,13 @@ const devApi = (secrets: { stripeSecretKey: string; mail: MailConfig | null }): 
         res.end(JSON.stringify({ error: 'ZOHO_SMTP_PASSWORD is not set in .env' }));
         return;
       }
-      readJsonBody(req).then(async (body) => {
-        try {
-          await sendTicketEmail(secrets.mail!, body);
-          res.end(JSON.stringify({ ok: true }));
-        } catch (err: any) {
-          res.statusCode = err instanceof TicketEmailError ? err.status : 502;
-          res.end(JSON.stringify({ error: err?.message || 'The email could not be sent.' }));
-        }
-      });
+      try {
+        await sendTicketEmail(secrets.mail!, body);
+        res.end(JSON.stringify({ ok: true }));
+      } catch (err: any) {
+        res.statusCode = err instanceof TicketEmailError ? err.status : 502;
+        res.end(JSON.stringify({ error: err?.message || 'The email could not be sent.' }));
+      }
     });
 
     server.middlewares.use('/api/easypaisa-order', (req, res) => {
@@ -185,6 +216,7 @@ export default defineConfig(({mode}) => {
       devApi({
         stripeSecretKey: env.STRIPE_SECRET_KEY || '',
         mail: mailConfigFromEnv(env),
+        env,
       }),
     ],
     resolve: {

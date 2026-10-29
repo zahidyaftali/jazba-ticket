@@ -38,7 +38,7 @@ import {
 } from "../services/backendService";
 import OrganizerHub from "./OrganizerHub";
 import ArtistHub from "./ArtistHub";
-import TicketPrintSheet, { TicketPrintData } from "./TicketPrintSheet";
+import TicketPrintSheet, { TicketPrintData, printWhenReady } from "./TicketPrintSheet";
 import brandMark from "../../assets/images/Favicon.png";
 import { shareOrCopy } from "../share";
 import { useLocalCurrency } from "../currency";
@@ -374,7 +374,7 @@ export default function UserDashboardPage({
   const handlePrintTicket = (pass: PersonalBooking) => {
     setPrintPass(pass);
     // Give React a tick to mount the print sheet before opening the dialog
-    setTimeout(() => window.print(), 120);
+    setTimeout(printWhenReady, 120);
   };
 
   useEffect(() => {
@@ -398,6 +398,7 @@ export default function UserDashboardPage({
     tier: pass.tier,
     tierName: tierDisplayName(pass.tier, pass.event),
     code: `#${pass.barCode.substring(0, 4)}-${pass.barCode.substring(4, 8)}`,
+    image: pass.event.image,
   });
 
   // â”€â”€ SUSPENDED ACCOUNT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

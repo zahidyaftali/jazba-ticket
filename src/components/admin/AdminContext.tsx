@@ -13,11 +13,13 @@ import {
   OrganizerProfile,
   PaymentDetails,
   TicketPass,
+  adminSetUserEmail,
 } from "../../services/backendService";
 import { getWordPressEvents } from "../../services/wordpressEventsService";
+import { fetchAuthUsers, AuthUserInfo } from "../../services/adminUsersService";
 import { EventItem, getEventTimestamp, isPastEvent, tierDisplayName, withEventSlugs } from "../../types";
 import { auth, accountEmail } from "../../firebase";
-import type { TicketPrintData } from "../TicketPrintSheet";
+import { printWhenReady, type TicketPrintData } from "../TicketPrintSheet";
 import { money } from "./ui";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -108,8 +110,15 @@ interface AdminCtx {
   eventById: (id: string) => AdminEvent | undefined;
   eventInfo: (eventId: string, booking?: Booking) => EventInfo;
   userById: (uid: string) => UserProfile | undefined;
-  /** A member's email: their profile's, else the one on their orders. */
-  userEmail: (u: UserProfile) => { email: string; fromOrders: boolean };
+  /** A member's email: their profile's, else their sign-in account's, else
+   *  the one on their orders. */
+  userEmail: (u: UserProfile) => { email: string; source: "profile" | "login" | "orders" | ""; fromOrders: boolean };
+  /** Firebase sign-in record for a member (needs FIREBASE_SERVICE_ACCOUNT). */
+  authUserFor: (uid: string) => AuthUserInfo | undefined;
+  /** How a member signs in: ["Google"], ["Facebook"], ["Email"]… */
+  signInMethodsFor: (u: UserProfile) => string[];
+  authStatus: "loading" | "ready" | "not-configured" | "error";
+  authError: string;
   customerFor: (b: Booking) => Customer;
   bookingById: (id: string) => Booking | undefined;
   passesFor: (bookingId: string) => TicketPass[];
@@ -203,6 +212,10 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [openBookingId, setOpenBookingId] = useState<string | null>(null);
   const [printData, setPrintData] = useState<TicketPrintData | null>(null);
+  const [authUsers, setAuthUsers] = useState<Map<string, AuthUserInfo>>(new Map());
+  const [authStatus, setAuthStatus] = useState<AdminCtx["authStatus"]>("loading");
+  const [authError, setAuthError] = useState("");
+  const authChecked = useRef(false);
   const firstLoad = useRef(true);
   const toastSeq = useRef(0);
 
@@ -265,6 +278,42 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
     loadWordPress();
   }, [reload, loadWordPress]);
 
+  // ---- sign-in accounts: real emails + sign-in methods from Firebase Auth.
+  // Profiles saved without an email (older Google / Facebook sign-ups) are
+  // filled in once, here, so every other screen sees the email too.
+  useEffect(() => {
+    if (loading || authChecked.current) return;
+    authChecked.current = true;
+    (async () => {
+      const result = await fetchAuthUsers();
+      if (result.status !== "ready") {
+        setAuthStatus(result.status);
+        if (result.status === "error") setAuthError(result.error);
+        return;
+      }
+      const map = new Map(result.users.map((u) => [u.uid, u]));
+      setAuthUsers(map);
+      setAuthStatus("ready");
+
+      const missing = data.users.filter((u) => !u.email && map.get(u.uid)?.email);
+      if (!missing.length) return;
+      const filled = new Map<string, string>();
+      for (const u of missing) {
+        const email = map.get(u.uid)!.email;
+        try {
+          await adminSetUserEmail(u.uid, email);
+          filled.set(u.uid, email);
+        } catch (err) {
+          console.warn("Could not save email for", u.uid, err);
+        }
+      }
+      if (filled.size) {
+        setData((d) => ({ ...d, users: d.users.map((u) => (filled.has(u.uid) ? { ...u, email: filled.get(u.uid)! } : u)) }));
+        pushToast("success", `Filled in ${filled.size} missing email${filled.size === 1 ? "" : "s"} from Google / Facebook sign-ins.`);
+      }
+    })();
+  }, [loading, data.users, pushToast]);
+
   // ---- routing
   useEffect(() => {
     const onPop = () => setRoute(parseRoute());
@@ -283,7 +332,7 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
   // ---- printing: mount the print sheet, print, unmount
   const printTicket = useCallback((d: TicketPrintData) => {
     setPrintData(d);
-    setTimeout(() => window.print(), 80);
+    setTimeout(printWhenReady, 50);
   }, []);
   useEffect(() => {
     const done = () => setPrintData(null);
@@ -324,19 +373,40 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
   const bookingById = useCallback((id: string) => bookingMap.get(id), [bookingMap]);
   const passesFor = useCallback((id: string) => passMap.get(id) || [], [passMap]);
 
+  const authUserFor = useCallback((uid: string) => authUsers.get(uid), [authUsers]);
+
   const userEmail = useCallback(
     (u: UserProfile) => {
-      if (u.email) return { email: u.email, fromOrders: false };
+      if (u.email) return { email: u.email, source: "profile" as const, fromOrders: false };
+      const login = authUsers.get(u.uid)?.email || "";
+      if (login) return { email: login, source: "login" as const, fromOrders: false };
       const fromOrders = orderEmailByUid.get(u.uid) || "";
-      return { email: fromOrders, fromOrders: !!fromOrders };
+      return { email: fromOrders, source: fromOrders ? ("orders" as const) : ("" as const), fromOrders: !!fromOrders };
     },
-    [orderEmailByUid],
+    [authUsers, orderEmailByUid],
+  );
+
+  const signInMethodsFor = useCallback(
+    (u: UserProfile) => {
+      const providers = authUsers.get(u.uid)?.providers;
+      if (providers?.length) {
+        const names: Record<string, string> = { "google.com": "Google", "facebook.com": "Facebook", password: "Email", phone: "Phone", "apple.com": "Apple" };
+        return [...new Set(providers.map((p) => names[p] || p))];
+      }
+      const guess = signInMethod(u);
+      return guess ? [guess] : [];
+    },
+    [authUsers],
   );
 
   const customerFor = useCallback(
     (b: Booking): Customer => {
       const u = b.userId ? userMap.get(b.userId) : undefined;
-      const email = b.billingEmail || u?.email || (b.userId ? orderEmailByUid.get(b.userId) : "") || "";
+      const email =
+        b.billingEmail ||
+        u?.email ||
+        (b.userId ? authUsers.get(b.userId)?.email || orderEmailByUid.get(b.userId) : "") ||
+        "";
       const name = realName(b.billingName) || realName(u?.name) || (email ? email.split("@")[0] : "") || "Unknown customer";
       return {
         name,
@@ -347,7 +417,7 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
         photo: u?.profileImage,
       };
     },
-    [userMap, orderEmailByUid],
+    [userMap, authUsers, orderEmailByUid],
   );
 
   const eventInfo = useCallback(
@@ -413,6 +483,7 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
         tier: b.tier || b.ticketType || "general",
         tierName: tierName(b),
         code: orderId,
+        image: info.image,
       };
     },
     [eventInfo, customerFor, tierName],
@@ -511,6 +582,10 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
     eventInfo,
     userById,
     userEmail,
+    authUserFor,
+    signInMethodsFor,
+    authStatus,
+    authError,
     customerFor,
     bookingById,
     passesFor,

@@ -11,8 +11,9 @@ export interface SendEmailInput {
   html: string;
   /** Lets the admin hit "Reply" and land straight in the sender's inbox. */
   replyTo?: string;
-  /** Files to attach — content is the file's bytes as a base64 string. */
-  attachments?: { filename: string; content: string }[];
+  /** Files to attach — content is the file's bytes as a base64 string.
+   *  Give a `cid` to show an image inline: <img src="cid:that-id">. */
+  attachments?: { filename: string; content: string; contentType?: string; cid?: string }[];
 }
 
 export interface MailConfig {
@@ -52,7 +53,13 @@ export async function sendEmail(config: MailConfig, input: SendEmailInput): Prom
     replyTo: input.replyTo || undefined,
     subject: input.subject,
     html: input.html,
-    attachments: input.attachments?.map((a) => ({ filename: a.filename, content: a.content, encoding: 'base64' })),
+    attachments: input.attachments?.map((a) => ({
+      filename: a.filename,
+      content: a.content,
+      encoding: 'base64',
+      ...(a.contentType ? { contentType: a.contentType } : {}),
+      ...(a.cid ? { cid: a.cid } : {}),
+    })),
   });
 }
 

@@ -907,6 +907,17 @@ export async function updateUserRoleAndStatus(uid: string, role: string, status:
   }
 }
 
+/** Admin: save a member's email (recovered from their sign-in account). */
+export async function adminSetUserEmail(uid: string, email: string): Promise<void> {
+  const path = `users/${uid}`;
+  try {
+    await updateDoc(doc(db, 'users', uid), { email });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+    throw error;
+  }
+}
+
 export async function deleteUserAccount(uid: string): Promise<void> {
   const path = `users/${uid}`;
   try {

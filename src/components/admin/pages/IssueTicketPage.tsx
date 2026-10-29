@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Send, Loader2, CircleCheck, TriangleAlert, Printer, Eye, Plus, UserRound, Search, X, Mail } from "lucide-react";
-import { issueManualTicket, Booking, updateBookingDetails } from "../../../services/backendService";
-import { sendTicketEmail } from "../../../services/ticketEmailService";
+import { Send, Loader2, CircleCheck, TriangleAlert, Printer, Eye, Plus, UserRound, Search, X, Mail, FileDown } from "lucide-react";
+import { issueManualTicket, Booking } from "../../../services/backendService";
 import { getAvailableTiers, defaultTier, DEFAULT_TIER_META } from "../../../types";
 import { useAdmin, Client, eventDateLabel, eventVenueLabel, AdminEvent } from "../AdminContext";
+import { useEmailTicket } from "../BookingDrawer";
 import {
   Avatar,
   Badge,
@@ -68,7 +68,7 @@ export default function IssueTicketPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [issued, setIssued] = useState<{ booking: Booking; emailed: boolean; emailError?: string } | null>(null);
-  const [resending, setResending] = useState(false);
+  const { send, sending: resending, download, downloading } = useEmailTicket();
 
   // ---- events
   const eventOptions = useMemo(() => {
@@ -154,26 +154,6 @@ export default function IssueTicketPage() {
     if (!keepEvent) setTierChoice("");
   };
 
-  const emailPayload = (b: Booking) => {
-    const t = ticketDataFor(b);
-    return {
-      to: b.billingEmail || "",
-      holderName: t.holderName,
-      eventTitle: t.eventTitle,
-      category: t.category,
-      date: t.date,
-      time: t.time,
-      venue: t.venue,
-      tierName: t.tierName || t.tier,
-      quantity: t.quantity,
-      orderId: t.orderId,
-      seat: t.seat,
-      code: t.code,
-      amount: b.paymentMethod === "complimentary" || !(b.amount > 0) ? "" : money(b.amountLocal ?? b.amount, b.currency || "USD"),
-      message: emailMessage.trim(),
-    };
-  };
-
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -213,15 +193,10 @@ export default function IssueTicketPage() {
       let emailed = false;
       let emailError: string | undefined;
       if (emailIt && email) {
-        const res = await sendTicketEmail(emailPayload(booking));
-        if (res.ok) {
-          emailed = true;
-          try {
-            await updateBookingDetails(booking.id!, { emailedAt: new Date().toISOString(), emailedTo: email });
-          } catch {
-            /* sent — only the "last emailed" note didn't save */
-          }
-        } else emailError = res.error;
+        // Also records when and where it was sent.
+        const res = await send(booking, email, emailMessage);
+        if (res.ok) emailed = true;
+        else emailError = res.error;
       }
 
       setIssued({ booking, emailed, emailError });
@@ -238,13 +213,10 @@ export default function IssueTicketPage() {
 
   const resend = async () => {
     if (!issued) return;
-    setResending(true);
-    const res = await sendTicketEmail(emailPayload(issued.booking));
-    setResending(false);
+    const res = await send(issued.booking, issued.booking.billingEmail || "", emailMessage);
     if (res.ok) {
       setIssued({ ...issued, emailed: true, emailError: undefined });
       notify(`Ticket emailed to ${issued.booking.billingEmail}.`);
-      updateBookingDetails(issued.booking.id!, { emailedAt: new Date().toISOString(), emailedTo: issued.booking.billingEmail }).catch(() => {});
     } else {
       setIssued({ ...issued, emailError: res.error });
       fail(res.error || "The email could not be sent.");
@@ -286,7 +258,7 @@ export default function IssueTicketPage() {
 
             {issued.emailed ? (
               <div className="flex items-start gap-2 bg-[#edf6e8] text-[#2f5d1f] px-4 py-3 text-sm font-bold">
-                <Mail className="w-4 h-4 shrink-0 mt-0.5" /> Emailed to {b.billingEmail}.
+                <Mail className="w-4 h-4 shrink-0 mt-0.5" /> Emailed to {b.billingEmail}, with the PDF ticket attached.
               </div>
             ) : issued.emailError ? (
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-[#f7ecec] text-[#7a2f2f] px-4 py-3 text-sm font-bold">
@@ -311,6 +283,17 @@ export default function IssueTicketPage() {
             <div className="flex flex-wrap gap-2 pt-2">
               <button type="button" className={btnDark} onClick={() => printTicket(ticketDataFor(b))}>
                 <Printer className="w-4 h-4" /> Print ticket
+              </button>
+              <button
+                type="button"
+                className={btnOutline}
+                disabled={downloading}
+                onClick={async () => {
+                  const res = await download(b);
+                  if (!res.ok) fail(res.error || "The PDF could not be created.");
+                }}
+              >
+                {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />} Download PDF
               </button>
               <button type="button" className={btnOutline} onClick={() => openBooking(b.id!)}>
                 <Eye className="w-4 h-4" /> View order
@@ -526,7 +509,7 @@ export default function IssueTicketPage() {
           </EditorPanel>
 
           {/* 4. Delivery */}
-          <EditorPanel title="4. Delivery" sub="Send a branded e-ticket from info@jazbatickets.com.">
+          <EditorPanel title="4. Delivery" sub="Send a branded e-ticket from info@jazbatickets.com — with the ticket attached as a PDF to show at the gate.">
             <label className="flex items-center gap-2 text-sm font-bold cursor-pointer">
               <input type="checkbox" checked={emailIt} onChange={(e) => setEmailIt(e.target.checked)} /> Email the ticket to the client now
             </label>
