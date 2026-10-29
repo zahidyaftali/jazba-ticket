@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Lock, Mail, LogOut, ExternalLink, AlertCircle, Loader2 } from 'lucide-react';
+import { Lock, Mail, AlertCircle, Loader2 } from 'lucide-react';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, auth, User } from '../firebase';
-import { isUserBootstrappedAdmin, getUserProfile } from '../services/backendService';
+import { isUserBootstrappedAdmin, getUserProfile, syncAccountProfile } from '../services/backendService';
 import AdminHub from './AdminHub';
 import brandMark from '../../assets/images/Favicon.png';
 
@@ -9,7 +9,6 @@ type AuthStage = 'checking' | 'signed-out' | 'denied' | 'granted';
 
 export default function AdminPortal() {
   const [stage, setStage] = useState<AuthStage>('checking');
-  const [adminName, setAdminName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -22,16 +21,11 @@ export default function AdminPortal() {
         return;
       }
       try {
-        let role = '';
-        let name = user.displayName || user.email || 'Admin';
         const profile = await getUserProfile(user.uid);
-        if (profile) {
-          role = profile.role || '';
-          name = profile.name || name;
-        }
+        const role = profile?.role || '';
         const isAdmin = isUserBootstrappedAdmin(user.email) || role === 'admin';
         if (isAdmin) {
-          setAdminName(name);
+          syncAccountProfile(user);
           setStage('granted');
         } else {
           await signOut(auth);
@@ -73,38 +67,7 @@ export default function AdminPortal() {
   }
 
   if (stage === 'granted') {
-    return (
-      <div className="min-h-screen bg-[#f7f7f7]" id="admin-portal-root">
-        <div className="bg-black text-white px-4 sm:px-6 md:px-8 py-4 flex items-center justify-between sticky top-0 z-40 border-b border-white/15">
-          <div className="flex items-center gap-3">
-            <img src={brandMark} alt="Jazba Tickets" className="w-9 h-9 object-contain" />
-            <div>
-              <span className="font-display font-bold text-sm block leading-none">Jazba Tickets Admin Portal</span>
-              <span className="text-[10px] text-white/50 block mt-1">Signed in as {adminName}</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <a
-              href="/"
-              className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-white/60 hover:text-white transition-colors"
-            >
-              <span>View Site</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 py-2 px-4 bg-[#ffed00] hover:bg-[#e6d200] text-black text-xs font-bold cursor-pointer transition-colors"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Logout</span>
-            </button>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-8">
-          <AdminHub />
-        </div>
-      </div>
-    );
+    return <AdminHub onLogout={handleLogout} />;
   }
 
   return (

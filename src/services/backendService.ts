@@ -11,7 +11,7 @@ import {
   addDoc,
   getCountFromServer
 } from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType } from '../firebase';
+import { db, auth, handleFirestoreError, OperationType, accountEmail } from '../firebase';
 import { EventItem } from '../types';
 
 export interface UserProfile {
@@ -84,6 +84,35 @@ export interface Booking {
   eventTitle?: string;
   eventImage?: string;
   eventDate?: string;
+
+  // ---- Written by the Stripe checkout and/or the admin "Issue ticket" form.
+  // All optional: older bookings may have none of them.
+  orderId?: string;
+  tier?: string;
+  tierName?: string;
+  seat?: string;
+  barCode?: string;
+  pricePaid?: number;
+  bookingDate?: string;
+  paymentMethod?: string;
+  paymentRegion?: string;
+  stripeTransactionId?: string;
+  promoApplied?: boolean;
+  billingName?: string;
+  billingEmail?: string;
+  billingPhone?: string;
+  /** Currency the price was agreed in (amount is always stored in USD). */
+  currency?: string;
+  /** The total in `currency`, e.g. 6000 for PKR 6,000. */
+  amountLocal?: number;
+  eventVenue?: string;
+  eventTime?: string;
+  /** 'admin' when issued from the admin portal; unset for online checkout. */
+  source?: string;
+  issuedBy?: string;
+  note?: string;
+  emailedAt?: string;
+  emailedTo?: string;
 }
 
 export interface TicketPass {
@@ -94,6 +123,8 @@ export interface TicketPass {
   eventId: string;
   qrCode: string;
   status: 'active' | 'cancelled' | 'scanned';
+  /** When the pass was checked in at the door. */
+  scannedAt?: string;
 }
 
 export interface PaymentDetails {
@@ -156,14 +187,19 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 
 export async function createUserProfile(uid: string, profile: Partial<UserProfile>): Promise<UserProfile> {
   const path = `users/${uid}`;
-  const isBootAdmin = isUserBootstrappedAdmin(profile.email || null);
+  // A profile is only ever created by its own signed-in user, so the auth
+  // account is the source of truth for the email and photo when the caller
+  // didn't pass them (Google/Facebook sign-ins used to save a blank email).
+  const self = auth.currentUser?.uid === uid ? auth.currentUser : null;
+  const email = profile.email || accountEmail(self);
+  const isBootAdmin = isUserBootstrappedAdmin(email || null);
   const userProfile: UserProfile = {
     uid,
     name: profile.name || 'Anonymous User',
-    email: profile.email || '',
+    email,
     phone: profile.phone || '',
     role: isBootAdmin ? 'admin' : (profile.role as any || 'user'),
-    profileImage: profile.profileImage || '',
+    profileImage: profile.profileImage || self?.photoURL || '',
     createdAt: profile.createdAt || new Date().toISOString(),
     status: profile.status || 'active',
     city: profile.city || 'London',
@@ -189,6 +225,30 @@ export async function updateUserProfile(uid: string, update: Partial<UserProfile
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
     throw error;
+  }
+}
+
+/** Fill in a signed-in user's blank email / photo from their auth account.
+ *  Profiles created by Google/Facebook sign-in used to be saved without an
+ *  email, so this repairs them the next time the member visits. */
+export async function syncAccountProfile(user: {
+  uid: string;
+  email: string | null;
+  photoURL: string | null;
+  providerData?: { email: string | null }[];
+}): Promise<void> {
+  try {
+    const snap = await getDoc(doc(db, 'users', user.uid));
+    if (!snap.exists()) return;
+    const data = snap.data() as UserProfile;
+    const update: Partial<UserProfile> = {};
+    const email = accountEmail(user);
+    if (!data.email && email) update.email = email;
+    if (!data.profileImage && user.photoURL && user.photoURL.length <= 512) update.profileImage = user.photoURL;
+    if (Object.keys(update).length) await updateUserProfile(user.uid, update);
+  } catch (err) {
+    // Never block sign-in over a cosmetic profile repair.
+    console.warn('syncAccountProfile skipped:', err);
   }
 }
 
@@ -514,7 +574,10 @@ export async function getTickets(userId?: string): Promise<TicketPass[]> {
 export async function updateTicketStatus(id: string, status: 'active' | 'cancelled' | 'scanned'): Promise<void> {
   const path = `tickets/${id}`;
   try {
-    await updateDoc(doc(db, 'tickets', id), { status });
+    await updateDoc(doc(db, 'tickets', id), {
+      status,
+      ...(status === 'scanned' ? { scannedAt: new Date().toISOString() } : {}),
+    });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
     throw error;
@@ -532,6 +595,123 @@ export async function updateBookingStatus(
     handleFirestoreError(error, OperationType.UPDATE, path);
     throw error;
   }
+}
+
+/** Admin: change any of a booking's fields (e.g. record when its ticket was emailed). */
+export async function updateBookingDetails(id: string, update: Partial<Booking>): Promise<void> {
+  const path = `bookings/${id}`;
+  try {
+    await updateDoc(doc(db, 'bookings', id), update as Record<string, any>);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+    throw error;
+  }
+}
+
+export interface ManualTicketInput {
+  eventId: string;
+  eventTitle: string;
+  eventDate: string;
+  eventTime: string;
+  eventVenue: string;
+  eventImage: string;
+  tier: string;
+  tierName: string;
+  quantity: number;
+  /** Order total in USD (0 for complimentary tickets). */
+  amountUsd: number;
+  currency: string;
+  amountLocal: number;
+  paymentMethod: string;
+  paymentStatus: Booking['paymentStatus'];
+  seat: string;
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  /** The registered account this client matches, or '' for a guest. */
+  clientUid: string;
+  note: string;
+}
+
+/** Admin: issue tickets directly from the portal (box office, guest list,
+ *  bank transfers…). Writes the booking plus one admission pass per ticket,
+ *  exactly like an online order, and returns the saved booking. */
+export async function issueManualTicket(input: ManualTicketInput): Promise<Booking> {
+  const orderId = `JZ-${Math.floor(100000 + Math.random() * 900000)}`;
+  const barCode = `8${Math.floor(10000000000 + Math.random() * 90000000000)}`;
+  const now = new Date();
+  const booking: Booking = {
+    id: orderId,
+    bookingNumber: orderId,
+    orderId,
+    eventId: input.eventId,
+    eventTitle: input.eventTitle,
+    eventDate: input.eventDate,
+    eventTime: input.eventTime,
+    eventVenue: input.eventVenue,
+    eventImage: input.eventImage,
+    userId: input.clientUid,
+    ticketType: input.tier,
+    tier: input.tier,
+    tierName: input.tierName,
+    quantity: input.quantity,
+    amount: input.amountUsd,
+    pricePaid: input.amountUsd,
+    currency: input.currency,
+    amountLocal: input.amountLocal,
+    paymentStatus: input.paymentStatus,
+    bookingStatus: 'active',
+    paymentMethod: input.paymentMethod,
+    qrCode: barCode,
+    barCode,
+    seat: input.seat,
+    createdAt: now.toISOString(),
+    bookingDate: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    billingName: input.clientName,
+    billingEmail: input.clientEmail,
+    billingPhone: input.clientPhone,
+    promoApplied: false,
+    source: 'admin',
+    issuedBy: auth.currentUser?.email || '',
+    note: input.note,
+  };
+
+  const path = `bookings/${orderId}`;
+  try {
+    await setDoc(doc(db, 'bookings', orderId), booking);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+    throw error;
+  }
+
+  for (let i = 0; i < input.quantity; i++) {
+    await createTicket({
+      ticketNumber: `${orderId}-T${i + 1}`,
+      bookingId: orderId,
+      userId: input.clientUid,
+      eventId: input.eventId,
+      qrCode: `TICKET-${orderId}-${i + 1}-${Math.floor(100000 + Math.random() * 900000)}`,
+      status: 'active',
+    });
+  }
+
+  // A registered client also sees it in their account's notifications.
+  if (input.clientUid) {
+    try {
+      await createNotification({
+        userId: input.clientUid,
+        title: 'Tickets issued to you',
+        message: `${input.quantity} × ${input.tierName} for ${input.eventTitle} (order ${orderId}). Find them under My tickets.`,
+        read: false,
+        createdAt: now.toISOString(),
+      });
+    } catch (err) {
+      console.warn('Ticket notification skipped:', err);
+    }
+  }
+
+  if (input.paymentStatus === 'paid') await updateAnalyticsAfterSale(input.quantity, input.amountUsd);
+  return booking;
 }
 
 /**

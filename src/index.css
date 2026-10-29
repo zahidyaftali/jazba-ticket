@@ -366,6 +366,13 @@ button:active { transform: scale(0.985); }
 #login-page-root .bg-white,
 #signup-page-root .bg-white { animation: jzFadeUp 0.5s var(--jz-ease) both; }
 
+/* Admin portal — drawers, dropdowns and toasts */
+@keyframes jzSlideIn { from { transform: translateX(28px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes jzSlideInLeft { from { transform: translateX(-28px); opacity: 0; } to { transform: none; opacity: 1; } }
+.jz-admin-fade { animation: jzFadeIn 0.18s var(--jz-ease) both; }
+.jz-admin-slide { animation: jzSlideIn 0.24s var(--jz-ease) both; }
+.jz-admin-slide-left { animation: jzSlideInLeft 0.24s var(--jz-ease) both; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
   div.cursor-pointer.bg-white[class*="rounded"]:hover,

@@ -36,7 +36,6 @@ import {
   updateUserProfile,
   getBookings,
 } from "../services/backendService";
-import AdminHub from "./AdminHub";
 import OrganizerHub from "./OrganizerHub";
 import ArtistHub from "./ArtistHub";
 import TicketPrintSheet, { TicketPrintData } from "./TicketPrintSheet";
@@ -191,6 +190,7 @@ export default function UserDashboardPage({
           const defaultRole = isBootAdmin ? "admin" : "user";
           await createUserProfile(user.uid, {
             name: user.displayName || user.email?.split("@")[0] || "Member",
+            email: user.email || user.providerData?.find((p) => p?.email)?.email || "",
             profileImage: user.photoURL || "",
             city: "London",
           });
@@ -1395,7 +1395,33 @@ export default function UserDashboardPage({
                 )}
 
                 {/* â”€â”€ ROLE HUBS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-                {activeTab === "admin" && userRole === "admin" && <AdminHub />}
+                {activeTab === "admin" && userRole === "admin" && (
+                  <div>
+                    {sectionHead(
+                      "Admin console",
+                      "Tickets, clients, events, artists, users and revenue — all managed in the admin portal.",
+                    )}
+                    <div className="bg-black text-white p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                      <div>
+                        <span className={`${overline} text-[#ffed00]`}>Administrator</span>
+                        <p className="font-display font-bold text-2xl leading-tight mt-2">
+                          Open the admin portal
+                        </p>
+                        <p className="text-sm text-white/60 mt-2 max-w-md">
+                          Issue and email tickets, check guests in, manage
+                          artists and events, and see every order in one
+                          dashboard.
+                        </p>
+                      </div>
+                      <a
+                        href="/admin"
+                        className="inline-flex items-center justify-center gap-2 bg-[#ffed00] hover:bg-[#e6d200] text-black font-bold text-sm px-6 py-3.5 shrink-0"
+                      >
+                        Go to admin portal <ArrowRight className="w-4 h-4" />
+                      </a>
+                    </div>
+                  </div>
+                )}
                 {activeTab === "organizer" && userRole === "organizer" && (
                   <OrganizerHub />
                 )}

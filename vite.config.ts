@@ -5,6 +5,7 @@ import {defineConfig, loadEnv, type Plugin} from 'vite';
 import {createCheckoutSession, getCheckoutSession, getOrigin} from './api/_lib/stripePayment';
 import {sendFormEmail, FormEmailError} from './api/_lib/formEmail';
 import {submitEasypaisaOrder} from './api/_lib/easypaisaOrder';
+import {sendTicketEmail, TicketEmailError} from './api/_lib/ticketEmail';
 import {mailConfigFromEnv, type MailConfig} from './api/_lib/sendEmail';
 import {fetchWordPressEvents, fetchWordPressSlug} from './api/_lib/wordpressEvents';
 
@@ -91,6 +92,29 @@ const devApi = (secrets: { stripeSecretKey: string; mail: MailConfig | null }): 
         } catch (err: any) {
           res.statusCode = err instanceof FormEmailError ? err.status : 502;
           res.end(JSON.stringify({ error: err?.message || 'Could not send your message.' }));
+        }
+      });
+    });
+
+    server.middlewares.use('/api/send-ticket-email', (req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method !== 'POST') {
+        res.statusCode = 405;
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
+      }
+      if (!secrets.mail) {
+        res.statusCode = 500;
+        res.end(JSON.stringify({ error: 'ZOHO_SMTP_PASSWORD is not set in .env' }));
+        return;
+      }
+      readJsonBody(req).then(async (body) => {
+        try {
+          await sendTicketEmail(secrets.mail!, body);
+          res.end(JSON.stringify({ ok: true }));
+        } catch (err: any) {
+          res.statusCode = err instanceof TicketEmailError ? err.status : 502;
+          res.end(JSON.stringify({ error: err?.message || 'The email could not be sent.' }));
         }
       });
     });

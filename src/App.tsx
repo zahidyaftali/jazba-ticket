@@ -15,7 +15,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import { Info } from 'lucide-react';
-import { onAuthStateChanged, signOut, auth } from './firebase';
+import { onAuthStateChanged, signOut, auth, accountEmail } from './firebase';
 import Navbar from './components/Navbar';
 import HeroSection from './components/HeroSection';
 import CategoryCircles from './components/CategoryCircles';
@@ -46,7 +46,7 @@ import OrganizerDetailPage from './components/OrganizerDetailPage';
 import { EventGridSkeleton, DetailPageSkeleton } from './components/Skeletons';
 import { categories, faqs } from './data';
 import { EventItem, TicketTier, eventPath, getAvailableTiers, isPastEvent, withEventSlugs } from './types';
-import { getPublishedEvents, getAllArtists } from './services/backendService';
+import { getPublishedEvents, getAllArtists, syncAccountProfile } from './services/backendService';
 import { getWordPressEvents } from './services/wordpressEventsService';
 
 type AuthUser = { email: string; name: string; profileImage?: string } | null;
@@ -566,10 +566,12 @@ function AppShell() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setCurrentUser({
-          email: user.email || '',
-          name: user.displayName || user.email?.split('@')[0] || 'Concert Fan',
+          email: accountEmail(user),
+          name: user.displayName || accountEmail(user).split('@')[0] || 'Concert Fan',
           profileImage: user.photoURL || '',
         });
+        // Repairs profiles saved without an email (older Google/Facebook sign-ins).
+        syncAccountProfile(user);
       } else {
         setCurrentUser(null);
       }

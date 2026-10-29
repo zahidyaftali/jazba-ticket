@@ -9,7 +9,7 @@ import {
   ArrowRight,
   AlertCircle
 } from 'lucide-react';
-import { signInWithEmailAndPassword, GoogleAuthProvider, FacebookAuthProvider, signInWithPopup, getAdditionalUserInfo, sendPasswordResetEmail, auth, socialSignInErrorMessage } from '../firebase';
+import { signInWithEmailAndPassword, GoogleAuthProvider, FacebookAuthProvider, signInWithPopup, getAdditionalUserInfo, sendPasswordResetEmail, auth, socialSignInErrorMessage, accountEmail } from '../firebase';
 import { createUserProfile } from '../services/backendService';
 
 interface LoginPageProps {
@@ -120,7 +120,8 @@ export default function LoginPage({ onBack, onSuccess, onSwitchToSignup }: Login
       if (getAdditionalUserInfo(result)?.isNewUser) {
         try {
           await createUserProfile(user.uid, {
-            name: user.displayName || user.email?.split('@')[0] || 'Member',
+            name: user.displayName || accountEmail(user).split('@')[0] || 'Member',
+            email: accountEmail(user),
             profileImage: user.photoURL || '',
             city: 'London',
           });

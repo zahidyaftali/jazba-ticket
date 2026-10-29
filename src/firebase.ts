@@ -26,6 +26,13 @@ export {
 } from 'firebase/auth';
 export type { User } from 'firebase/auth';
 
+/** The account's email address. Facebook (and sometimes Google) can leave
+ *  `user.email` empty while the provider record still carries it. */
+export function accountEmail(user: { email: string | null; providerData?: { email: string | null }[] } | null | undefined): string {
+  if (!user) return '';
+  return user.email || user.providerData?.find((p) => p?.email)?.email || '';
+}
+
 /** A visitor-friendly message for a failed Google/Facebook popup sign-in,
  *  or '' when the visitor simply closed the popup. */
 export function socialSignInErrorMessage(err: any, provider: 'Google' | 'Facebook'): string {

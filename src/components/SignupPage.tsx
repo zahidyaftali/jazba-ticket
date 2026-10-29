@@ -10,7 +10,7 @@ import {
   ArrowRight,
   AlertCircle
 } from 'lucide-react';
-import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, FacebookAuthProvider, signInWithPopup, getAdditionalUserInfo, auth, socialSignInErrorMessage } from '../firebase';
+import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, FacebookAuthProvider, signInWithPopup, getAdditionalUserInfo, auth, socialSignInErrorMessage, accountEmail } from '../firebase';
 import { createUserProfile } from '../services/backendService';
 
 interface SignupPageProps {
@@ -67,7 +67,7 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
 
       // Complete the profile on the backend (role/status are handled server-side)
       try {
-        await createUserProfile(user.uid, { name: name.trim(), city: 'London' });
+        await createUserProfile(user.uid, { name: name.trim(), email: user.email || email, city: 'London' });
       } catch (dbErr) {
         console.error("Failed to write profile:", dbErr);
       }
@@ -105,7 +105,8 @@ export default function SignupPage({ onBack, onSuccess, onSwitchToLogin }: Signu
       if (getAdditionalUserInfo(result)?.isNewUser) {
         try {
           await createUserProfile(user.uid, {
-            name: user.displayName || user.email?.split('@')[0] || 'Member',
+            name: user.displayName || accountEmail(user).split('@')[0] || 'Member',
+            email: accountEmail(user),
             profileImage: user.photoURL || '',
             city: 'London',
           });
