@@ -17,7 +17,7 @@ import {
 } from "../../services/backendService";
 import { getWordPressEvents } from "../../services/wordpressEventsService";
 import { fetchAuthUsers, AuthUserInfo } from "../../services/adminUsersService";
-import { EventItem, getEventTimestamp, isPastEvent, tierDisplayName, withEventSlugs } from "../../types";
+import { EventItem, getEventTimestamp, isPastEvent, tierDisplayName, ticketSeat, withEventSlugs } from "../../types";
 import { auth, accountEmail } from "../../firebase";
 import { printWhenReady, type TicketPrintData } from "../TicketPrintSheet";
 import { money } from "./ui";
@@ -486,7 +486,7 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
         holderName: c.name,
         holderEmail: c.email,
         orderId,
-        seat: b.seat,
+        seat: ticketSeat(b),
         quantity: b.quantity || 1,
         tier: b.tier || b.ticketType || "general",
         tierName: tierName(b),

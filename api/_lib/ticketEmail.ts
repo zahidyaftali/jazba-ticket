@@ -345,6 +345,9 @@ export async function buildTicketPdf(t: TicketFields): Promise<Uint8Array> {
 
 // ── Email ─────────────────────────────────────────────────────────────────
 
+/** public/email/jazba-tickets-logo.png on the live site (white wordmark). */
+const EMAIL_LOGO_URL = 'https://jazbatickets.com/email/jazba-tickets-logo.png';
+
 function detail(label: string, value: string): string {
   return `
     <td valign="top" width="50%" style="padding:14px 12px 0 0;font-family:Arial,Helvetica,sans-serif">
@@ -353,8 +356,9 @@ function detail(label: string, value: string): string {
     </td>`;
 }
 
-/** Render the e-ticket email (no sending). Images are referenced by cid:
- *  — the logo and QR code travel inside the email itself. */
+/** Render the e-ticket email (no sending). The QR code travels inside the
+ *  email (cid:); the logo is loaded from the website, so mail apps don't
+ *  list it as a second attachment next to the PDF ticket. */
 export function buildTicketEmail(t: TicketFields): { to: string; subject: string; html: string } {
   const firstName = t.holderName.split(/\s+/)[0];
   const overline = 'font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#666666';
@@ -370,7 +374,7 @@ export function buildTicketEmail(t: TicketFields): { to: string; subject: string
     <tr><td style="background:#000000;padding:16px 24px">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
         <td valign="middle">
-          <img src="cid:jazba-logo" width="${logoW}" height="${logoH}" alt="JAZBA TICKETS" style="display:block;border:0;outline:none;color:#ffffff;font-size:13px;font-weight:700;letter-spacing:4px">
+          <img src="${EMAIL_LOGO_URL}" width="${logoW}" height="${logoH}" alt="JAZBA TICKETS" style="display:block;border:0;outline:none;color:#ffffff;font-size:13px;font-weight:700;letter-spacing:4px">
         </td>
         <td align="right" valign="middle">
           <span style="display:inline-block;background:#ffed00;color:#000000;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:6px 10px">${escapeHtml(t.tierName)}</span>
@@ -421,7 +425,7 @@ export function buildTicketEmail(t: TicketFields): { to: string; subject: string
 
 type Attachment = NonNullable<SendEmailInput['attachments']>[number];
 
-/** The PDF ticket, plus the logo and QR code the email shows inline. */
+/** The PDF ticket, plus the QR code the email shows inline. */
 export async function ticketAttachments(t: TicketFields): Promise<{ pdf: Attachment; inline: Attachment[] }> {
   const [pdf, qrPng] = await Promise.all([
     buildTicketPdf(t),
@@ -430,7 +434,6 @@ export async function ticketAttachments(t: TicketFields): Promise<{ pdf: Attachm
   return {
     pdf: { filename: ticketFilename(t), content: Buffer.from(pdf).toString('base64'), contentType: 'application/pdf' },
     inline: [
-      { filename: 'jazba-tickets.png', content: LOGO_PNG_BASE64, contentType: 'image/png', cid: 'jazba-logo' },
       { filename: `qr-${t.orderId}.png`, content: Buffer.from(qrPng).toString('base64'), contentType: 'image/png', cid: 'ticket-qr' },
     ],
   };

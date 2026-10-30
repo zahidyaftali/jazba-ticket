@@ -21,7 +21,7 @@ import {
   ArrowRight,
   Share2,
 } from "lucide-react";
-import { EventItem, isPastEvent, tierDisplayName } from "../types";
+import { EventItem, isPastEvent, tierDisplayName, ticketSeat } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import {
   auth,
@@ -221,7 +221,7 @@ export default function UserDashboardPage({
               item.orderId ||
               item.bookingNumber ||
               `JXB-${String(item.id).substring(0, 4).toUpperCase()}`,
-            seat: item.seat || "F-12",
+            seat: ticketSeat(item),
             barCode: item.barCode || item.qrCode || "937284918231",
             pricePaid: item.pricePaid || item.amount || evt.price,
           });
@@ -248,7 +248,7 @@ export default function UserDashboardPage({
                     tier: item.tier || "general",
                     bookingDate: item.bookingDate || "Just now",
                     orderId: item.orderId || `JXB-LOCAL-${index}`,
-                    seat: item.seat || `${String.fromCharCode(65 + index)}-8`,
+                    seat: ticketSeat(item),
                     barCode:
                       item.barCode ||
                       Math.floor(
@@ -906,10 +906,12 @@ export default function UserDashboardPage({
                                     <span
                                       className={`${overline} text-[#8a8a8a] block`}
                                     >
-                                      Seats
+                                      {pass.seat ? "Seats" : "Admits"}
                                     </span>
                                     <span className="font-bold mt-1 block">
-                                      Row {pass.seat} · {pass.quantity}×
+                                      {pass.seat
+                                        ? `Row ${pass.seat} · ${pass.quantity}×`
+                                        : `${pass.quantity}× · Standing`}
                                     </span>
                                   </div>
                                 </div>

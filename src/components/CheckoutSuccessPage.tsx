@@ -217,8 +217,10 @@ export default function CheckoutSuccessPage({ sessionId, events, onGoToDashboard
                   <span className="block font-bold text-sm mt-1.5">{event.time}</span>
                 </div>
                 <div>
-                  <span className={`${overline} text-white/50`}>Seats</span>
-                  <span className="block font-bold text-sm mt-1.5">Row {session.seat} · {session.quantity}×</span>
+                  <span className={`${overline} text-white/50`}>{session.seat ? 'Seats' : 'Admits'}</span>
+                  <span className="block font-bold text-sm mt-1.5">
+                    {session.seat ? `Row ${session.seat} · ${session.quantity}×` : `${session.quantity}× · Standing`}
+                  </span>
                 </div>
               </div>
 

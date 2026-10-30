@@ -117,6 +117,21 @@ export const DEFAULT_TIER_META: Record<'general' | 'vip' | 'elite', { name: stri
   elite: { name: 'Elite', note: 'Front rows, lounge access and artist meet' },
 };
 
+/** Only VIP packages (vip, vip-group) come with a seat — every other ticket
+ *  is standing. Same rule as isSeatedTier() in api/_lib/stripePayment.ts. */
+export function isSeatedTier(tier?: string): boolean {
+  return /(^|-)vip(-|$)/.test(String(tier || '').toLowerCase());
+}
+
+/** The seat to show on a ticket, or '' for a standing ticket. Online orders
+ *  only keep a seat on VIP packages (older standing orders were given a
+ *  random one by mistake); a seat typed in by an admin is always shown. */
+export function ticketSeat(b: { seat?: string; tier?: string; ticketType?: string; source?: string }): string {
+  const seat = (b.seat || '').trim();
+  if (!seat) return '';
+  return b.source === 'admin' || isSeatedTier(b.tier || b.ticketType) ? seat : '';
+}
+
 /** Display name for a booked tier: the event's own package name, else the
  *  default label for general/vip/elite. */
 export function tierDisplayName(tier: string, event?: EventItem): string {

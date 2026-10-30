@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Mail, Printer, Send, Loader2, Phone, UserRound, ExternalLink, FileDown, Trash2 } from "lucide-react";
 import { Booking, deleteBooking, updateBookingDetails, updateBookingStatus, updateTicketStatus } from "../../services/backendService";
 import { sendTicketEmail, downloadTicketPdf, TicketEmailPayload } from "../../services/ticketEmailService";
-import { eventPath } from "../../types";
+import { eventPath, isSeatedTier, ticketSeat } from "../../types";
 import { useAdmin } from "./AdminContext";
 import {
   Avatar,
@@ -299,7 +299,7 @@ export default function BookingDrawer() {
           {paymentMethodLabel(b.paymentMethod)}
           {b.paymentRegion && <span className="block text-[11px] text-[#8a8a8a] font-medium">{b.paymentRegion} region</span>}
         </Detail>
-        <Detail label="Seat / row">{b.seat || "—"}</Detail>
+        <Detail label="Seat / row">{ticketSeat(b) || (isSeatedTier(b.tier || b.ticketType) ? "—" : "Standing")}</Detail>
         <Detail label="Ordered">{fmtDateTime(b.createdAt)}</Detail>
         <Detail label="Ticket code">
           <span className="tracking-[0.15em]">{orderId}</span>

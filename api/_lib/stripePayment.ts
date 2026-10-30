@@ -37,6 +37,12 @@ export const PROMO_CODES = new Map<string, { rate: number; eventIds?: string[]; 
   ['DAKHLAY26', { rate: 0.4, eventIds: ['wp-607', 'wp-700'], tiers: ['standard', 'standard-group'] }],
 ]);
 
+/** Only VIP packages (vip, vip-group) come with a seat — every other ticket
+ *  is standing. Same rule as isSeatedTier() in src/types.ts. */
+export function isSeatedTier(tier: string): boolean {
+  return /(^|-)vip(-|$)/.test(tier.toLowerCase());
+}
+
 /** The discount a code gives on an event's package (0.18 = 18%), or 0 when
  *  the code is unknown or doesn't cover that event or package. Same as
  *  promoRate() in src/types.ts. */
@@ -278,7 +284,10 @@ export async function createCheckoutSession(
   // login email); the login email gets a copy when the two differ.
   const ticketEmail = EMAIL_RE.test(typedEmail) ? typedEmail : user.email;
 
-  const seat = `${String.fromCharCode(65 + Math.floor(Math.random() * 10))}-${Math.floor(1 + Math.random() * 24)}`;
+  // Only VIP tickets are seated; everything else is standing, so no seat.
+  const seat = isSeatedTier(tier)
+    ? `${String.fromCharCode(65 + Math.floor(Math.random() * 10))}-${Math.floor(1 + Math.random() * 24)}`
+    : '';
   // A stable, human-readable order number, later reused as the Firestore
   // booking doc id — so a refreshed success page overwrites the same
   // document instead of creating a duplicate booking.
@@ -362,7 +371,7 @@ export function readCheckoutSession(session: Stripe.Checkout.Session): VerifiedC
     tier,
     tierName: m.tier_name || DEFAULT_TIER_NAMES[tier] || tier,
     quantity: Number(m.quantity) || 1,
-    seat: m.seat || '',
+    seat: isSeatedTier(tier) ? m.seat || '' : '',
     buyerUid: m.buyer_uid || '',
     buyerEmail,
     ticketEmail: m.ticket_email || buyerEmail,
