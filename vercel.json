@@ -6,11 +6,23 @@
     "api/easypaisa-order.ts": { "maxDuration": 30 },
     "api/send-form-email.ts": { "maxDuration": 30 },
     "api/send-ticket-email.ts": { "maxDuration": 30 },
-    "api/admin-users.ts": { "maxDuration": 30 }
+    "api/admin-users.ts": { "maxDuration": 30 },
+    "api/event-share.ts": { "maxDuration": 30 }
   },
   "rewrites": [
     { "source": "/__/auth/:path*", "destination": "https://gen-lang-client-0037466749.firebaseapp.com/__/auth/:path*" },
     { "source": "/events/wp-:id(\\d+)", "destination": "/api/event-redirect?id=:id" },
+    {
+      "source": "/events/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|WhatsApp|LinkedInBot|Slackbot|TelegramBot|Discordbot|Pinterest|redditbot|SkypeUriPreview|MicrosoftPreview|Snap URL Preview|vkShare|Embedly|Iframely|Bluesky|Mastodon).*"
+        }
+      ],
+      "destination": "/api/event-share?slug=:slug"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [

@@ -19,7 +19,8 @@ import { USD_RATES } from './currencyRates.js';
 
 const WP_API = 'https://jazbaentertainment.com/wp-json/wp/v2/jazba_event';
 const FETCH_TIMEOUT_MS = 15000;
-const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=800&auto=crop';
+/** Stock photo shown for an event with no image of its own. */
+export const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=800&auto=crop';
 
 /** WordPress events get this id prefix here, e.g. post 700 → "wp-700". */
 export const WP_EVENT_PREFIX = 'wp-';
@@ -697,4 +698,15 @@ export async function fetchWordPressEvent(eventId: string): Promise<EventItem | 
   if (!res.ok) throw new Error(`WordPress event request failed (${res.status})`);
   const post = await res.json();
   return post?.status === 'publish' ? mapWordPressEvent(post) : null;
+}
+
+/** One published event by its URL slug ("aa-tenu-moaj-karawan-live-lahore"),
+ *  or null. Used to build the link preview for /events/<slug>. */
+export async function fetchWordPressEventBySlug(slug: string): Promise<EventItem | null> {
+  if (!slug || slug.length > 200) return null;
+  const res = await wpFetch(`${WP_API}?slug=${encodeURIComponent(slug)}&_embed=wp:featuredmedia`);
+  if (!res.ok) throw new Error(`WordPress event request failed (${res.status})`);
+  const posts = await res.json();
+  const post = Array.isArray(posts) ? posts.find((p: any) => p?.status === 'publish') : null;
+  return post ? mapWordPressEvent(post) : null;
 }

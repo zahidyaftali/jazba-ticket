@@ -11,6 +11,7 @@ import {HttpError, verifyAdmin} from './api/_lib/adminAuth';
 import {listAuthUsers, serviceAccountFromEnv} from './api/_lib/firebaseAuthUsers';
 import {mailConfigFromEnv, type MailConfig} from './api/_lib/sendEmail';
 import {fetchWordPressEvents, fetchWordPressSlug} from './api/_lib/wordpressEvents';
+import {SHARE_BOT_UA, renderEventSharePage} from './api/_lib/eventShare';
 
 function readJsonBody(req: any): Promise<any> {
   return new Promise((resolve) => {
@@ -189,6 +190,23 @@ const devApi = (secrets: { stripeSecretKey: string; mail: MailConfig | null; env
           res.setHeader('Location', '/events');
           res.end();
         });
+    });
+
+    // Mirrors the vercel.json link-preview rewrite: crawlers asking for
+    // /events/<slug> get index.html with the event's own share tags.
+    server.middlewares.use((req, res, next) => {
+      const match = (req.url || '').match(/^\/events\/([^/?#]+)\/?(?:\?.*)?$/);
+      if (!match || !SHARE_BOT_UA.test(String(req.headers['user-agent'] || ''))) return next();
+      let slug = match[1];
+      try {
+        slug = decodeURIComponent(slug);
+      } catch {
+        // keep the raw segment
+      }
+      renderEventSharePage(slug, getOrigin(req)).then(({ html }) => {
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.end(html);
+      });
     });
 
     server.middlewares.use('/api/wp-events', (req, res) => {
