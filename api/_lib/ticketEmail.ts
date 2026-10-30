@@ -3,7 +3,7 @@
 // default export for CommonJS modules.
 import QRCode from 'qrcode';
 import pdfLib from 'pdf-lib';
-import { sendEmail, escapeHtml, type MailConfig } from './sendEmail.js';
+import { sendEmail, escapeHtml, type MailConfig, type SendEmailInput } from './sendEmail.js';
 import { HttpError, verifyAdmin } from './adminAuth.js';
 import { LOGO_PNG_BASE64, LOGO_SIZE, MARK_PNG_BASE64 } from './ticketAssets.js';
 
@@ -419,25 +419,30 @@ export function buildTicketEmail(t: TicketFields): { to: string; subject: string
   return { to: t.to, subject: `Your ticket — ${t.eventTitle}`, html };
 }
 
+type Attachment = NonNullable<SendEmailInput['attachments']>[number];
+
+/** The PDF ticket, plus the logo and QR code the email shows inline. */
+export async function ticketAttachments(t: TicketFields): Promise<{ pdf: Attachment; inline: Attachment[] }> {
+  const [pdf, qrPng] = await Promise.all([
+    buildTicketPdf(t),
+    QRCode.toBuffer(t.orderId, { errorCorrectionLevel: 'M', margin: 2, width: 360, color: { dark: '#000000', light: '#ffffff' } }),
+  ]);
+  return {
+    pdf: { filename: ticketFilename(t), content: Buffer.from(pdf).toString('base64'), contentType: 'application/pdf' },
+    inline: [
+      { filename: 'jazba-tickets.png', content: LOGO_PNG_BASE64, contentType: 'image/png', cid: 'jazba-logo' },
+      { filename: `qr-${t.orderId}.png`, content: Buffer.from(qrPng).toString('base64'), contentType: 'image/png', cid: 'ticket-qr' },
+    ],
+  };
+}
+
 /** Admin: email the ticket — logo + QR inline, the PDF ticket attached. */
 export async function sendTicketEmail(mail: MailConfig, body: TicketEmailBody): Promise<void> {
   await verifyAdmin(str(body.idToken, 4096), 'Only admins can send tickets.');
   const t = parseTicket(body, true);
   const { to, subject, html } = buildTicketEmail(t);
-  const [pdf, qrPng] = await Promise.all([
-    buildTicketPdf(t),
-    QRCode.toBuffer(t.orderId, { errorCorrectionLevel: 'M', margin: 2, width: 360, color: { dark: '#000000', light: '#ffffff' } }),
-  ]);
-  await sendEmail(mail, {
-    to,
-    subject,
-    html,
-    attachments: [
-      { filename: ticketFilename(t), content: Buffer.from(pdf).toString('base64'), contentType: 'application/pdf' },
-      { filename: 'jazba-tickets.png', content: LOGO_PNG_BASE64, contentType: 'image/png', cid: 'jazba-logo' },
-      { filename: `qr-${t.orderId}.png`, content: Buffer.from(qrPng).toString('base64'), contentType: 'image/png', cid: 'ticket-qr' },
-    ],
-  });
+  const { pdf, inline } = await ticketAttachments(t);
+  await sendEmail(mail, { to, subject, html, attachments: [pdf, ...inline] });
 }
 
 /** Admin: the ticket as a PDF file, for "Download PDF" in the portal. */

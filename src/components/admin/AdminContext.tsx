@@ -321,6 +321,14 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
+  // A link like /admin/orders?order=TT-123456 (from the new-order email)
+  // opens that order once the data has loaded.
+  useEffect(() => {
+    if (loading) return;
+    const id = new URLSearchParams(window.location.search).get("order");
+    if (id) setOpenBookingId(id);
+  }, [loading]);
+
   const navigate = useCallback((to: string) => {
     if (to !== window.location.pathname + window.location.search) {
       window.history.pushState({}, "", to);

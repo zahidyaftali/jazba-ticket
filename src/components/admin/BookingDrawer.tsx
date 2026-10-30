@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Mail, Printer, Send, Loader2, Phone, UserRound, ExternalLink, FileDown } from "lucide-react";
-import { Booking, updateBookingDetails, updateBookingStatus, updateTicketStatus } from "../../services/backendService";
+import { Mail, Printer, Send, Loader2, Phone, UserRound, ExternalLink, FileDown, Trash2 } from "lucide-react";
+import { Booking, deleteBooking, updateBookingDetails, updateBookingStatus, updateTicketStatus } from "../../services/backendService";
 import { sendTicketEmail, downloadTicketPdf, TicketEmailPayload } from "../../services/ticketEmailService";
 import { eventPath } from "../../types";
 import { useAdmin } from "./AdminContext";
@@ -110,6 +110,7 @@ export default function BookingDrawer() {
   const [to, setTo] = useState("");
   const [message, setMessage] = useState("");
   const [busyPass, setBusyPass] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { send, sending, download, downloading } = useEmailTicket();
 
   const customer = b ? customerFor(b) : null;
@@ -162,6 +163,25 @@ export default function BookingDrawer() {
       notify(`Ticket emailed to ${to.trim()}.`);
       setMessage("");
     } else fail(res.error || "The email could not be sent.");
+  };
+
+  const doDelete = async () => {
+    const paidByCard = b.paymentMethod === "stripe" && b.paymentStatus === "paid";
+    const warning =
+      `Delete order ${orderId} and its ${passes.length || b.quantity} ticket(s)? This cannot be undone.` +
+      (paidByCard ? "\n\nThis does NOT refund the card payment — refund it in Stripe first if needed." : "");
+    if (!window.confirm(warning)) return;
+    setDeleting(true);
+    try {
+      await deleteBooking(b.id!);
+      closeBooking();
+      notify(`Order ${orderId} deleted.`);
+      reload();
+    } catch {
+      fail("Failed to delete the order.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -402,6 +422,20 @@ export default function BookingDrawer() {
             {sending ? "Sending…" : b.emailedAt ? "Resend ticket" : "Send ticket"}
           </button>
         </div>
+      </div>
+
+      {/* Delete */}
+      <div className="mt-8 border-t border-[#efefef] pt-5">
+        <button
+          type="button"
+          onClick={doDelete}
+          disabled={deleting}
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-[#7a2f2f] hover:underline cursor-pointer disabled:opacity-50"
+        >
+          {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+          {deleting ? "Deleting…" : "Delete this order"}
+        </button>
+        <p className="text-[11px] text-[#8a8a8a] mt-1">For test or duplicate orders. Card refunds are done in Stripe.</p>
       </div>
     </Drawer>
   );

@@ -7,6 +7,8 @@ import nodemailer from 'nodemailer';
 
 export interface SendEmailInput {
   to: string;
+  /** Extra visible recipient(s), comma-separated. */
+  cc?: string;
   subject: string;
   html: string;
   /** Lets the admin hit "Reply" and land straight in the sender's inbox. */
@@ -50,6 +52,7 @@ export async function sendEmail(config: MailConfig, input: SendEmailInput): Prom
     // Zoho only relays mail sent from the signed-in mailbox itself.
     from: { name: 'Jazba Tickets', address: config.user },
     to: input.to,
+    cc: input.cc || undefined,
     replyTo: input.replyTo || undefined,
     subject: input.subject,
     html: input.html,

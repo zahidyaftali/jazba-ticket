@@ -98,12 +98,43 @@ function fsValue(v: any): any {
   return undefined;
 }
 
+/** What the e-ticket prints about the event. */
+export interface EventDetails {
+  date: string;
+  time: string;
+  venue: string;
+  image: string;
+  category: string;
+}
+
 interface EventPricing {
   title: string;
   /** The event page on this site — where Stripe's "back" link returns to. */
   path: string;
   /** Ticket packages on sale, keyed by tier id. */
   tiers: Record<string, { price: number; name: string }>;
+  details: EventDetails;
+}
+
+/** Date line for a ticket, e.g. "15 November 2026". */
+function dateLabel(fullDate: unknown, date: unknown, year: unknown): string {
+  const full = typeof fullDate === 'string' ? fullDate.trim() : '';
+  if (full) return full;
+  return [date, year].filter((v) => typeof v === 'string' && v.trim()).join(' ');
+}
+
+/** Ticket details for an event from WordPress (also used for orders whose
+ *  checkout started before event details were stored on the session). */
+export function wordPressEventDetails(event: {
+  fullDate?: string; date?: string; year?: string; time?: string; location?: string; image?: string; category?: string;
+}): EventDetails {
+  return {
+    date: dateLabel(event.fullDate, event.date, event.year),
+    time: event.time || '',
+    venue: event.location || '',
+    image: event.image || '',
+    category: event.category || '',
+  };
 }
 
 const DEFAULT_TIER_NAMES: Record<string, string> = { general: 'General admission', vip: 'VIP', elite: 'Elite' };
@@ -124,7 +155,12 @@ async function fetchWordPressEventPricing(eventId: string): Promise<EventPricing
     if (option.price > 0) tiers[option.id] = { price: option.price, name: option.name };
   }
   if (Object.keys(tiers).length === 0) throw new PaymentError('Tickets for this event are not on sale yet.');
-  return { title: event.title, path: `/events/${encodeURIComponent(event.slug || eventId)}`, tiers };
+  return {
+    title: event.title,
+    path: `/events/${encodeURIComponent(event.slug || eventId)}`,
+    tiers,
+    details: wordPressEventDetails(event),
+  };
 }
 
 /** Fetch a published event's pricing straight from Firestore, reading as the
@@ -155,7 +191,18 @@ export async function fetchEventPricing(eventId: string, idToken: string): Promi
   if (Number(tp.elite) > 0) tiers.elite = { price: Number(tp.elite), name: DEFAULT_TIER_NAMES.elite };
 
   // The page redirects an id link to its readable /events/<slug> URL.
-  return { title: fsValue(f.title) || 'Event', path: `/events/${encodeURIComponent(eventId)}`, tiers };
+  return {
+    title: fsValue(f.title) || 'Event',
+    path: `/events/${encodeURIComponent(eventId)}`,
+    tiers,
+    details: {
+      date: dateLabel(fsValue(f.fullDate), fsValue(f.date), fsValue(f.year)),
+      time: String(fsValue(f.time) || ''),
+      venue: String(fsValue(f.location) || ''),
+      image: String(fsValue(f.image) || ''),
+      category: String(fsValue(f.category) || ''),
+    },
+  };
 }
 
 /** Compute the USD total exactly like the checkout page displays it —
@@ -185,7 +232,14 @@ export interface CreateCheckoutSessionBody {
   currency?: unknown;
   idToken?: unknown;
   fullName?: unknown;
+  /** The email typed at checkout — where the e-ticket is sent. */
+  email?: unknown;
 }
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Stripe metadata values are capped at 500 characters. */
+const meta = (value: string) => (value.length > 500 ? '' : value);
 
 /** Create a Stripe-hosted Checkout Session — the buyer pays on Stripe's own
  *  page, entirely outside this site, then is redirected back to /checkout/success. */
@@ -201,6 +255,7 @@ export async function createCheckoutSession(
   const currency = typeof body.currency === 'string' ? body.currency.toUpperCase() : '';
   const idToken = typeof body.idToken === 'string' ? body.idToken : '';
   const fullName = typeof body.fullName === 'string' ? body.fullName.trim().slice(0, 200) : '';
+  const typedEmail = typeof body.email === 'string' ? body.email.trim().slice(0, 200) : '';
 
   if (!eventId || !/^[a-zA-Z0-9_-]{1,128}$/.test(eventId)) throw new PaymentError('Invalid event.');
   if (!/^[a-z0-9-]{1,64}$/.test(tier)) throw new PaymentError('Invalid ticket type.');
@@ -218,6 +273,10 @@ export async function createCheckoutSession(
   const promoApplied = discountRate > 0;
   const amountUsd = computeTotalUsd(selected.price, quantity, discountRate);
   if (amountUsd <= 0 || amountUsd > 10000) throw new PaymentError('Invalid payment amount.');
+
+  // The e-ticket goes to the email typed at checkout (it starts out as the
+  // login email); the login email gets a copy when the two differ.
+  const ticketEmail = EMAIL_RE.test(typedEmail) ? typedEmail : user.email;
 
   const seat = `${String.fromCharCode(65 + Math.floor(Math.random() * 10))}-${Math.floor(1 + Math.random() * 24)}`;
   // A stable, human-readable order number, later reused as the Firestore
@@ -243,7 +302,7 @@ export async function createCheckoutSession(
         },
       },
     ],
-    customer_email: user.email || undefined,
+    customer_email: ticketEmail || undefined,
     success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}${event.path}`,
     metadata: {
@@ -257,7 +316,15 @@ export async function createCheckoutSession(
       buyer_uid: user.uid,
       buyer_email: user.email,
       buyer_name: fullName,
+      ticket_email: ticketEmail,
       seat,
+      // Printed on the e-ticket emailed once the payment goes through.
+      event_title: meta(event.title),
+      event_date: meta(event.details.date),
+      event_time: meta(event.details.time),
+      event_venue: meta(event.details.venue),
+      event_image: meta(event.details.image),
+      event_category: meta(event.details.category),
     },
   });
 
@@ -274,35 +341,48 @@ export interface VerifiedCheckoutSession {
   quantity: number;
   seat: string;
   buyerUid: string;
+  /** The login email of the account that paid. */
   buyerEmail: string;
+  /** Where the e-ticket goes — the email typed at checkout. */
+  ticketEmail: string;
   buyerName: string;
   amountUsd: number;
   promoApplied: boolean;
 }
 
-/** Re-verify a completed Checkout Session with Stripe (server-to-server) —
- *  the success page never trusts the redirect alone. */
-export async function getCheckoutSession(secretKey: string, sessionId: string): Promise<VerifiedCheckoutSession> {
-  if (!sessionId || !/^cs_[a-zA-Z0-9_]+$/.test(sessionId)) {
-    throw new PaymentError('Invalid checkout session.');
-  }
-  const stripe = new Stripe(secretKey);
-  const session = await stripe.checkout.sessions.retrieve(sessionId);
+/** Order details from a Checkout Session's metadata. */
+export function readCheckoutSession(session: Stripe.Checkout.Session): VerifiedCheckoutSession {
   const m = session.metadata || {};
   const tier = /^[a-z0-9-]{1,64}$/.test(m.tier || '') ? m.tier : 'general';
-
+  const buyerEmail = m.buyer_email || session.customer_details?.email || '';
   return {
     paid: session.payment_status === 'paid',
-    orderId: m.order_id || sessionId,
+    orderId: m.order_id || session.id,
     eventId: m.event_id || '',
     tier,
     tierName: m.tier_name || DEFAULT_TIER_NAMES[tier] || tier,
     quantity: Number(m.quantity) || 1,
     seat: m.seat || '',
     buyerUid: m.buyer_uid || '',
-    buyerEmail: m.buyer_email || session.customer_details?.email || '',
+    buyerEmail,
+    ticketEmail: m.ticket_email || buyerEmail,
     buyerName: m.buyer_name || '',
     amountUsd: Number(m.amount_usd) || 0,
     promoApplied: !!m.promo,
   };
+}
+
+/** Re-verify a Checkout Session with Stripe (server-to-server) — the success
+ *  page never trusts the redirect alone. The payment is expanded so the
+ *  order emails can record on it that they were sent. */
+export async function retrieveCheckoutSession(
+  secretKey: string,
+  sessionId: string,
+): Promise<{ stripe: Stripe; session: Stripe.Checkout.Session; order: VerifiedCheckoutSession }> {
+  if (!sessionId || !/^cs_[a-zA-Z0-9_]+$/.test(sessionId)) {
+    throw new PaymentError('Invalid checkout session.');
+  }
+  const stripe = new Stripe(secretKey);
+  const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ['payment_intent'] });
+  return { stripe, session, order: readCheckoutSession(session) };
 }

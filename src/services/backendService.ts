@@ -597,6 +597,22 @@ export async function updateBookingStatus(
   }
 }
 
+/** Admin: permanently delete an order and its ticket passes (e.g. a test
+ *  purchase). Refunds are separate — they're done in Stripe. */
+export async function deleteBooking(id: string): Promise<void> {
+  const path = `bookings/${id}`;
+  try {
+    const passes = await getDocs(query(collection(db, 'tickets'), where('bookingId', '==', id)));
+    for (const p of passes.docs) {
+      await deleteDoc(doc(db, 'tickets', p.id));
+    }
+    await deleteDoc(doc(db, 'bookings', id));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+    throw error;
+  }
+}
+
 /** Admin: change any of a booking's fields (e.g. record when its ticket was emailed). */
 export async function updateBookingDetails(id: string, update: Partial<Booking>): Promise<void> {
   const path = `bookings/${id}`;

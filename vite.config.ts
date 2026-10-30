@@ -2,7 +2,8 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig, loadEnv, type Plugin} from 'vite';
-import {createCheckoutSession, getCheckoutSession, getOrigin} from './api/_lib/stripePayment';
+import {createCheckoutSession, getOrigin} from './api/_lib/stripePayment';
+import {confirmCheckoutSession} from './api/_lib/orderConfirmation';
 import {sendFormEmail, FormEmailError} from './api/_lib/formEmail';
 import {submitEasypaisaOrder} from './api/_lib/easypaisaOrder';
 import {sendTicketEmail, ticketPdfForAdmin, TicketEmailError} from './api/_lib/ticketEmail';
@@ -67,7 +68,7 @@ const devApi = (secrets: { stripeSecretKey: string; mail: MailConfig | null; env
         return;
       }
       const sessionId = new URLSearchParams((req.url || '').split('?')[1] || '').get('session_id') || '';
-      getCheckoutSession(secrets.stripeSecretKey, sessionId)
+      confirmCheckoutSession(secrets.stripeSecretKey, sessionId, secrets.mail, getOrigin(req))
         .then((result) => res.end(JSON.stringify(result)))
         .catch((err: any) => {
           res.statusCode = err?.status || 400;

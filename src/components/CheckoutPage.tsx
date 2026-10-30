@@ -170,6 +170,7 @@ export default function CheckoutPage({
           currency,
           idToken,
           fullName,
+          email: emailAddress.trim(),
         }),
       });
       const data = await res.json().catch(() => ({}));

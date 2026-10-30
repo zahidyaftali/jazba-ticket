@@ -2,6 +2,7 @@
   "functions": {
     "api/wp-events.ts": { "maxDuration": 30 },
     "api/create-checkout-session.ts": { "maxDuration": 30 },
+    "api/get-checkout-session.ts": { "maxDuration": 30 },
     "api/easypaisa-order.ts": { "maxDuration": 30 },
     "api/send-form-email.ts": { "maxDuration": 30 },
     "api/send-ticket-email.ts": { "maxDuration": 30 },

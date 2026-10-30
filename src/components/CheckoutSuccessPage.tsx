@@ -22,6 +22,10 @@ interface VerifiedSession {
   seat: string;
   buyerUid: string;
   buyerEmail: string;
+  /** The email typed at checkout — where the e-ticket goes. */
+  ticketEmail?: string;
+  /** Who the e-ticket was emailed to; '' if it couldn't be sent. */
+  ticketEmailedTo?: string;
   buyerName: string;
   amountUsd: number;
   promoApplied: boolean;
@@ -105,7 +109,7 @@ export default function CheckoutSuccessPage({ sessionId, events, onGoToDashboard
             pricePaid: verified.amountUsd,
             paymentMethod: 'stripe',
             billingName: verified.buyerName || user.displayName || 'Guest',
-            billingEmail: verified.buyerEmail || user.email || '',
+            billingEmail: verified.ticketEmail || verified.buyerEmail || user.email || '',
             promoApplied: verified.promoApplied,
           } as any);
         } catch (err) {
@@ -177,7 +181,10 @@ export default function CheckoutSuccessPage({ sessionId, events, onGoToDashboard
             {event ? `Thank you — you're going to ${event.title}.` : 'Thank you — your payment is confirmed.'}
           </h2>
           <p className="text-[#666] text-sm mt-4 max-w-md mx-auto">
-            Tickets sent to {session?.buyerEmail || 'your email'}. Taking you to your profile shortly — or head there now.
+            {session?.ticketEmailedTo
+              ? <>Your e-ticket has been emailed to <span className="font-bold text-black break-all">{session.ticketEmailedTo}</span>.</>
+              : <>Your ticket is saved in your profile — download or print it below.</>}{' '}
+            Taking you to your profile shortly — or head there now.
           </p>
         </div>
 
@@ -256,7 +263,7 @@ export default function CheckoutSuccessPage({ sessionId, events, onGoToDashboard
               time: event.time,
               venue: event.location,
               holderName: session.buyerName || 'Guest',
-              holderEmail: session.buyerEmail,
+              holderEmail: session.ticketEmail || session.buyerEmail,
               orderId: session.orderId,
               seat: session.seat,
               quantity: session.quantity,
