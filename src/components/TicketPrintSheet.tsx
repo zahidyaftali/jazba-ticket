@@ -30,7 +30,7 @@ const overline = "text-[9px] font-bold tracking-[0.2em] uppercase";
 
 /** A real, scannable QR code of the order number, drawn as crisp SVG
  *  squares. Built synchronously so it's ready before the print dialog opens. */
-function QrCode({ value, size = 128 }: { value: string; size?: number }) {
+export function QrCode({ value, size = 128 }: { value: string; size?: number }) {
   const path = useMemo(() => {
     try {
       const qr = QRCode.create(value || "JAZBA", { errorCorrectionLevel: "M" });

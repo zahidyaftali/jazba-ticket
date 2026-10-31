@@ -38,7 +38,7 @@ import {
 } from "../services/backendService";
 import OrganizerHub from "./OrganizerHub";
 import ArtistHub from "./ArtistHub";
-import TicketPrintSheet, { TicketPrintData, printWhenReady } from "./TicketPrintSheet";
+import TicketPrintSheet, { QrCode, TicketPrintData, printWhenReady } from "./TicketPrintSheet";
 import brandMark from "../../assets/images/Favicon.png";
 import { shareOrCopy } from "../share";
 import { useLocalCurrency } from "../currency";
@@ -397,7 +397,7 @@ export default function UserDashboardPage({
     quantity: pass.quantity,
     tier: pass.tier,
     tierName: tierDisplayName(pass.tier, pass.event),
-    code: `#${pass.barCode.substring(0, 4)}-${pass.barCode.substring(4, 8)}`,
+    code: pass.orderId,
     image: pass.event.image,
   });
 
@@ -507,7 +507,7 @@ export default function UserDashboardPage({
       className="jz-page bg-white min-h-screen text-black pb-24"
       id="user-dashboard-wrapper"
     >
-      {/* â”€â”€ HEADER â€” black band â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* â”€â”€ HEADER — black band â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="bg-black text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-14">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
@@ -553,7 +553,7 @@ export default function UserDashboardPage({
             </div>
           </div>
 
-          {/* Stats row â€” breathing room so values never touch the dividers */}
+          {/* Stats row — breathing room so values never touch the dividers */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-6 border-t border-white/15 mt-10 pt-8">
             {[
               { label: "Tickets held", value: totalPassesCount },
@@ -575,7 +575,7 @@ export default function UserDashboardPage({
         </div>
       </section>
 
-      {/* â”€â”€ BODY â€” sidebar + content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* â”€â”€ BODY — sidebar + content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 pt-12">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
           {/* SIDEBAR NAV */}
@@ -682,7 +682,7 @@ export default function UserDashboardPage({
                           No tickets yet
                         </h3>
                         <p className="text-sm text-[#666] mt-2 max-w-sm mx-auto">
-                          When you book a show, your tickets will live here â€”
+                          When you book a show, your tickets will live here —
                           ready to scan at the door.
                         </p>
                         <button
@@ -806,7 +806,7 @@ export default function UserDashboardPage({
                   <div>
                     {sectionHead(
                       "My tickets",
-                      "Show the barcode at the entrance â€” on screen or printed.",
+                      "Show the QR code at the entrance — on screen or printed.",
                     )}
 
                     {userBookings.length > 0 ? (
@@ -943,36 +943,14 @@ export default function UserDashboardPage({
                               </div>
                             </div>
 
-                            {/* ── Tear-off stub with the barcode ── */}
+                            {/* ── Tear-off stub with the QR code the door scanner reads (the order number) ── */}
                             <div className="md:w-56 shrink-0 border-t-2 md:border-t-0 md:border-l-2 border-dashed border-black bg-[#f7f7f7] p-6 flex flex-row md:flex-col items-center justify-center gap-5 text-center">
-                              <div className="bg-white p-3 border border-[#e4e4e4] shrink-0">
-                                <div className="w-24 h-24 grid grid-cols-6 gap-px p-1">
-                                  {Array.from({ length: 36 }).map((_, i) => {
-                                    const seed =
-                                      Number(
-                                        pass.barCode.charAt(
-                                          i % pass.barCode.length,
-                                        ),
-                                      ) || i;
-                                    const filled =
-                                      (i + seed) % 3 === 0 ||
-                                      (i * seed) % 5 === 1 ||
-                                      i < 6 ||
-                                      i > 30 ||
-                                      i % 6 === 0;
-                                    return (
-                                      <span
-                                        key={i}
-                                        className={`w-full h-full ${filled ? "bg-black" : "bg-transparent"}`}
-                                      />
-                                    );
-                                  })}
-                                </div>
+                              <div className="bg-white p-2 border border-[#e4e4e4] shrink-0">
+                                <QrCode value={pass.orderId} size={128} />
                               </div>
                               <div>
                                 <span className="font-bold text-xs tracking-[0.2em] block">
-                                  #{pass.barCode.substring(0, 4)}-
-                                  {pass.barCode.substring(4, 8)}
+                                  {pass.orderId}
                                 </span>
                                 <span
                                   className={`${overline} text-[#666] mt-2 flex items-center justify-center gap-1`}
@@ -1080,7 +1058,7 @@ export default function UserDashboardPage({
                   <div>
                     {sectionHead(
                       "Orders & billing",
-                      "Every order with its receipt â€” UK bookings include 20% VAT.",
+                      "Every order with its receipt — UK bookings include 20% VAT.",
                     )}
 
                     <div className="overflow-x-auto border border-[#e4e4e4]">
@@ -1155,7 +1133,7 @@ export default function UserDashboardPage({
                                 colSpan={6}
                                 className="py-10 px-5 text-center text-[#666]"
                               >
-                                No orders yet â€” your receipts will appear here
+                                No orders yet — your receipts will appear here
                                 after your first booking.
                               </td>
                             </tr>
@@ -1226,7 +1204,7 @@ export default function UserDashboardPage({
                               value: profilePhone,
                               set: setProfilePhone,
                               type: "tel",
-                              ph: "+44 â€¦",
+                              ph: "+44 …",
                             },
                             {
                               label: "City",
@@ -1349,7 +1327,7 @@ export default function UserDashboardPage({
                               onChange={(e) =>
                                 setCurrentPassword(e.target.value)
                               }
-                              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                              placeholder="••••••••"
                               className="w-full bg-white px-0 py-2.5 text-base text-black placeholder-[#8a8a8a]"
                             />
                           </div>

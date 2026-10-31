@@ -426,9 +426,14 @@ export function CheckInPage() {
         title="Check-in"
         sub="Scan or type a ticket code at the door to admit guests. Every admission pass is listed below."
         actions={
-          <button type="button" className={btnOutline} onClick={exportCsv}>
-            <Download className="w-4 h-4" /> Export CSV
-          </button>
+          <>
+            <a href="/scan" target="_blank" rel="noopener" className={btnPrimary}>
+              <ScanLine className="w-4 h-4" /> Open scanner app
+            </a>
+            <button type="button" className={btnOutline} onClick={exportCsv}>
+              <Download className="w-4 h-4" /> Export CSV
+            </button>
+          </>
         }
       />
 
@@ -495,7 +500,10 @@ export function CheckInPage() {
                   <span className="font-bold text-sm flex-1 min-w-[140px]">{p.ticketNumber}</span>
                   <StatusBadge map={PASS_STATUS} value={p.status} />
                   {p.status === "scanned" && p.scannedAt && (
-                    <span className="text-[11px] text-[#8a8a8a]">at {fmtDateTime(p.scannedAt)}</span>
+                    <span className="text-[11px] text-[#8a8a8a]">
+                      at {fmtDateTime(p.scannedAt)}
+                      {p.scannedBy ? ` by ${p.scannedBy}` : ""}
+                    </span>
                   )}
                   {busy?.includes(p.id!) ? (
                     <Loader2 className="w-4 h-4 animate-spin" />

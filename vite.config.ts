@@ -33,6 +33,13 @@ function readJsonBody(req: any): Promise<any> {
 const devApi = (secrets: { stripeSecretKey: string; mail: MailConfig | null; env: Record<string, string> }): Plugin => ({
   name: 'jazba-dev-api',
   configureServer(server) {
+    // Mirrors the vercel.json rewrite: the door scanner app lives at /scan.
+    server.middlewares.use((req, _res, next) => {
+      const match = (req.url || '').match(/^\/scan\/?(\?.*)?$/);
+      if (match) req.url = `/scan.html${match[1] || ''}`;
+      next();
+    });
+
     server.middlewares.use('/api/create-checkout-session', (req, res) => {
       res.setHeader('Content-Type', 'application/json');
       if (req.method !== 'POST') {
@@ -260,6 +267,15 @@ export default defineConfig(({mode}) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
+      },
+    },
+    build: {
+      rollupOptions: {
+        // The site, plus the door scanner app (scan.html, served at /scan).
+        input: {
+          main: path.resolve(__dirname, 'index.html'),
+          scan: path.resolve(__dirname, 'scan.html'),
+        },
       },
     },
     server: {

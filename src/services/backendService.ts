@@ -125,6 +125,8 @@ export interface TicketPass {
   status: 'active' | 'cancelled' | 'scanned';
   /** When the pass was checked in at the door. */
   scannedAt?: string;
+  /** Email of the admin whose scanner checked it in (Jazba Scan app). */
+  scannedBy?: string;
 }
 
 export interface PaymentDetails {

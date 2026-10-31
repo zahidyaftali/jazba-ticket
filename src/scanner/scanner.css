@@ -1,0 +1,44 @@
+/* Jazba Scan only. */
+
+html,
+body {
+  background: #000000;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The line sweeping the viewfinder. */
+.scan-line {
+  top: 8%;
+  animation: scan-sweep 2.2s ease-in-out infinite alternate;
+  box-shadow: 0 0 12px rgba(255, 237, 0, 0.8);
+}
+@keyframes scan-sweep {
+  from {
+    top: 8%;
+  }
+  to {
+    top: 92%;
+  }
+}
+
+/* "Checked in" screen: the bar shrinks until it returns to scanning. */
+.scan-countdown {
+  width: 100%;
+  animation: scan-countdown 2.8s linear forwards;
+}
+@keyframes scan-countdown {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scan-line {
+    animation: none;
+    top: 50%;
+  }
+}
