@@ -29,6 +29,8 @@ interface VerifiedSession {
   buyerName: string;
   amountUsd: number;
   promoApplied: boolean;
+  /** The server saved the booking (see api/_lib/orderRecords.ts). */
+  bookingSaved?: boolean;
 }
 
 const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
@@ -85,36 +87,41 @@ export default function CheckoutSuccessPage({ sessionId, events, onGoToDashboard
           return;
         }
 
-        // Write the booking — reusing the Stripe order id as the doc id
+        // The server saves the booking once Stripe confirms the payment.
+        // Only if that didn't happen does the page try to save it itself —
+        // a fallback the security rules refuse once they're published, as
+        // visitors may not create bookings. The order id as the doc id
         // makes a refreshed page safely idempotent (see createBooking()).
-        try {
-          const barcodeVal = `8${Math.floor(10000000000 + Math.random() * 90000000000)}`;
-          await createBooking({
-            id: verified.orderId,
-            bookingNumber: verified.orderId,
-            userId: user.uid,
-            eventId: verified.eventId,
-            ticketType: verified.tier,
-            quantity: verified.quantity,
-            amount: verified.amountUsd,
-            paymentStatus: 'paid',
-            bookingStatus: 'active',
-            qrCode: barcodeVal,
-            createdAt: new Date().toISOString(),
-            tier: verified.tier,
-            bookingDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            orderId: verified.orderId,
-            seat: verified.seat,
-            barCode: barcodeVal,
-            pricePaid: verified.amountUsd,
-            paymentMethod: 'stripe',
-            billingName: verified.buyerName || user.displayName || 'Guest',
-            billingEmail: verified.ticketEmail || verified.buyerEmail || user.email || '',
-            promoApplied: verified.promoApplied,
-          } as any);
-        } catch (err) {
-          // Already booked (refresh/back-button) — harmless, ticket still shows below.
-          console.error('createBooking after Stripe checkout:', err);
+        if (!verified.bookingSaved) {
+          try {
+            const barcodeVal = `8${Math.floor(10000000000 + Math.random() * 90000000000)}`;
+            await createBooking({
+              id: verified.orderId,
+              bookingNumber: verified.orderId,
+              userId: user.uid,
+              eventId: verified.eventId,
+              ticketType: verified.tier,
+              quantity: verified.quantity,
+              amount: verified.amountUsd,
+              paymentStatus: 'paid',
+              bookingStatus: 'active',
+              qrCode: barcodeVal,
+              createdAt: new Date().toISOString(),
+              tier: verified.tier,
+              bookingDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+              orderId: verified.orderId,
+              seat: verified.seat,
+              barCode: barcodeVal,
+              pricePaid: verified.amountUsd,
+              paymentMethod: 'stripe',
+              billingName: verified.buyerName || user.displayName || 'Guest',
+              billingEmail: verified.ticketEmail || verified.buyerEmail || user.email || '',
+              promoApplied: verified.promoApplied,
+            } as any);
+          } catch (err) {
+            // Already booked (refresh/back-button) — harmless, ticket still shows below.
+            console.error('createBooking after Stripe checkout:', err);
+          }
         }
 
         if (cancelled) return;

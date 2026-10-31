@@ -10,6 +10,7 @@ import {sendTicketEmail, ticketPdfForAdmin, TicketEmailError} from './api/_lib/t
 import {HttpError, verifyAdmin} from './api/_lib/adminAuth';
 import {listAuthUsers, serviceAccountFromEnv} from './api/_lib/firebaseAuthUsers';
 import {listCardPayments} from './api/_lib/stripeLedger';
+import {getRulesStatus, publishRules} from './api/_lib/securityRules';
 import {mailConfigFromEnv, type MailConfig} from './api/_lib/sendEmail';
 import {fetchWordPressEvents, fetchWordPressSlug} from './api/_lib/wordpressEvents';
 import {SHARE_BOT_UA, renderEventSharePage} from './api/_lib/eventShare';
@@ -77,7 +78,8 @@ const devApi = (secrets: { stripeSecretKey: string; mail: MailConfig | null; env
         return;
       }
       const sessionId = new URLSearchParams((req.url || '').split('?')[1] || '').get('session_id') || '';
-      confirmCheckoutSession(secrets.stripeSecretKey, sessionId, secrets.mail, getOrigin(req))
+      Promise.resolve()
+        .then(() => confirmCheckoutSession(secrets.stripeSecretKey, sessionId, secrets.mail, getOrigin(req), serviceAccountFromEnv(secrets.env)))
         .then((result) => res.end(JSON.stringify(result)))
         .catch((err: any) => {
           res.statusCode = err?.status || 400;
@@ -141,6 +143,25 @@ const devApi = (secrets: { stripeSecretKey: string; mail: MailConfig | null; env
       } catch (err: any) {
         res.statusCode = err instanceof HttpError ? err.status : 502;
         res.end(JSON.stringify({ error: err?.message || 'Could not load payments from Stripe.' }));
+      }
+    });
+
+    server.middlewares.use('/api/admin-security-rules', async (req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method !== 'POST') {
+        res.statusCode = 405;
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
+      }
+      try {
+        const body = await readJsonBody(req);
+        await verifyAdmin(typeof body.idToken === 'string' ? body.idToken : '', 'Only admins can manage database security.');
+        const sa = serviceAccountFromEnv(secrets.env);
+        if (!sa) throw new HttpError('FIREBASE_SERVICE_ACCOUNT is not set in .env', 500);
+        res.end(JSON.stringify(body.publish === true ? await publishRules(sa) : await getRulesStatus(sa)));
+      } catch (err: any) {
+        res.statusCode = err instanceof HttpError ? err.status : 502;
+        res.end(JSON.stringify({ error: err?.message || 'Could not check the security rules.' }));
       }
     });
 

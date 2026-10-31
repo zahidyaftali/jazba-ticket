@@ -7,12 +7,11 @@ import {
   Users,
   Plus,
   ScanLine,
-  Trash2,
   ArrowRight,
   Send,
 } from "lucide-react";
-import { purgeCollection } from "../../../services/backendService";
 import { useAdmin, byNewest } from "../AdminContext";
+import SecurityRulesCard from "../SecurityRulesCard";
 import {
   Avatar,
   PAYMENT_STATUS,
@@ -33,7 +32,6 @@ const DAY = 86_400_000;
 export default function DashboardPage() {
   const { data, analytics, allEvents, eventInfo, customerFor, tierName, amountLabel, navigate, openBooking, admin, notify, fail, reload } =
     useAdmin();
-  const [purging, setPurging] = useState(false);
   const { users, bookings, payments, tickets, artists } = data;
 
   const hour = new Date().getHours();
@@ -63,31 +61,11 @@ export default function DashboardPage() {
   const newUsers = users.filter((u) => new Date(u.createdAt).getTime() > monthAgo).length;
   const recent = [...bookings].sort(byNewest).slice(0, 6);
 
-  const handlePurgeTransactions = async () => {
-    if (
-      !window.confirm(
-        "Delete ALL orders, payments and tickets? This permanently removes them from the database and cannot be undone.",
-      )
-    )
-      return;
-    setPurging(true);
-    try {
-      let removed = 0;
-      removed += await purgeCollection("bookings");
-      removed += await purgeCollection("payments");
-      removed += await purgeCollection("tickets");
-      notify(`Deleted ${removed} record(s).`);
-    } catch (err) {
-      console.error("Purge failed:", err);
-      fail("Failed to delete — make sure you are signed in as an admin.");
-    } finally {
-      setPurging(false);
-      reload();
-    }
-  };
 
   return (
     <div className="space-y-6">
+      <SecurityRulesCard />
+
       {/* Greeting + quick actions */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
@@ -322,23 +300,6 @@ export default function DashboardPage() {
         </Panel>
       </div>
 
-      {/* Demo-data cleanup — analytics above always reflect live counts */}
-      {(bookings.length > 0 || payments.length > 0 || tickets.length > 0) && (
-        <div className="bg-white border border-[#e4e4e4] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h3 className="font-display font-bold text-sm text-black">Demo data cleanup</h3>
-            <p className="text-xs text-[#8a8a8a] font-medium mt-1">
-              Remove test orders, payments and tickets so revenue and sales figures only count real transactions.
-            </p>
-          </div>
-          <button type="button" onClick={handlePurgeTransactions} disabled={purging} className={btnOutline}>
-            <Trash2 className="w-4 h-4" />
-            {purging
-              ? "Deleting…"
-              : `Clear orders, payments & tickets (${bookings.length + payments.length + tickets.length})`}
-          </button>
-        </div>
-      )}
     </div>
   );
 }

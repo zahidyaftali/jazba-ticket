@@ -36,7 +36,29 @@ export function mailConfigFromEnv(env: Record<string, string | undefined>): Mail
   };
 }
 
+/** A plain email address (the rule browsers use for email fields): no
+ *  quotes, commas, angle brackets, comments or non-ASCII, so there is nothing
+ *  for the mail library's address parser to misread into another recipient. */
+export const EMAIL_RE =
+  /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
+
+export function isValidEmail(address: string): boolean {
+  return address.length <= 254 && EMAIL_RE.test(address);
+}
+
+/** A comma-separated address list, every one checked. */
+function addressList(list: string | undefined, field: string): string[] {
+  const out = (list || '').split(',').map((a) => a.trim()).filter(Boolean);
+  for (const a of out) if (!isValidEmail(a)) throw new Error(`Email not sent: the ${field} address is not valid.`);
+  return out;
+}
+
 export async function sendEmail(config: MailConfig, input: SendEmailInput): Promise<void> {
+  const to = addressList(input.to, 'to');
+  if (!to.length) throw new Error('Email not sent: no recipient.');
+  const cc = addressList(input.cc, 'cc');
+  const replyTo = addressList(input.replyTo, 'reply-to')[0];
+
   const transport = nodemailer.createTransport({
     host: config.host,
     port: 465,
@@ -51,9 +73,9 @@ export async function sendEmail(config: MailConfig, input: SendEmailInput): Prom
   await transport.sendMail({
     // Zoho only relays mail sent from the signed-in mailbox itself.
     from: { name: 'Jazba Tickets', address: config.user },
-    to: input.to,
-    cc: input.cc || undefined,
-    replyTo: input.replyTo || undefined,
+    to,
+    cc: cc.length ? cc : undefined,
+    replyTo,
     subject: input.subject,
     html: input.html,
     attachments: input.attachments?.map((a) => ({

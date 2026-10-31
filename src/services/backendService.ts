@@ -651,12 +651,24 @@ export interface ManualTicketInput {
   note: string;
 }
 
+/** A new order number like "JZ-7K3M9QX2" — the same scheme as card orders
+ *  (api/_lib/orderId.ts): 32^8 possibilities, no 0/O or 1/I. */
+function newOrderId(prefix: string): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return `${prefix}-${Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('')}`;
+}
+
 /** Admin: issue tickets directly from the portal (box office, guest list,
  *  bank transfers…). Writes the booking plus one admission pass per ticket,
  *  exactly like an online order, and returns the saved booking. */
 export async function issueManualTicket(input: ManualTicketInput): Promise<Booking> {
-  const orderId = `JZ-${Math.floor(100000 + Math.random() * 900000)}`;
-  const barCode = `8${Math.floor(10000000000 + Math.random() * 90000000000)}`;
+  // Never reuse a number: saving over an existing order would erase it.
+  let orderId = newOrderId('JZ');
+  for (let tries = 0; tries < 5 && (await getDoc(doc(db, 'bookings', orderId))).exists(); tries++) {
+    orderId = newOrderId('JZ');
+  }
+  const barCode = orderId;
   const now = new Date();
   const booking: Booking = {
     id: orderId,

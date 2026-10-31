@@ -1,4 +1,4 @@
-import { sendEmail, escapeHtml, type MailConfig } from './sendEmail.js';
+import { sendEmail, escapeHtml, type MailConfig, EMAIL_RE } from './sendEmail.js';
 import {
   PaymentError,
   computeTotalUsd,
@@ -19,7 +19,6 @@ import {
 
 const NOTIFY_TO = 'info@jazbatickets.com';
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 const SCREENSHOT_TYPES: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 // ~3 MB decoded — keeps the whole request under Vercel's 4.5 MB body limit.

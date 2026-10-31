@@ -1,4 +1,4 @@
-import { sendEmail, escapeHtml, type MailConfig } from './sendEmail.js';
+import { sendEmail, escapeHtml, type MailConfig, EMAIL_RE } from './sendEmail.js';
 
 // Every form on the site (Contact, Book-an-artist, Help centre, Newsletter)
 // notifies the same inbox — this is the one place that decides the subject
@@ -23,8 +23,6 @@ class FormEmailError extends Error {
     this.status = status;
   }
 }
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function str(v: unknown, max = 4000): string {
   return typeof v === 'string' ? v.trim().slice(0, max) : '';

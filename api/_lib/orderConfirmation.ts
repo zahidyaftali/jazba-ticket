@@ -1,45 +1,60 @@
 import type Stripe from 'stripe';
 // The .js extensions are required: Vercel runs these as native ESM.
-import { sendEmail, escapeHtml, type MailConfig } from './sendEmail.js';
+import { sendEmail, escapeHtml, type MailConfig, EMAIL_RE } from './sendEmail.js';
 import { buildTicketEmail, parseTicket, ticketAttachments, type TicketFields } from './ticketEmail.js';
 import { retrieveCheckoutSession, wordPressEventDetails, type VerifiedCheckoutSession } from './stripePayment.js';
 import { WP_EVENT_PREFIX, fetchWordPressEvent } from './wordpressEvents.js';
+import { saveCardOrder } from './orderRecords.js';
+import type { ServiceAccount } from './firebaseAuthUsers.js';
 
-// Runs when a card buyer lands back on /checkout/success. Once Stripe
-// confirms the payment, the buyer is emailed their e-ticket (PDF attached)
-// and info@ gets a "new order" notice with the same ticket — each exactly
-// once per payment. The Stripe payment itself remembers what was sent (in
+// Runs when a card buyer lands back on /checkout/success, and when Stripe
+// notifies us of a completed checkout (api/stripe-webhook.ts). Once Stripe
+// confirms the payment, the server saves the booking and its admission passes
+// (api/_lib/orderRecords.ts), the buyer is emailed their e-ticket (PDF
+// attached) and info@ gets a "new order" notice with the same ticket — each
+// exactly once per payment. The Stripe payment itself remembers what was sent (in
 // its metadata), so a refreshed success page never sends a second copy.
 // Shared by api/get-checkout-session.ts and the Vite dev middleware.
 
 const NOTIFY_TO = 'info@jazbatickets.com';
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 export interface ConfirmedOrder extends VerifiedCheckoutSession {
   /** Who the e-ticket was emailed to — '' when it hasn't been sent. */
   ticketEmailedTo: string;
+  /** True once the booking is in the database (saved now or earlier). */
+  bookingSaved: boolean;
 }
 
-/** Verify a Checkout Session with Stripe and, if it's paid, send the order
- *  emails. Email trouble never fails the confirmation — the booking still
- *  gets written and the ticket still shows on screen. */
+/** Verify a Checkout Session with Stripe and, if it's paid, save the booking
+ *  and send the order emails. Email trouble never fails the confirmation —
+ *  the ticket still shows on screen. */
 export async function confirmCheckoutSession(
   secretKey: string,
   sessionId: string,
   mail: MailConfig | null,
   origin: string,
+  serviceAccount: ServiceAccount | null,
 ): Promise<ConfirmedOrder> {
   const { stripe, session, order } = await retrieveCheckoutSession(secretKey, sessionId);
-  if (!order.paid) return { ...order, ticketEmailedTo: '' };
+  if (!order.paid) return { ...order, ticketEmailedTo: '', bookingSaved: false };
+
+  let bookingSaved = false;
+  try {
+    const result = await saveCardOrder(serviceAccount, session, order);
+    bookingSaved = true;
+    if (result === 'created') console.log(`Order ${order.orderId}: booking saved.`);
+  } catch (err: any) {
+    console.error(`Order ${order.orderId}: booking NOT saved:`, err?.message || err);
+  }
+
   if (!mail) {
     console.error(`Order ${order.orderId}: emails not sent — ZOHO_SMTP_PASSWORD is not set.`);
-    return { ...order, ticketEmailedTo: '' };
+    return { ...order, ticketEmailedTo: '', bookingSaved };
   }
   try {
-    return { ...order, ticketEmailedTo: await deliverOrderEmails(stripe, session, order, mail, origin) };
+    return { ...order, ticketEmailedTo: await deliverOrderEmails(stripe, session, order, mail, origin), bookingSaved };
   } catch (err: any) {
     console.error(`Order ${order.orderId}: order emails failed:`, err?.message || err);
-    return { ...order, ticketEmailedTo: '' };
+    return { ...order, ticketEmailedTo: '', bookingSaved };
   }
 }
 

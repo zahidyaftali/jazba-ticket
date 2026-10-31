@@ -1,6 +1,8 @@
 import Stripe from 'stripe';
 // The .js extensions are required: Vercel runs these as native ESM.
 import { USD_RATES } from './currencyRates.js';
+import { EMAIL_RE } from './sendEmail.js';
+import { newOrderId } from './orderId.js';
 import { WP_EVENT_PREFIX, fetchWordPressEvent, isWordPressEventOver } from './wordpressEvents.js';
 
 // Shared by the Vercel serverless functions (api/create-checkout-session.ts,
@@ -287,8 +289,6 @@ export interface CreateCheckoutSessionBody {
   email?: unknown;
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 /** Stripe metadata values are capped at 500 characters. */
 const meta = (value: string) => (value.length > 500 ? '' : value);
 
@@ -337,7 +337,7 @@ export async function createCheckoutSession(
   // A stable, human-readable order number, later reused as the Firestore
   // booking doc id — so a refreshed success page overwrites the same
   // document instead of creating a duplicate booking.
-  const orderId = `TT-${Math.floor(100000 + Math.random() * 900000)}`;
+  const orderId = newOrderId('TT');
   const tierLabel = selected.name;
 
   const stripe = new Stripe(secretKey);

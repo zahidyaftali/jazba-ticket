@@ -230,7 +230,10 @@ function ArtistsList() {
   };
 
   const handlePurge = async () => {
-    if (!window.confirm("Delete ALL artists? This permanently removes them from the database and cannot be undone.")) return;
+    const typed = window.prompt(`Delete ALL ${artists.length} artists? This permanently removes them from the database and cannot be undone.
+
+Type DELETE to confirm.`);
+    if ((typed || "").trim() !== "DELETE") return;
     setPurging(true);
     try {
       const removed = await purgeCollection("artists");

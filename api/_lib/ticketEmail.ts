@@ -3,7 +3,7 @@
 // default export for CommonJS modules.
 import QRCode from 'qrcode';
 import pdfLib from 'pdf-lib';
-import { sendEmail, escapeHtml, type MailConfig, type SendEmailInput } from './sendEmail.js';
+import { sendEmail, escapeHtml, type MailConfig, type SendEmailInput, EMAIL_RE } from './sendEmail.js';
 import { HttpError, verifyAdmin } from './adminAuth.js';
 import { LOGO_PNG_BASE64, LOGO_SIZE, MARK_PNG_BASE64 } from './ticketAssets.js';
 
@@ -30,8 +30,6 @@ type Color = import('pdf-lib').Color;
 
 /** Errors carry the HTTP status the route answers with. */
 export { HttpError as TicketEmailError };
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function str(v: unknown, max: number): string {
   return typeof v === 'string' ? v.trim().slice(0, max) : '';

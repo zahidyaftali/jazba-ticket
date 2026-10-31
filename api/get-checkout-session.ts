@@ -3,12 +3,13 @@
 import { getOrigin } from './_lib/stripePayment.js';
 import { confirmCheckoutSession } from './_lib/orderConfirmation.js';
 import { mailConfigFromEnv } from './_lib/sendEmail.js';
+import { serviceAccountFromEnv } from './_lib/firebaseAuthUsers.js';
 
 // Vercel serverless function: GET /api/get-checkout-session?session_id=cs_...
 // Re-verifies a completed Checkout Session directly with Stripe (never
-// trusts the redirect alone) before the success page is allowed to create a
-// booking. Once paid, the buyer is emailed their e-ticket and info@ gets an
-// order notice (once per payment). Returns the order the booking is built from.
+// trusts the redirect alone). Once paid, the server saves the booking, the
+// buyer is emailed their e-ticket and info@ gets an order notice (once per
+// payment). Returns the order for the success page.
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -24,7 +25,13 @@ export default async function handler(req: any, res: any) {
   const sessionId = typeof req.query?.session_id === 'string' ? req.query.session_id : '';
 
   try {
-    const result = await confirmCheckoutSession(secretKey, sessionId, mailConfigFromEnv(process.env), getOrigin(req));
+    let serviceAccount = null;
+    try {
+      serviceAccount = serviceAccountFromEnv(process.env);
+    } catch (err: any) {
+      console.error('FIREBASE_SERVICE_ACCOUNT:', err?.message || err);
+    }
+    const result = await confirmCheckoutSession(secretKey, sessionId, mailConfigFromEnv(process.env), getOrigin(req), serviceAccount);
     res.status(200).json(result);
   } catch (err: any) {
     console.error('get-checkout-session failed:', err?.message || err);

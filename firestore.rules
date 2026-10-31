@@ -1,13 +1,24 @@
 rules_version = '2';
+
+// Jazba Tickets — who may read and change what in the database.
+//
+// Orders are the money: a booking or admission pass can only be created by
+// an admin, or by the server once Stripe has confirmed the payment (the
+// server uses the Firebase service account, which these rules don't apply
+// to — see api/_lib/orderRecords.ts). So nobody can give themselves a "paid"
+// ticket from their browser. Publish changes from Admin → Dashboard, or with
+// `firebase deploy --only firestore:rules`.
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Default-deny catch-all rule
+
+    // Anything not listed below is closed.
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Helper functions
+    // ── Helpers ─────────────────────────────────────────────────────────
+
     function isSignedIn() {
       return request.auth != null;
     }
@@ -28,35 +39,30 @@ service cloud.firestore {
       return resource.data;
     }
 
-    // Role-based helper functions
     function isBootstrappedAdmin() {
-      return request.auth.token.email == 'zahidyaftali999@gmail.com';
+      return isSignedIn() && request.auth.token.email == 'zahidyaftali999@gmail.com';
+    }
+
+    // The caller's role from their profile; a suspended account has none.
+    function hasRole(role) {
+      let path = /databases/$(database)/documents/users/$(request.auth.uid);
+      return isSignedIn() && exists(path)
+        && get(path).data.role == role
+        && get(path).data.get('status', 'active') != 'suspended';
     }
 
     function isAdmin() {
-      return isSignedIn() && (
-        isBootstrappedAdmin() || 
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
-      );
+      return isBootstrappedAdmin() || hasRole('admin');
     }
 
     function isOrganizer() {
-      return isSignedIn() && (
-        isBootstrappedAdmin() ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'organizer')
-      );
+      return hasRole('organizer');
     }
 
     function isArtist() {
-      return isSignedIn() && (
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'artist'
-      );
+      return hasRole('artist');
     }
 
-    // Entity validator function for User profiles
     function isValidUser(data) {
       return data.keys().hasAll(['uid', 'email', 'name', 'role', 'status', 'createdAt'])
         && data.keys().size() <= 10
@@ -72,82 +78,86 @@ service cloud.firestore {
         && (!data.keys().hasAny(['updatedAt']) || (data.updatedAt is string && data.updatedAt.size() <= 64));
     }
 
-    // Match rules for users collection
-    // Profiles contain emails/phone numbers — readable only by the owner or an admin.
+    // ── Accounts ────────────────────────────────────────────────────────
+    // Profiles hold emails and phone numbers: only the owner and admins see
+    // them. People can edit their own profile, but never their own role or
+    // suspension.
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId) && isValidId(userId) && isValidUser(incoming()) && (incoming().role == 'user' || isBootstrappedAdmin());
-      allow update: if (isOwner(userId) && isValidId(userId) && isValidUser(incoming()) && (incoming().role == existing().role || isBootstrappedAdmin() || isAdmin())) || isAdmin();
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUser(incoming())
+        && (incoming().role == 'user' || isBootstrappedAdmin())
+        && incoming().status == 'active';
+      allow update: if isAdmin() || (
+        isOwner(userId) && isValidUser(incoming())
+        && incoming().role == existing().role
+        && incoming().status == existing().status
+      );
       allow delete: if isAdmin();
     }
 
-    // Match rules for organizers collection
-    // Public read: organiser profiles appear on the public Organisers pages
+    // ── Public profiles and events ──────────────────────────────────────
     match /organizers/{organizerId} {
       allow read: if true;
-      allow create: if isSignedIn() && (incoming().userId == request.auth.uid) && (isOrganizer() || isAdmin()) && isValidId(organizerId);
-      allow update: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin()) && (incoming().userId == existing().userId) && isValidId(organizerId);
+      allow create: if isValidId(organizerId) && incoming().userId == request.auth.uid && (isOrganizer() || isAdmin());
+      allow update: if isValidId(organizerId) && (existing().userId == request.auth.uid || isAdmin()) && incoming().userId == existing().userId;
       allow delete: if isAdmin();
     }
 
-    // Match rules for artists collection
     match /artists/{artistId} {
       allow read: if true;
-      allow create: if isSignedIn() && isValidId(artistId) && (isAdmin() || (incoming().userId == request.auth.uid && isArtist()));
-      allow update: if isSignedIn() && isValidId(artistId) && (isAdmin() || (existing().userId == request.auth.uid && incoming().userId == existing().userId));
+      allow create: if isValidId(artistId) && (isAdmin() || (isArtist() && incoming().userId == request.auth.uid));
+      allow update: if isValidId(artistId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid && incoming().userId == existing().userId));
       allow delete: if isAdmin();
     }
 
-    // Match rules for events collection
+    // Organisers manage only their own events; admins manage all.
     match /events/{eventId} {
       allow read: if true;
-      allow create: if isSignedIn() && (isOrganizer() || isAdmin()) && isValidId(eventId);
-      allow update: if isSignedIn() && (isOrganizer() || isAdmin()) && isValidId(eventId);
-      allow delete: if isSignedIn() && (isOrganizer() || isAdmin()) && isValidId(eventId);
+      allow create: if isValidId(eventId) && (isAdmin() || (isOrganizer() && incoming().organizerId == request.auth.uid));
+      allow update: if isValidId(eventId) && (isAdmin() || (isOrganizer() && existing().organizerId == request.auth.uid && incoming().organizerId == existing().organizerId));
+      allow delete: if isAdmin() || (isOrganizer() && existing().organizerId == request.auth.uid);
     }
 
-    // Match rules for bookings collection
+    // ── Orders ──────────────────────────────────────────────────────────
+    // Buyers can see their own orders and passes. Only admins (and the
+    // server, after a confirmed payment) can create or change them.
     match /bookings/{bookingId} {
+      allow get: if isValidId(bookingId) && isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidId(bookingId);
-      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin()) && isValidId(bookingId);
-      allow update: if isAdmin() || (isOrganizer()) && isValidId(bookingId);
+      allow create, update: if isValidId(bookingId) && isAdmin();
       allow delete: if isAdmin();
     }
 
-    // Match rules for tickets collection
     match /tickets/{ticketId} {
+      allow get: if isValidId(ticketId) && isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidId(ticketId);
-      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin()) && isValidId(ticketId);
-      allow update: if isAdmin() || (isOrganizer()) && isValidId(ticketId);
+      allow create, update: if isValidId(ticketId) && isAdmin();
       allow delete: if isAdmin();
     }
 
-    // Match rules for payments collection
     match /payments/{paymentId} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin()) && isValidId(paymentId);
-      allow update: if isAdmin() && isValidId(paymentId);
+      allow create, update: if isValidId(paymentId) && isAdmin();
       allow delete: if isAdmin();
     }
 
-    // Match rules for notifications collection
+    // ── Notifications ───────────────────────────────────────────────────
+    // People can only mark their own notifications read.
     match /notifications/{notificationId} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      // Users may only create notifications addressed to themselves (booking confirmations).
-      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || isAdmin());
-      allow update: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if isAdmin() || (isSignedIn() && incoming().userId == request.auth.uid);
+      allow update: if isAdmin() || (
+        isSignedIn() && existing().userId == request.auth.uid
+        && incoming().diff(existing()).affectedKeys().hasOnly(['read'])
+      );
       allow delete: if isAdmin();
     }
 
-    // Match rules for analytics collection
     match /analytics/{analyticsDocId} {
-      allow read: if isAdmin();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
 
-    // Entity validator for follow records (a signed-in user following an artist/organizer)
+    // ── Follows ─────────────────────────────────────────────────────────
     function isValidFollow(data, followId) {
       return data.keys().hasAll(['followerId', 'targetType', 'targetId', 'createdAt'])
         && data.keys().size() == 4
@@ -158,7 +168,6 @@ service cloud.firestore {
         && followId == data.followerId + '_' + data.targetType + '_' + data.targetId;
     }
 
-    // Match rules for follows collection (public follower counts, owner-only writes)
     match /follows/{followId} {
       allow read: if true;
       allow create: if isSignedIn() && isValidId(followId) && isValidFollow(incoming(), followId);

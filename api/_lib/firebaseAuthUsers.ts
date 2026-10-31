@@ -7,7 +7,7 @@ import { FIREBASE, HttpError } from './adminAuth.js';
 // environment variable (the JSON file from Firebase console → Project
 // settings → Service accounts → Generate new private key).
 
-interface ServiceAccount {
+export interface ServiceAccount {
   project_id: string;
   client_email: string;
   private_key: string;
@@ -76,7 +76,8 @@ export function signServiceJwt(sa: ServiceAccount, scope: string, nowSec = Math.
 // Re-used across warm serverless invocations.
 let cachedToken: { value: string; expiresAt: number; email: string } | null = null;
 
-async function accessToken(sa: ServiceAccount): Promise<string> {
+/** An OAuth token for Google APIs (Auth, Firestore, Rules) as the service account. */
+export async function serviceAccountToken(sa: ServiceAccount): Promise<string> {
   if (cachedToken && cachedToken.email === sa.client_email && cachedToken.expiresAt > Date.now() + 60_000) {
     return cachedToken.value;
   }
@@ -102,7 +103,7 @@ const iso = (ms: unknown) => {
 
 /** Every Firebase Authentication account (paged, up to 20,000). */
 export async function listAuthUsers(sa: ServiceAccount): Promise<AuthUserInfo[]> {
-  const token = await accessToken(sa);
+  const token = await serviceAccountToken(sa);
   const out: AuthUserInfo[] = [];
   let pageToken = '';
   for (let page = 0; page < 20; page++) {
