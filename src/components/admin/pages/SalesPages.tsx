@@ -1,11 +1,14 @@
 import React, { useMemo, useState } from "react";
-import { Download, Eye } from "lucide-react";
+import { Download, Eye, ExternalLink, FileDown, Loader2 } from "lucide-react";
 import { updateBookingStatus, type Booking } from "../../../services/backendService";
 import { useAdmin, byNewest } from "../AdminContext";
 import { paymentMethodLabel } from "../BookingDrawer";
+import { downloadPaymentPdf, type PaymentPdfSection } from "../paymentPdf";
 import {
   Avatar,
   DataTable,
+  Detail,
+  Drawer,
   EmptyRow,
   FilterTabs,
   IconButton,
@@ -17,10 +20,12 @@ import {
   TableFooter,
   Toolbar,
   btnOutline,
+  btnPrimary,
   downloadCsv,
   fmtDate,
   fmtDateTime,
   money,
+  overline,
   selectCls,
   tdCls,
   thCls,
@@ -243,22 +248,40 @@ interface PaymentRow {
   status: "success" | "pending" | "failed" | "refunded";
   /** Extra line under the status, e.g. why a card failed. */
   note: string;
+  /** Stripe's own receipt page, for successful card payments. */
+  receiptUrl: string;
+  /** Everything known about the payment, as shown in the details panel and PDF. */
+  sections: PaymentPdfSection[];
 }
+
+const detailRow = (label: string, value?: string | number | null): [string, string] => [
+  label,
+  value == null ? "" : String(value),
+];
+
+const paymentStatusLabel = (s: string) => PAYMENT_STATUS[s]?.label || s;
 
 /** Payments — every card payment straight from Stripe, plus any payment
  *  records saved in the database. */
 export function PaymentsPage() {
-  const { data, bookingById, userById, customerFor, userEmail, eventInfo, openBooking, cardPayments, cardPaymentsStatus, cardPaymentsError } =
+  const { data, bookingById, userById, customerFor, userEmail, eventInfo, openBooking, cardPayments, cardPaymentsStatus, cardPaymentsError, fail } =
     useAdmin();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | PaymentRow["status"]>("all");
+  /** The payment open in the details panel. */
+  const [viewKey, setViewKey] = useState("");
+  /** The payment whose PDF is being made. */
+  const [downloading, setDownloading] = useState("");
 
   const rows = useMemo<PaymentRow[]>(() => {
     const list: PaymentRow[] = cardPayments.map((cp) => {
       const b = cp.orderId ? bookingById(cp.orderId) : undefined;
       const c = b ? customerFor(b) : undefined;
-      const title = cp.eventTitle || (cp.eventId ? eventInfo(cp.eventId, b).title : "");
+      const info = cp.eventId ? eventInfo(cp.eventId, b) : undefined;
+      const title = cp.eventTitle || info?.title || "";
       const pkg = cp.tierName ? `${cp.tierName} × ${cp.quantity}` : "";
+      const name = (c?.name && c.name !== "Unknown customer" ? c.name : "") || cp.customerName || "Unknown customer";
+      const email = c?.email || cp.email;
       const notes = [
         cp.status === "success" && !b ? "Paid, but no booking yet: the buyer didn't return to the site." : "",
         cp.status === "refunded" ? `Refunded ${money(cp.amountRefunded, cp.currency)}` : "",
@@ -272,11 +295,7 @@ export function PaymentsPage() {
         createdAt: cp.createdAt,
         orderId: cp.orderId,
         booking: b,
-        who: {
-          name: (c?.name && c.name !== "Unknown customer" ? c.name : "") || cp.customerName || "Unknown customer",
-          email: c?.email || cp.email,
-          photo: c?.photo,
-        },
+        who: { name, email, photo: c?.photo },
         detail: [title, pkg].filter(Boolean).join(" · "),
         provider: "stripe",
         transactionId: cp.transactionId,
@@ -285,6 +304,40 @@ export function PaymentsPage() {
         amount: cp.amount,
         status: cp.status,
         note: notes.filter(Boolean).join(" · "),
+        receiptUrl: cp.receiptUrl,
+        sections: [
+          {
+            heading: "Order",
+            rows: [
+              detailRow("Order number", cp.orderId),
+              detailRow("Event", title),
+              detailRow("Event date", info ? [info.date, info.time].filter(Boolean).join(" · ") : ""),
+              detailRow("Venue", info?.venue),
+              detailRow("Package", cp.tierName),
+              detailRow("Tickets", cp.quantity),
+              detailRow(
+                "Booking",
+                b ? "Created" : cp.status === "success" ? "Not created: the buyer didn't return to the site" : "",
+              ),
+            ],
+          },
+          { heading: "Customer", rows: [detailRow("Name", name), detailRow("Email", email)] },
+          {
+            heading: "Payment",
+            rows: [
+              detailRow("Amount", money(cp.amount, cp.currency)),
+              detailRow("Currency", cp.currency),
+              detailRow("Status", paymentStatusLabel(cp.status)),
+              detailRow("Paid by", "Card, via Stripe"),
+              detailRow("Promo code", cp.promo),
+              detailRow("Sale", cp.sale ? `${cp.sale} off` : ""),
+              detailRow("Refunded", cp.amountRefunded ? money(cp.amountRefunded, cp.currency) : ""),
+              detailRow("Failure reason", cp.status === "failed" ? cp.failure || "The card was declined." : ""),
+              detailRow("Transaction ID", cp.transactionId),
+              detailRow("Checkout session", cp.id),
+            ],
+          },
+        ],
       };
     });
 
@@ -298,20 +351,46 @@ export function PaymentsPage() {
       const who = b
         ? customerFor(b)
         : { name: u?.name || "Unknown customer", email: u ? userEmail(u).email : "", photo: u?.profileImage };
+      const info = b ? eventInfo(b.eventId, b) : undefined;
+      const orderId = b?.orderId || b?.bookingNumber || p.bookingId;
+      const amount = Number(p.amount) || 0;
       list.push({
         key: `db-${p.id}`,
         createdAt: p.createdAt,
-        orderId: b?.orderId || b?.bookingNumber || p.bookingId,
+        orderId,
         booking: b,
         who,
-        detail: b ? eventInfo(b.eventId, b).title : "",
+        detail: info?.title || "",
         provider: p.provider,
         transactionId: p.transactionId,
         transactionUrl: "",
         currency: p.currency,
-        amount: Number(p.amount) || 0,
+        amount,
         status: p.status,
         note: "",
+        receiptUrl: "",
+        sections: [
+          {
+            heading: "Order",
+            rows: [
+              detailRow("Order number", orderId),
+              detailRow("Event", info?.title),
+              detailRow("Event date", info ? [info.date, info.time].filter(Boolean).join(" · ") : ""),
+              detailRow("Venue", info?.venue),
+            ],
+          },
+          { heading: "Customer", rows: [detailRow("Name", who.name), detailRow("Email", who.email)] },
+          {
+            heading: "Payment",
+            rows: [
+              detailRow("Amount", money(amount, p.currency)),
+              detailRow("Currency", p.currency),
+              detailRow("Status", paymentStatusLabel(p.status)),
+              detailRow("Paid by", PROVIDER_LABELS[p.provider] || p.provider),
+              detailRow("Transaction ID", p.transactionId),
+            ],
+          },
+        ],
       });
     }
     return list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
@@ -346,6 +425,39 @@ export function PaymentsPage() {
     ]);
 
   const stripeLoading = cardPaymentsStatus === "loading";
+  const viewing = viewKey ? rows.find((r) => r.key === viewKey) : undefined;
+
+  const downloadPdf = async (r: PaymentRow) => {
+    setDownloading(r.key);
+    try {
+      const when = r.createdAt
+        ? new Date(r.createdAt).toLocaleString("en-GB", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZoneName: "short",
+          })
+        : "";
+      await downloadPaymentPdf(
+        {
+          orderId: r.orderId,
+          amountLabel: money(r.amount, r.currency),
+          statusLabel: paymentStatusLabel(r.status),
+          successful: r.status === "success",
+          dateLabel: when,
+          sections: r.sections,
+        },
+        `payment-${(r.orderId || r.transactionId || "details").replace(/[^A-Za-z0-9_-]/g, "")}.pdf`,
+      );
+    } catch (err) {
+      console.error("Payment PDF failed:", err);
+      fail("Couldn't create the PDF. Please try again.");
+    } finally {
+      setDownloading("");
+    }
+  };
 
   return (
     <div>
@@ -389,6 +501,7 @@ export function PaymentsPage() {
               <th className={thCls}>Transaction ID</th>
               <th className={thCls}>Amount</th>
               <th className={thCls}>Status</th>
+              <th className={`${thCls} text-right`}>Details</th>
             </>
           }
         >
@@ -434,11 +547,19 @@ export function PaymentsPage() {
                 <StatusBadge map={PAYMENT_STATUS} value={r.status} />
                 {r.note && <span className="block text-[11px] text-[#666] mt-1 max-w-[220px]">{r.note}</span>}
               </td>
+              <td className={`${tdCls} text-right whitespace-nowrap`}>
+                <IconButton title="View payment details" onClick={() => setViewKey(r.key)}>
+                  <Eye className="w-4 h-4" />
+                </IconButton>
+                <IconButton title="Download payment details (PDF)" onClick={() => downloadPdf(r)} disabled={downloading === r.key}>
+                  {downloading === r.key ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                </IconButton>
+              </td>
             </tr>
           ))}
           {filtered.length === 0 && (
             <EmptyRow
-              colSpan={7}
+              colSpan={8}
               title={
                 rows.length
                   ? "No payments match your filters"
@@ -452,6 +573,79 @@ export function PaymentsPage() {
         </DataTable>
         <TableFooter shown={filtered.length} total={rows.length} noun="payments" />
       </div>
+
+      <Drawer
+        open={!!viewing}
+        onClose={() => setViewKey("")}
+        eyebrow="Payment details"
+        title={viewing ? `${money(viewing.amount, viewing.currency)} · ${viewing.orderId || "Payment"}` : ""}
+        sub={
+          viewing && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <StatusBadge map={PAYMENT_STATUS} value={viewing.status} />
+              <span className="text-sm text-[#666]">{fmtDateTime(viewing.createdAt)}</span>
+            </div>
+          )
+        }
+        footer={
+          viewing && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={btnPrimary}
+                onClick={() => downloadPdf(viewing)}
+                disabled={downloading === viewing.key}
+              >
+                {downloading === viewing.key ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                Download PDF
+              </button>
+              {viewing.booking && (
+                <button
+                  type="button"
+                  className={btnOutline}
+                  onClick={() => {
+                    setViewKey("");
+                    openBooking(viewing.booking!.id!);
+                  }}
+                >
+                  View order
+                </button>
+              )}
+              {viewing.transactionUrl && (
+                <a href={viewing.transactionUrl} target="_blank" rel="noopener noreferrer" className={btnOutline}>
+                  Open in Stripe <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              )}
+              {viewing.receiptUrl && (
+                <a href={viewing.receiptUrl} target="_blank" rel="noopener noreferrer" className={btnOutline}>
+                  Stripe receipt <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              )}
+            </div>
+          )
+        }
+      >
+        {viewing && (
+          <div className="space-y-8">
+            {viewing.sections.map((section) => {
+              const rows = section.rows.filter(([, v]) => v);
+              if (!rows.length) return null;
+              return (
+                <section key={section.heading}>
+                  <h3 className={`${overline} text-[#666] border-b border-black pb-2`}>{section.heading}</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 mt-4">
+                    {rows.map(([label, value]) => (
+                      <div key={label}>
+                        <Detail label={label}>{value}</Detail>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        )}
+      </Drawer>
     </div>
   );
 }
