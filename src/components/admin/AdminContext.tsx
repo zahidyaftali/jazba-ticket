@@ -17,6 +17,7 @@ import {
 } from "../../services/backendService";
 import { getWordPressEvents } from "../../services/wordpressEventsService";
 import { fetchAuthUsers, AuthUserInfo } from "../../services/adminUsersService";
+import { fetchCardPayments, CardPayment } from "../../services/adminPaymentsService";
 import { EventItem, getEventTimestamp, isPastEvent, tierDisplayName, ticketSeat, withEventSlugs } from "../../types";
 import { auth, accountEmail } from "../../firebase";
 import { printWhenReady, type TicketPrintData } from "../TicketPrintSheet";
@@ -101,6 +102,10 @@ interface AdminCtx {
   refreshing: boolean;
   wpLoading: boolean;
   reload: () => Promise<void>;
+  /** Card payments read straight from Stripe (the Payments page). */
+  cardPayments: CardPayment[];
+  cardPaymentsStatus: "loading" | "ready" | "error";
+  cardPaymentsError: string;
 
   route: AdminRoute;
   navigate: (to: string) => void;
@@ -208,6 +213,9 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [wpLoading, setWpLoading] = useState(true);
+  const [cardPayments, setCardPayments] = useState<CardPayment[]>([]);
+  const [cardPaymentsStatus, setCardPaymentsStatus] = useState<AdminCtx["cardPaymentsStatus"]>("loading");
+  const [cardPaymentsError, setCardPaymentsError] = useState("");
   const [route, setRoute] = useState<AdminRoute>(parseRoute);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [openBookingId, setOpenBookingId] = useState<string | null>(null);
@@ -240,9 +248,23 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
     setWpLoading(false);
   }, []);
 
+  const loadCardPayments = useCallback(async () => {
+    const result = await fetchCardPayments();
+    if (result.status === "ready") {
+      setCardPayments(result.payments);
+      setCardPaymentsStatus("ready");
+      setCardPaymentsError("");
+    } else {
+      setCardPaymentsStatus("error");
+      setCardPaymentsError(result.error);
+    }
+  }, []);
+
   const reload = useCallback(async () => {
     if (firstLoad.current) setLoading(true);
     else setRefreshing(true);
+    // Stripe is slower than Firestore — it fills in on its own.
+    loadCardPayments();
     try {
       const [users, bookings, events, artists, organizers, payments, tickets] = await Promise.all([
         getAllUsers(),
@@ -271,7 +293,7 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
       setLoading(false);
       setRefreshing(false);
     }
-  }, [pushToast]);
+  }, [pushToast, loadCardPayments]);
 
   useEffect(() => {
     reload();
@@ -583,6 +605,9 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
     refreshing,
     wpLoading,
     reload,
+    cardPayments,
+    cardPaymentsStatus,
+    cardPaymentsError,
     route,
     navigate,
     allEvents,

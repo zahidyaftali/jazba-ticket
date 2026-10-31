@@ -366,6 +366,7 @@ export const PAYMENT_STATUS: Record<string, { label: string; tone: Tone }> = {
   pending: { label: "Pending", tone: "warning" },
   failed: { label: "Failed", tone: "negative" },
   success: { label: "Successful", tone: "positive" },
+  refunded: { label: "Refunded", tone: "neutral" },
 };
 export const BOOKING_STATUS: Record<string, { label: string; tone: Tone }> = {
   active: { label: "Active", tone: "info" },

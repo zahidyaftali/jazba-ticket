@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Download, Eye } from "lucide-react";
-import { updateBookingStatus } from "../../../services/backendService";
+import { updateBookingStatus, type Booking } from "../../../services/backendService";
 import { useAdmin, byNewest } from "../AdminContext";
 import { paymentMethodLabel } from "../BookingDrawer";
 import {
@@ -226,52 +226,144 @@ const PROVIDER_LABELS: Record<string, string> = {
   paypal: "PayPal",
 };
 
-/** Payments — the payment-provider ledger. */
-export function PaymentsPage() {
-  const { data, bookingById, userById, customerFor, userEmail, openBooking } = useAdmin();
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<"all" | "success" | "pending" | "failed">("all");
+interface PaymentRow {
+  key: string;
+  createdAt: string;
+  /** Order number shown in the Booking column. */
+  orderId: string;
+  booking?: Booking;
+  who: { name: string; email: string; photo?: string };
+  /** "Event · Package × 2" */
+  detail: string;
+  provider: string;
+  transactionId: string;
+  transactionUrl: string;
+  currency: string;
+  amount: number;
+  status: "success" | "pending" | "failed" | "refunded";
+  /** Extra line under the status, e.g. why a card failed. */
+  note: string;
+}
 
-  const rows = useMemo(
-    () =>
-      [...data.payments]
-        .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
-        .map((p) => {
-          const b = bookingById(p.bookingId);
-          const u = userById(p.userId);
-          const who = b
-            ? customerFor(b)
-            : { name: u?.name || "Unknown customer", email: u ? userEmail(u).email : "", photo: u?.profileImage };
-          return { p, b, who };
-        }),
-    [data.payments, bookingById, userById, customerFor, userEmail],
-  );
+/** Payments — every card payment straight from Stripe, plus any payment
+ *  records saved in the database. */
+export function PaymentsPage() {
+  const { data, bookingById, userById, customerFor, userEmail, eventInfo, openBooking, cardPayments, cardPaymentsStatus, cardPaymentsError } =
+    useAdmin();
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<"all" | PaymentRow["status"]>("all");
+
+  const rows = useMemo<PaymentRow[]>(() => {
+    const list: PaymentRow[] = cardPayments.map((cp) => {
+      const b = cp.orderId ? bookingById(cp.orderId) : undefined;
+      const c = b ? customerFor(b) : undefined;
+      const title = cp.eventTitle || (cp.eventId ? eventInfo(cp.eventId, b).title : "");
+      const pkg = cp.tierName ? `${cp.tierName} × ${cp.quantity}` : "";
+      const notes = [
+        cp.status === "success" && !b ? "Paid, but no booking yet: the buyer didn't return to the site." : "",
+        cp.status === "refunded" ? `Refunded ${money(cp.amountRefunded, cp.currency)}` : "",
+        cp.status === "failed" ? cp.failure || "The card was declined." : "",
+        cp.status === "pending" ? "Checkout started, not paid yet." : "",
+        cp.promo ? `Promo ${cp.promo}` : "",
+        cp.sale ? `${cp.sale} off sale` : "",
+      ];
+      return {
+        key: cp.id,
+        createdAt: cp.createdAt,
+        orderId: cp.orderId,
+        booking: b,
+        who: {
+          name: (c?.name && c.name !== "Unknown customer" ? c.name : "") || cp.customerName || "Unknown customer",
+          email: c?.email || cp.email,
+          photo: c?.photo,
+        },
+        detail: [title, pkg].filter(Boolean).join(" · "),
+        provider: "stripe",
+        transactionId: cp.transactionId,
+        transactionUrl: cp.transactionId ? `https://dashboard.stripe.com/payments/${cp.transactionId}` : "",
+        currency: cp.currency,
+        amount: cp.amount,
+        status: cp.status,
+        note: notes.filter(Boolean).join(" · "),
+      };
+    });
+
+    // Payment records saved in the database (none are written for card
+    // orders today); skip any that duplicate a Stripe payment.
+    const seen = new Set(cardPayments.map((cp) => cp.transactionId).filter(Boolean));
+    for (const p of data.payments) {
+      if (p.transactionId && seen.has(p.transactionId)) continue;
+      const b = bookingById(p.bookingId);
+      const u = userById(p.userId);
+      const who = b
+        ? customerFor(b)
+        : { name: u?.name || "Unknown customer", email: u ? userEmail(u).email : "", photo: u?.profileImage };
+      list.push({
+        key: `db-${p.id}`,
+        createdAt: p.createdAt,
+        orderId: b?.orderId || b?.bookingNumber || p.bookingId,
+        booking: b,
+        who,
+        detail: b ? eventInfo(b.eventId, b).title : "",
+        provider: p.provider,
+        transactionId: p.transactionId,
+        transactionUrl: "",
+        currency: p.currency,
+        amount: Number(p.amount) || 0,
+        status: p.status,
+        note: "",
+      });
+    }
+    return list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  }, [cardPayments, data.payments, bookingById, userById, customerFor, userEmail, eventInfo]);
 
   const q = query.trim().toLowerCase();
-  const filtered = rows.filter(({ p, who }) => {
-    if (status !== "all" && p.status !== status) return false;
+  const filtered = rows.filter((r) => {
+    if (status !== "all" && r.status !== status) return false;
     if (!q) return true;
-    return [p.bookingId, p.transactionId, p.provider, who.name, who.email].filter(Boolean).some((v) => String(v).toLowerCase().includes(q));
+    return [r.orderId, r.transactionId, r.provider, r.who.name, r.who.email, r.detail]
+      .filter(Boolean)
+      .some((v) => String(v).toLowerCase().includes(q));
   });
-  const count = (s: typeof status) => rows.filter((r) => s === "all" || r.p.status === s).length;
+  const count = (s: typeof status) => rows.filter((r) => s === "all" || r.status === s).length;
 
   const exportCsv = () =>
     downloadCsv(`jazba-payments-${new Date().toISOString().slice(0, 10)}.csv`, [
-      ["Date", "Booking", "Customer", "Email", "Provider", "Transaction ID", "Currency", "Amount", "Status"],
-      ...filtered.map(({ p, who }) => [fmtDateTime(p.createdAt), p.bookingId, who.name, who.email, p.provider, p.transactionId, p.currency, p.amount, p.status]),
+      ["Date", "Order", "Details", "Customer", "Email", "Provider", "Transaction ID", "Currency", "Amount", "Status", "Note"],
+      ...filtered.map((r) => [
+        fmtDateTime(r.createdAt),
+        r.orderId,
+        r.detail,
+        r.who.name,
+        r.who.email,
+        PROVIDER_LABELS[r.provider] || r.provider,
+        r.transactionId,
+        r.currency,
+        r.amount,
+        r.status,
+        r.note,
+      ]),
     ]);
+
+  const stripeLoading = cardPaymentsStatus === "loading";
 
   return (
     <div>
       <PageHeader
         title="Payments"
-        sub="Payment records from the payment providers, linked to their orders."
+        sub="Every card payment, straight from Stripe, linked to its order."
         actions={
           <button type="button" className={btnOutline} onClick={exportCsv}>
             <Download className="w-4 h-4" /> Export CSV
           </button>
         }
       />
+      {cardPaymentsStatus === "error" && (
+        <div className="mb-4 border border-[#be6464] bg-white px-4 py-3 text-sm">
+          <span className="font-bold">Couldn't load card payments from Stripe.</span>{" "}
+          <span className="text-[#666]">{cardPaymentsError} Use the refresh button at the top to try again.</span>
+        </div>
+      )}
       <div className="bg-white border border-[#e4e4e4]">
         <FilterTabs
           tabs={[
@@ -279,12 +371,13 @@ export function PaymentsPage() {
             { id: "success" as const, label: "Successful", count: count("success") },
             { id: "pending" as const, label: "Pending", count: count("pending") },
             { id: "failed" as const, label: "Failed", count: count("failed") },
+            { id: "refunded" as const, label: "Refunded", count: count("refunded") },
           ]}
           value={status}
           onChange={setStatus}
         />
         <Toolbar>
-          <SearchInput value={query} onChange={setQuery} placeholder="Search booking, transaction, customer…" />
+          <SearchInput value={query} onChange={setQuery} placeholder="Search order, transaction, customer, event…" />
         </Toolbar>
         <DataTable
           head={
@@ -299,42 +392,61 @@ export function PaymentsPage() {
             </>
           }
         >
-          {filtered.map(({ p, b, who }) => (
-            <tr key={p.id} className="hover:bg-[#fafafa]">
-              <td className={`${tdCls} whitespace-nowrap text-[#666]`}>{fmtDate(p.createdAt)}</td>
+          {filtered.map((r) => (
+            <tr key={r.key} className="hover:bg-[#fafafa]">
+              <td className={`${tdCls} whitespace-nowrap text-[#666]`}>
+                {fmtDate(r.createdAt)}
+                <span className="block text-[11px] text-[#8a8a8a]">
+                  {r.createdAt ? new Date(r.createdAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : ""}
+                </span>
+              </td>
               <td className={tdCls}>
-                {b ? (
-                  <button type="button" onClick={() => openBooking(b.id!)} className="font-bold hover:underline cursor-pointer">
-                    {b.orderId || b.bookingNumber || p.bookingId}
+                {r.booking ? (
+                  <button type="button" onClick={() => openBooking(r.booking!.id!)} className="font-bold hover:underline cursor-pointer">
+                    {r.orderId}
                   </button>
                 ) : (
-                  <span className="font-bold">{p.bookingId || "—"}</span>
+                  <span className="font-bold">{r.orderId || "—"}</span>
                 )}
+                {r.detail && <span className="block text-[11px] text-[#666] max-w-[240px] truncate">{r.detail}</span>}
               </td>
               <td className={tdCls}>
                 <div className="flex items-center gap-2.5 min-w-[170px]">
-                  <Avatar src={who.photo} name={who.name} size={28} />
+                  <Avatar src={r.who.photo} name={r.who.name} size={28} />
                   <div className="min-w-0">
-                    <p className="font-bold truncate max-w-[180px]">{who.name}</p>
-                    <p className="text-[11px] text-[#8a8a8a] truncate max-w-[180px]">{who.email || "No email on file"}</p>
+                    <p className="font-bold truncate max-w-[180px]">{r.who.name}</p>
+                    <p className="text-[11px] text-[#8a8a8a] truncate max-w-[180px]">{r.who.email || "No email on file"}</p>
                   </div>
                 </div>
               </td>
-              <td className={`${tdCls} font-bold`}>{PROVIDER_LABELS[p.provider] || p.provider}</td>
-              <td className={`${tdCls} text-[11px] text-[#666]`}>{p.transactionId || "—"}</td>
-              <td className={`${tdCls} font-bold whitespace-nowrap`}>
-                {p.currency} {p.amount}
+              <td className={`${tdCls} font-bold`}>{PROVIDER_LABELS[r.provider] || r.provider}</td>
+              <td className={`${tdCls} text-[11px] text-[#666]`}>
+                {r.transactionUrl ? (
+                  <a href={r.transactionUrl} target="_blank" rel="noopener noreferrer" className="hover:underline hover:text-black">
+                    {r.transactionId}
+                  </a>
+                ) : (
+                  r.transactionId || "—"
+                )}
               </td>
+              <td className={`${tdCls} font-bold whitespace-nowrap`}>{money(r.amount, r.currency)}</td>
               <td className={tdCls}>
-                <StatusBadge map={PAYMENT_STATUS} value={p.status} />
+                <StatusBadge map={PAYMENT_STATUS} value={r.status} />
+                {r.note && <span className="block text-[11px] text-[#666] mt-1 max-w-[220px]">{r.note}</span>}
               </td>
             </tr>
           ))}
           {filtered.length === 0 && (
             <EmptyRow
               colSpan={7}
-              title={rows.length ? "No payments match your filters" : "No payments recorded yet."}
-              sub={rows.length ? undefined : "Card payments are processed on Stripe — their orders are listed under Orders."}
+              title={
+                rows.length
+                  ? "No payments match your filters"
+                  : stripeLoading
+                    ? "Loading payments from Stripe…"
+                    : "No payments recorded yet."
+              }
+              sub={rows.length || stripeLoading ? undefined : "Card payments appear here as soon as Stripe takes them."}
             />
           )}
         </DataTable>

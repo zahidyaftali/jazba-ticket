@@ -81,7 +81,7 @@ const SUB_TITLES: Record<string, string> = {
 };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { data, route, navigate, reload, refreshing, loading, admin, onLogout, toasts, dismissToast, clients } =
+  const { data, route, navigate, reload, refreshing, loading, admin, onLogout, toasts, dismissToast, clients, cardPayments } =
     useAdmin();
   const [collapsed, setCollapsed] = useState(readCollapsedPref);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -122,7 +122,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           ],
         },
         { id: "orders", label: "Orders", icon: ShoppingBag, to: "/admin/orders", count: data.bookings.length },
-        { id: "payments", label: "Payments", icon: CreditCard, to: "/admin/payments", count: data.payments.length },
+        { id: "payments", label: "Payments", icon: CreditCard, to: "/admin/payments", count: data.payments.length + cardPayments.length },
         { id: "clients", label: "Clients", icon: Contact, to: "/admin/clients", count: clients.filter((c) => c.orders.length).length },
       ],
     },

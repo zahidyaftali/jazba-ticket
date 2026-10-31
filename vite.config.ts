@@ -9,6 +9,7 @@ import {submitEasypaisaOrder} from './api/_lib/easypaisaOrder';
 import {sendTicketEmail, ticketPdfForAdmin, TicketEmailError} from './api/_lib/ticketEmail';
 import {HttpError, verifyAdmin} from './api/_lib/adminAuth';
 import {listAuthUsers, serviceAccountFromEnv} from './api/_lib/firebaseAuthUsers';
+import {listCardPayments} from './api/_lib/stripeLedger';
 import {mailConfigFromEnv, type MailConfig} from './api/_lib/sendEmail';
 import {fetchWordPressEvents, fetchWordPressSlug} from './api/_lib/wordpressEvents';
 import {SHARE_BOT_UA, renderEventSharePage} from './api/_lib/eventShare';
@@ -115,6 +116,24 @@ const devApi = (secrets: { stripeSecretKey: string; mail: MailConfig | null; env
       } catch (err: any) {
         res.statusCode = err instanceof HttpError ? err.status : 502;
         res.end(JSON.stringify({ error: err?.message || 'Could not load sign-in accounts.' }));
+      }
+    });
+
+    server.middlewares.use('/api/admin-payments', async (req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method !== 'POST') {
+        res.statusCode = 405;
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
+      }
+      try {
+        const body = await readJsonBody(req);
+        await verifyAdmin(typeof body.idToken === 'string' ? body.idToken : '', 'Only admins can see payments.');
+        if (!secrets.stripeSecretKey) throw new HttpError('STRIPE_SECRET_KEY is not set in .env', 500);
+        res.end(JSON.stringify({ payments: await listCardPayments(secrets.stripeSecretKey) }));
+      } catch (err: any) {
+        res.statusCode = err instanceof HttpError ? err.status : 502;
+        res.end(JSON.stringify({ error: err?.message || 'Could not load payments from Stripe.' }));
       }
     });
 
