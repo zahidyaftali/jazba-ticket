@@ -155,6 +155,7 @@ export async function deliverOrderEmails(
         row('Package', ticket.tierName),
         row('No. of tickets', String(order.quantity)),
         row('Promo code', session.metadata?.promo || ''),
+        row('Sale', session.metadata?.sale ? `${session.metadata.sale} off` : ''),
         row('Paid by card', amount),
         row('Buyer', order.buyerName),
         row('Ticket emailed to', recipients || 'NO EMAIL ADDRESS — please send this ticket manually'),

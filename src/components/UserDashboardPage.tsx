@@ -21,7 +21,7 @@ import {
   ArrowRight,
   Share2,
 } from "lucide-react";
-import { EventItem, isPastEvent, tierDisplayName, ticketSeat } from "../types";
+import { EventItem, isPastEvent, tierDisplayName, ticketSeat, eventFromPrice } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import {
   auth,
@@ -784,7 +784,7 @@ export default function UserDashboardPage({
                                 {evt.title}
                               </h4>
                               <span className="text-sm text-[#666] mt-0.5 block">
-                                From {formatFrom(evt.price)} · {evt.date}
+                                From {formatFrom(eventFromPrice(evt))} · {evt.date}
                               </span>
                             </div>
                             <button
@@ -1033,7 +1033,7 @@ export default function UserDashboardPage({
                                 {show.title}
                               </h4>
                               <span className="text-sm text-[#666]">
-                                From {formatFrom(show.price)} · {show.date}
+                                From {formatFrom(eventFromPrice(show))} · {show.date}
                               </span>
                             </div>
                             <div className="flex gap-2 shrink-0">

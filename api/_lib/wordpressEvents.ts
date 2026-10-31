@@ -160,6 +160,8 @@ interface ParsedTier {
   name: string;
   note: string;
   price: ParsedPrice;
+  /** Offer price shown beside a struck-through regular one, during a sale. */
+  offer: ParsedPrice | null;
   group: boolean;
   /** People admitted on one group ticket, e.g. 4; 0 if not a group or not stated. */
   groupSize: number;
@@ -169,14 +171,22 @@ interface ParsedShow { name: string; when: string; details: string[]; tiers: Par
 function parseTierList(listHtml: string, group: boolean, defaultGroupSize: number): ParsedTier[] {
   const tiers: ParsedTier[] = [];
   for (const li of listHtml.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)) {
-    const label = li[1].match(/<span\b[^>]*>([\s\S]*)<\/span>/i)?.[1] ?? '';
-    const price = parsePrice(li[1].match(/<b\b[^>]*>([\s\S]*?)<\/b>/i)?.[1] ?? '');
+    const label = li[1].split(/<b\b/i)[0].match(/<span\b[^>]*>([\s\S]*)<\/span>/i)?.[1] ?? '';
+    // During a sale the price reads <s class="jz-offer-was">PKR 3,000</s>
+    // <span class="jz-offer-now">PKR 2,250</span>: the regular price is the
+    // struck one. Whether the offer price is charged here is decided by
+    // SALES in api/_lib/stripePayment.ts, so the sale stops on time.
+    const priceHtml = li[1].match(/<b\b[^>]*>([\s\S]*?)<\/b>/i)?.[1] ?? '';
+    const wasHtml = innerOfClass(priceHtml, 'jz-offer-was');
+    const price = parsePrice(wasHtml || priceHtml);
+    const nowPrice = wasHtml ? parsePrice(innerOfClass(priceHtml, 'jz-offer-now')) : null;
+    const offer = nowPrice && price && nowPrice.currency === price.currency && nowPrice.amount < price.amount ? nowPrice : null;
     const name = toText(label.split(/<small\b/i)[0]);
     if (!name || !price) continue;
     const note = Array.from(label.matchAll(/<small\b[^>]*>([\s\S]*?)<\/small>/gi), (s) => toText(s[1])).filter(Boolean).join(' · ');
     // "Group of 4" in the package's own note, else the list's "Groups of 4 or more".
     const groupSize = group ? Number(note.match(/\bgroups? of (\d+)/i)?.[1]) || defaultGroupSize : 0;
-    tiers.push({ name, note, price, group, groupSize });
+    tiers.push({ name, note, price, offer, group, groupSize });
   }
   return tiers;
 }
@@ -252,6 +262,7 @@ function buildTicketOptions(shows: ParsedShow[]): (TicketOption & { group: boole
         name,
         ...(note ? { note } : {}),
         price: toUsd(t.price),
+        ...(t.offer ? { offerPrice: toUsd(t.offer) } : {}),
         ...(t.groupSize ? { groupSize: t.groupSize } : {}),
         group: t.group,
       });
@@ -260,7 +271,12 @@ function buildTicketOptions(shows: ParsedShow[]): (TicketOption & { group: boole
   return options;
 }
 
-const toPriceLine = (t: ParsedTier): PriceLine => ({ name: t.name, ...(t.note ? { note: t.note } : {}), price: t.price.label });
+const toPriceLine = (t: ParsedTier): PriceLine => ({
+  name: t.name,
+  ...(t.note ? { note: t.note } : {}),
+  price: t.price.label,
+  ...(t.offer ? { offer: t.offer.label } : {}),
+});
 
 // ── Body content: the whole post, as structured sections ───────────────────
 // Every part of the post is kept, in order, as plain data (see ContentBlock in

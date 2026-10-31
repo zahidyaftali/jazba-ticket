@@ -37,6 +37,30 @@ export const PROMO_CODES = new Map<string, { rate: number; eventIds?: string[]; 
   ['DAKHLAY26', { rate: 0.4, eventIds: ['wp-607', 'wp-700'], tiers: ['standard', 'standard-group'] }],
 ]);
 
+// Timed sales on the listed events, from startsAt until (not including)
+// endsAt. A package is charged the organiser's offer price when the post lists
+// one (offerPrice), otherwise `rate` comes off. Outside the window the regular
+// price applies even if the post still shows the offer. Must stay identical
+// to SALES in src/types.ts.
+export const SALES: { rate: number; eventIds: string[]; startsAt: string; endsAt: string }[] = [
+  // Aa – Tenu Moaj Karawan Live, Lahore (wp-700): 25% off for 48 hours,
+  // Sat 31 Oct 00:00 to Sun 1 Nov 2026 11:59 PM Pakistan time. The post's
+  // offer prices apply (Student Group is PKR 8,500 → 7,200).
+  { rate: 0.25, eventIds: ['wp-700'], startsAt: '2026-10-31T00:00:00+05:00', endsAt: '2026-11-02T00:00:00+05:00' },
+];
+
+/** The share the event's running sale takes off a package (0 when none).
+ *  Same as saleRate() in src/types.ts. */
+export function saleRate(eventId: string, tier: { price: number; offerPrice?: number }, now = Date.now()): number {
+  const sale = SALES.find(
+    (s) => s.eventIds.includes(eventId) && Date.parse(s.startsAt) <= now && now < Date.parse(s.endsAt),
+  );
+  if (!sale) return 0;
+  const offer = tier.offerPrice;
+  if (offer && offer > 0 && offer < tier.price) return 1 - offer / tier.price;
+  return sale.rate;
+}
+
 /** Only VIP packages (vip, vip-group) come with a seat — every other ticket
  *  is standing. Same rule as isSeatedTier() in src/types.ts. */
 export function isSeatedTier(tier: string): boolean {
@@ -51,6 +75,21 @@ export function promoRate(code: string, eventId: string, tier: string): number {
   if (!promo || (promo.eventIds && !promo.eventIds.includes(eventId))) return 0;
   if (promo.tiers && !promo.tiers.includes(tier)) return 0;
   return promo.rate;
+}
+
+/** What comes off an order: the event's sale or the promo code, whichever is
+ *  bigger. They never add up. Same rule as orderDiscount() in src/types.ts.
+ *  `code` is the promo only when it set the price. */
+export function orderDiscountRate(
+  promoCode: string,
+  eventId: string,
+  tier: string,
+  pricing: { price: number; offerPrice?: number },
+  now = Date.now(),
+): { rate: number; code: string; sale: number } {
+  const sale = saleRate(eventId, pricing, now);
+  const codeRate = promoRate(promoCode, eventId, tier);
+  return codeRate > sale ? { rate: codeRate, code: promoCode, sale: 0 } : { rate: sale, code: '', sale };
 }
 
 export class PaymentError extends Error {
@@ -118,7 +157,7 @@ interface EventPricing {
   /** The event page on this site — where Stripe's "back" link returns to. */
   path: string;
   /** Ticket packages on sale, keyed by tier id. */
-  tiers: Record<string, { price: number; name: string }>;
+  tiers: Record<string, { price: number; name: string; offerPrice?: number }>;
   details: EventDetails;
 }
 
@@ -158,7 +197,13 @@ async function fetchWordPressEventPricing(eventId: string): Promise<EventPricing
 
   const tiers: EventPricing['tiers'] = {};
   for (const option of event.ticketOptions || []) {
-    if (option.price > 0) tiers[option.id] = { price: option.price, name: option.name };
+    if (option.price > 0) {
+      tiers[option.id] = {
+        price: option.price,
+        name: option.name,
+        ...(option.offerPrice ? { offerPrice: option.offerPrice } : {}),
+      };
+    }
   }
   if (Object.keys(tiers).length === 0) throw new PaymentError('Tickets for this event are not on sale yet.');
   return {
@@ -275,9 +320,10 @@ export async function createCheckoutSession(
   const selected = Object.prototype.hasOwnProperty.call(event.tiers, tier) ? event.tiers[tier] : undefined;
   if (!selected) throw new PaymentError('That ticket package is not available for this event.');
 
-  const discountRate = promoRate(promoCode, eventId, tier);
-  const promoApplied = discountRate > 0;
-  const amountUsd = computeTotalUsd(selected.price, quantity, discountRate);
+  const discount = orderDiscountRate(promoCode, eventId, tier, selected);
+  const promoApplied = discount.code !== '';
+  const salePercent = discount.sale ? `${Math.round(discount.sale * 100)}%` : '';
+  const amountUsd = computeTotalUsd(selected.price, quantity, discount.rate);
   if (amountUsd <= 0 || amountUsd > 10000) throw new PaymentError('Invalid payment amount.');
 
   // The e-ticket goes to the email typed at checkout (it starts out as the
@@ -306,7 +352,7 @@ export async function createCheckoutSession(
           unit_amount: toChargeAmount(amountUsd, currency),
           product_data: {
             name: `${event.title} — ${tierLabel} × ${quantity}`,
-            description: `Jazba Tickets order${promoApplied ? ' — promo applied' : ''}`,
+            description: `Jazba Tickets order${promoApplied ? ' — promo applied' : salePercent ? ` — ${salePercent} off sale` : ''}`,
           },
         },
       },
@@ -321,6 +367,7 @@ export async function createCheckoutSession(
       tier_name: tierLabel,
       quantity: String(quantity),
       promo: promoApplied ? promoCode : '',
+      sale: salePercent,
       amount_usd: amountUsd.toFixed(2),
       buyer_uid: user.uid,
       buyer_email: user.email,

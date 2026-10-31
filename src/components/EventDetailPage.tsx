@@ -5,7 +5,11 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ContentSectionView } from './EventContent';
-import { EventItem, TicketTier, computeOrderTotals, defaultTier, getAvailableTiers, isPastEvent, findPromo, promoRate, promoPackagesNote } from '../types';
+import {
+  EventItem, TicketTier, computeOrderTotals, defaultTier, getAvailableTiers, isPastEvent, findPromo, promoPackagesNote,
+  orderDiscount, salePrice, salePriceLabel, eventFromPrice,
+} from '../types';
+import { SaleBanner, SaleTag } from './SaleBadge';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth } from '../firebase';
 import { getOrganizerProfile, followTarget, unfollowTarget, isFollowingTarget, getFollowerCount, OrganizerProfile } from '../services/backendService';
@@ -135,11 +139,13 @@ export default function EventDetailPage({
   const selectedTier = availableTiers.find((t) => t.tier === ticketTier) || availableTiers[0];
   // A code can be accepted yet give no discount on the chosen package; the
   // note then names the packages it does cover.
+  // A running sale and a promo code don't add up: the bigger one applies.
   const codeAccepted = appliedPromo !== '';
-  const discountRate = promoRate(appliedPromo, event.id, selectedTier?.tier ?? '');
+  const discount = orderDiscount(appliedPromo, event.id, selectedTier);
+  const discountRate = discount.rate;
   const discountPercent = Math.round(discountRate * 100);
-  const promoApplied = discountRate > 0;
-  const promoNote = promoPackagesNote(appliedPromo, event, selectedTier?.tier ?? '');
+  const promoApplied = discount.usesCode;
+  const promoNote = promoPackagesNote(appliedPromo, event, selectedTier?.tier ?? '') || (codeAccepted ? discount.note : '');
   const totals = computeOrderTotals(selectedTier?.price ?? 0, quantity, discountRate);
 
   const handleApplyPromo = (e: React.FormEvent) => {
@@ -329,7 +335,14 @@ export default function EventDetailPage({
                 <span className="font-bold">{p.name}</span>
                 {p.note && <span className="block text-xs text-[#666] mt-0.5">{p.note}</span>}
               </span>
-              <span className="font-display font-bold shrink-0">{p.price}</span>
+              <span className="font-display font-bold shrink-0 text-right">
+                {salePriceLabel(event.id, p) ? (
+                  <>
+                    <span className="block text-xs font-normal text-[#8a8a8a] line-through">{p.price}</span>
+                    {salePriceLabel(event.id, p)}
+                  </>
+                ) : p.price}
+              </span>
             </li>
           ))}
         </ul>
@@ -750,13 +763,17 @@ export default function EventDetailPage({
             ) : (
             <div className="border border-black">
 
+              <SaleBanner eventId={event.id} />
+
               <div className="px-6 py-5 border-b border-[#f2f2f2]">
                 <span className={`${overline} text-[#666]`}>Tickets</span>
               </div>
 
               {/* Tier rows — only the packages this event offers */}
               <div className="px-6 border-b border-[#f2f2f2]">
-                {availableTiers.map(({ tier, name, price, groupSize }) => (
+                {availableTiers.map((option) => {
+                  const { tier, name, price, groupSize } = option;
+                  return (
                   <button
                     key={tier}
                     onClick={() => setTicketTier(tier)}
@@ -776,11 +793,13 @@ export default function EventDetailPage({
                       </div>
                     </div>
                     <div className="text-right shrink-0 pl-3">
-                      <span className="font-display font-bold text-base block">{formatPrecise(price)}</span>
+                      {discount.sale && <span className="text-xs text-[#8a8a8a] line-through block">{formatPrecise(price)}</span>}
+                      <span className="font-display font-bold text-base block">{formatPrecise(salePrice(event.id, option))}</span>
                       {tierTags[tier] && <span className={`${overline} text-[#8a8a8a]`}>{tierTags[tier]}</span>}
                     </div>
                   </button>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Quantity */}
@@ -843,9 +862,9 @@ export default function EventDetailPage({
                     <span>Subtotal ({quantity} × {selectedTier?.name})</span>
                     <span className="shrink-0">{formatPrecise(totals.subtotal)}</span>
                   </div>
-                  {promoApplied && (
+                  {discountRate > 0 && (
                     <div className="flex justify-between text-[#666]">
-                      <span>Discount ({discountPercent}%)</span>
+                      <span>{promoApplied ? `Discount (${discountPercent}%)` : 'Sale discount'}</span>
                       <span>−{formatPrecise(totals.discount)}</span>
                     </div>
                   )}
@@ -912,7 +931,7 @@ export default function EventDetailPage({
                       <MapPin className="w-3.5 h-3.5 shrink-0" /> {evt.location}
                     </span>
                     <span className="font-bold text-sm flex items-center gap-1.5 shrink-0 pl-3">
-                      From {formatFrom(evt.price)} <ArrowRight className="w-4 h-4" />
+                      From {formatFrom(eventFromPrice(evt))} <SaleTag eventId={evt.id} /> <ArrowRight className="w-4 h-4" />
                     </span>
                   </div>
                 </div>

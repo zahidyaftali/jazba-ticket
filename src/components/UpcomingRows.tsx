@@ -1,6 +1,7 @@
 import React from 'react';
 import { MapPin, Clock, ArrowRight } from 'lucide-react';
-import { EventItem } from '../types';
+import { EventItem, eventFromPrice } from '../types';
+import { SaleTag } from './SaleBadge';
 import { useLocalCurrency } from '../currency';
 
 interface UpcomingRowsProps {
@@ -76,8 +77,8 @@ export default function UpcomingRows({ events, onBook, onViewAll, onViewDetail }
                 {/* Price + action */}
                 <div className="flex items-center justify-between md:justify-end gap-6 shrink-0">
                   <div className="text-left md:text-right">
-                    <span className={`${overline} text-[#8a8a8a] block`}>From</span>
-                    <span className="font-display font-bold text-xl leading-none">{formatFrom(item.price)}</span>
+                    <span className={`${overline} text-[#8a8a8a] block`}>From <SaleTag eventId={item.id} className="ml-1" /></span>
+                    <span className="font-display font-bold text-xl leading-none">{formatFrom(eventFromPrice(item))}</span>
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); onBook(item); }}

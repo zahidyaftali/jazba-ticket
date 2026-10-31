@@ -4,7 +4,11 @@ import {
   ShieldCheck, Globe, Calendar, Loader2, Minus, Plus, AlertCircle, Lock,
   Copy, ImageUp, Smartphone,
 } from 'lucide-react';
-import { EventItem, TicketTier, computeOrderTotals, defaultTier, getAvailableTiers, findPromo, promoRate, promoPackagesNote } from '../types';
+import {
+  EventItem, TicketTier, computeOrderTotals, defaultTier, getAvailableTiers, findPromo, promoPackagesNote,
+  orderDiscount, salePrice,
+} from '../types';
+import { SaleBanner } from './SaleBadge';
 import { auth } from '../firebase';
 import { formatMoney as formatLocalMoney } from '../currency';
 import {
@@ -117,10 +121,12 @@ export default function CheckoutPage({
   // Same maths as the payment server, so the total shown is the amount charged.
   const unitPrice = availableTiers.find((t) => t.tier === ticketTier)?.price ?? 0;
   // A code can be accepted yet give no discount on the chosen package; the
-  // note then names the packages it does cover.
-  const discountRate = promoRate(appliedPromo, event.id, ticketTier);
+  // note then names the packages it does cover. A running sale and a code
+  // don't add up: the bigger one applies.
+  const discount = orderDiscount(appliedPromo, event.id, availableTiers.find((t) => t.tier === ticketTier));
+  const discountRate = discount.rate;
   const discountPercent = Math.round(discountRate * 100);
-  const promoNote = promoPackagesNote(appliedPromo, event, ticketTier);
+  const promoNote = promoPackagesNote(appliedPromo, event, ticketTier) || (appliedPromo ? discount.note : '');
   const totals = computeOrderTotals(unitPrice, ticketCount, discountRate);
 
   // Local pricing follows the detected region — same shared rates as the
@@ -607,6 +613,8 @@ export default function CheckoutPage({
           <div className="lg:col-span-5 lg:sticky lg:top-20 lg:self-start">
             <div className="border border-black">
 
+              <SaleBanner eventId={event.id} />
+
               {/* Event strip */}
               <div className="p-6 border-b border-[#f2f2f2]">
                 <span className={`${overline} text-[#666]`}>Your order</span>
@@ -633,7 +641,9 @@ export default function CheckoutPage({
               {/* Tier rows */}
               <div className="p-6 border-b border-[#f2f2f2]">
                 <span className={`${overline} text-[#666] block mb-1`}>Ticket type</span>
-                {availableTiers.map(({ tier, name, price, groupSize }) => (
+                {availableTiers.map((option) => {
+                  const { tier, name, price, groupSize } = option;
+                  return (
                   <button
                     key={tier}
                     type="button"
@@ -653,9 +663,13 @@ export default function CheckoutPage({
                         {!!groupSize && <span className="text-xs text-[#666] block">Number of people: {groupSize}</span>}
                       </div>
                     </div>
-                    <span className="font-display font-bold text-base shrink-0 pl-3">{formatMoney(price)}</span>
+                    <span className="text-right shrink-0 pl-3">
+                      {discount.sale && <span className="text-xs text-[#8a8a8a] line-through block">{formatMoney(price)}</span>}
+                      <span className="font-display font-bold text-base block">{formatMoney(salePrice(event.id, option))}</span>
+                    </span>
                   </button>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Quantity */}
@@ -701,7 +715,7 @@ export default function CheckoutPage({
                     Apply
                   </button>
                 </div>
-                {discountRate > 0 && (
+                {discount.usesCode && (
                   <span className="flex items-center gap-1.5 text-sm font-bold mt-3">
                     <Check className="w-4 h-4" /> {discountPercent}% discount applied
                   </span>
@@ -723,7 +737,7 @@ export default function CheckoutPage({
                   </div>
                   {discountRate > 0 && (
                     <div className="flex justify-between text-[#666]">
-                      <span>Discount ({discountPercent}%)</span>
+                      <span>{discount.usesCode ? `Discount (${discountPercent}%)` : 'Sale discount'}</span>
                       <span>−{formatMoney(totals.discount)}</span>
                     </div>
                   )}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MapPin, Clock, Heart, ArrowRight } from 'lucide-react';
-import { EventItem } from '../types';
+import { EventItem, eventFromPrice } from '../types';
+import { SaleTag } from './SaleBadge';
 import { useLocalCurrency } from '../currency';
 
 interface EventCardProps {
@@ -97,7 +98,8 @@ export default function EventCard({ event, onBook, onViewDetail }: EventCardProp
         <div className="pt-3.5   flex items-center justify-between">
           <div>
             <span className="text-[9px] font-semibold text-neutral-400 block text-sentence tracking-wider">Prices from</span>
-            <span className="font-display font-black text-neutral-900 text-lg">{formatFrom(event.price)}</span>
+            <span className="font-display font-black text-neutral-900 text-lg">{formatFrom(eventFromPrice(event))}</span>
+            <SaleTag eventId={event.id} className="ml-2 align-middle" />
           </div>
           <button 
             onClick={(e) => { e.stopPropagation(); onBook(event); }}

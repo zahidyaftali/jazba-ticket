@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Hourglass, ArrowRight } from 'lucide-react';
-import { EventItem } from '../types';
+import { EventItem, eventFromPrice } from '../types';
 import { useLocalCurrency } from '../currency';
 
 interface EventsForYouProps {
@@ -140,7 +140,7 @@ export default function EventsForYou({ events, onBook, onViewDetail }: EventsFor
                     onClick={(e) => { e.stopPropagation(); onBook(item); }}
                     className="mt-4 w-full bg-black text-white py-3.5 text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2"
                   >
-                    {item.price > 0 ? `Buy from ${format(item.price)}` : 'View event'} <ArrowRight className="w-4 h-4" />
+                    {item.price > 0 ? `Buy from ${format(eventFromPrice(item))}` : 'View event'} <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               </div>

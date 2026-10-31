@@ -49,6 +49,9 @@ export interface TicketOption {
   name: string;
   note?: string;
   price: number; // USD, like every stored price
+  /** Sale price the organiser lists beside the struck-through regular one
+   *  (USD). Only charged while a sale in SALES is running. */
+  offerPrice?: number;
   /** Group package: people admitted on one ticket, e.g. 4. */
   groupSize?: number;
 }
@@ -58,6 +61,8 @@ export interface PriceLine {
   name: string;
   note?: string;
   price: string; // as written by the organiser, e.g. "PKR 2,200 each"
+  /** The organiser's sale price, e.g. "PKR 1,650 each" (shown only during a sale). */
+  offer?: string;
 }
 
 // ---- Rich event content (the full body of a jazbaentertainment.com post) ----
@@ -147,6 +152,7 @@ export interface AvailableTier {
   price: number;
   name: string;
   note: string;
+  offerPrice?: number;
   groupSize?: number;
 }
 
@@ -163,6 +169,7 @@ export function getAvailableTiers(event: EventItem): AvailableTier[] {
         price: o.price,
         name: o.name,
         note: o.note || '',
+        ...(o.offerPrice ? { offerPrice: o.offerPrice } : {}),
         ...(o.groupSize ? { groupSize: o.groupSize } : {}),
       }));
   }
@@ -228,6 +235,103 @@ export function promoPackagesNote(code: string, event: EventItem, tier: TicketTi
     .filter((t) => promo.tiers!.includes(t.tier))
     .map((t) => t.name);
   return names.length ? `This code works on ${names.join(' and ')} tickets only.` : '';
+}
+
+/** A timed sale on the listed events, from startsAt until (not including)
+ *  endsAt. A package is charged the organiser's offer price when the post
+ *  lists one (TicketOption.offerPrice), otherwise `rate` comes off. */
+export interface Sale {
+  rate: number;
+  eventIds: string[];
+  startsAt: string;
+  endsAt: string;
+  /** When the sale ends, as buyers see it. */
+  endsLabel: string;
+}
+
+/** Must stay identical to SALES in api/_lib/stripePayment.ts, which sets the
+ *  price actually charged. */
+export const SALES: Sale[] = [
+  // Aa – Tenu Moaj Karawan Live, Lahore (wp-700): 25% off for 48 hours,
+  // Sat 31 Oct 00:00 to Sun 1 Nov 2026 11:59 PM Pakistan time. The post's
+  // offer prices apply (Student Group is PKR 8,500 → 7,200).
+  {
+    rate: 0.25,
+    eventIds: ['wp-700'],
+    startsAt: '2026-10-31T00:00:00+05:00',
+    endsAt: '2026-11-02T00:00:00+05:00',
+    endsLabel: 'Sunday 1 November, 11:59 PM (PKT)',
+  },
+];
+
+/** The sale running on an event right now, if any. */
+export function activeSale(eventId: string, now = Date.now()): Sale | undefined {
+  return SALES.find(
+    (s) => s.eventIds.includes(eventId) && Date.parse(s.startsAt) <= now && now < Date.parse(s.endsAt),
+  );
+}
+
+/** A package's regular price and, when listed, its offer price (USD). */
+interface PricedTier {
+  price: number;
+  offerPrice?: number;
+}
+
+/** The share the event's running sale takes off a package (0 when none).
+ *  Same as saleRate() in api/_lib/stripePayment.ts. */
+export function saleRate(eventId: string, tier?: PricedTier, now = Date.now()): number {
+  const sale = activeSale(eventId, now);
+  if (!sale) return 0;
+  const offer = tier?.offerPrice;
+  if (tier && offer && offer > 0 && offer < tier.price) return 1 - offer / tier.price;
+  return sale.rate;
+}
+
+/** A package's price as buyers pay it right now. */
+export function salePrice(eventId: string, tier: PricedTier): number {
+  return tier.price * (1 - saleRate(eventId, tier));
+}
+
+/** An organiser's listed price ("PKR 2,200 each") during the event's sale
+ *  ("PKR 1,650 each"), or '' when there's no sale on. */
+export function salePriceLabel(eventId: string, line: PriceLine): string {
+  const sale = activeSale(eventId);
+  if (!sale) return '';
+  return (
+    line.offer ||
+    line.price.replace(/\d[\d,]*(?:\.\d+)?/, (n) =>
+      Math.round(Number(n.replace(/,/g, '')) * (1 - sale.rate)).toLocaleString('en-US'),
+    )
+  );
+}
+
+/** An event's "from" price as buyers pay it right now. */
+export function eventFromPrice(event: EventItem): number {
+  if (!activeSale(event.id)) return event.price;
+  const from = event.ticketOptions?.find((o) => o.price === event.price);
+  return salePrice(event.id, from || { price: event.price });
+}
+
+/** What comes off an order: the event's sale or the promo code, whichever is
+ *  bigger. They never add up. Same rule as orderDiscountRate() in
+ *  api/_lib/stripePayment.ts. */
+export function orderDiscount(code: string, eventId: string, tier?: AvailableTier) {
+  const sale = activeSale(eventId);
+  const saleOff = saleRate(eventId, tier);
+  const codeRate = promoRate(code, eventId, tier?.tier ?? '');
+  const usesCode = codeRate > saleOff;
+  return {
+    rate: usesCode ? codeRate : saleOff,
+    sale,
+    /** True when the promo code sets the price (it beats the sale). */
+    usesCode,
+    /** Shown under the promo box when a sale is running and a code was entered. */
+    note: !sale || codeRate === 0
+      ? ''
+      : usesCode
+        ? "Used instead of the sale price. Offers can't be combined."
+        : 'The sale price is already lower than this code.',
+  };
 }
 
 /** Order maths, in USD. Must stay identical to computeTotalUsd() in

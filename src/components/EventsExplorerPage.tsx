@@ -13,7 +13,8 @@ import {
   Check,
   ArrowRight,
 } from 'lucide-react';
-import { EventItem, CategoryItem, isPastEvent } from '../types';
+import { EventItem, CategoryItem, isPastEvent, eventFromPrice } from '../types';
+import { SaleTag } from './SaleBadge';
 import { useLocalCurrency } from '../currency';
 
 interface EventsExplorerPageProps {
@@ -523,8 +524,8 @@ export default function EventsExplorerPage({
 
                         <div className="flex items-center justify-between border-t border-[#f2f2f2] mt-4 pt-4">
                           <div>
-                            <span className={`${overline} text-[#8a8a8a] block`}>From</span>
-                            <span className="font-display font-bold text-lg">{formatFrom(evt.price)}</span>
+                            <span className={`${overline} text-[#8a8a8a] block`}>From <SaleTag eventId={evt.id} className="ml-1" /></span>
+                            <span className="font-display font-bold text-lg">{formatFrom(eventFromPrice(evt))}</span>
                           </div>
                           <button
                             onClick={(e) => { e.stopPropagation(); onBook(evt); }}
@@ -583,8 +584,8 @@ export default function EventsExplorerPage({
 
                       <div className="flex sm:flex-col items-center sm:items-end justify-between gap-3 shrink-0">
                         <div className="text-left sm:text-right">
-                          <span className={`${overline} text-[#8a8a8a] block`}>From</span>
-                          <span className="font-display font-bold text-2xl leading-none">{formatFrom(evt.price)}</span>
+                          <span className={`${overline} text-[#8a8a8a] block`}>From <SaleTag eventId={evt.id} className="ml-1" /></span>
+                          <span className="font-display font-bold text-2xl leading-none">{formatFrom(eventFromPrice(evt))}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           {likeButton(evt)}

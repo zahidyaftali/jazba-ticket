@@ -3,7 +3,7 @@ import {
   PaymentError,
   computeTotalUsd,
   fetchEventPricing,
-  promoRate,
+  orderDiscountRate,
   toChargeAmount,
   verifyFirebaseUser,
 } from './stripePayment.js';
@@ -24,6 +24,7 @@ const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 const SCREENSHOT_TYPES: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 // ~3 MB decoded — keeps the whole request under Vercel's 4.5 MB body limit.
 const MAX_SCREENSHOT_BASE64 = 4_000_000;
+const SALE_GRACE_MS = 60 * 60 * 1000;
 
 export interface EasypaisaOrderBody {
   eventId?: unknown;
@@ -84,9 +85,11 @@ export async function submitEasypaisaOrder(
   const selected = Object.prototype.hasOwnProperty.call(event.tiers, tier) ? event.tiers[tier] : undefined;
   if (!selected) throw new PaymentError('That ticket package is not available for this event.');
 
-  const discountRate = promoRate(promoCode, eventId, tier);
-  const promoApplied = discountRate > 0;
-  const amountUsd = computeTotalUsd(selected.price, quantity, discountRate);
+  // A transfer made just before a sale ends can be submitted a little after,
+  // so the sale price still counts for an hour past the deadline.
+  const discount = orderDiscountRate(promoCode, eventId, tier, selected, Date.now() - SALE_GRACE_MS);
+  const promoApplied = discount.code !== '';
+  const amountUsd = computeTotalUsd(selected.price, quantity, discount.rate);
   if (amountUsd <= 0 || amountUsd > 10000) throw new PaymentError('Invalid payment amount.');
   // Same rupee figure the checkout shows and a PKR Stripe charge would take.
   const amountPkr = toChargeAmount(amountUsd, 'PKR') / 100;
@@ -100,6 +103,7 @@ export async function submitEasypaisaOrder(
     row('Ticket category', selected.name),
     row('No. of tickets', String(quantity)),
     row('Promo code', promoApplied ? promoCode : ''),
+    row('Sale', discount.sale ? `${Math.round(discount.sale * 100)}% off` : ''),
     row('Amount due', amountLabel),
     row('Full name', fullName),
     row('Phone', phone),
