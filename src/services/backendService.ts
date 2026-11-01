@@ -52,6 +52,8 @@ export interface OrganizerProfile {
   createdAt?: string;
   updatedAt?: string;
   reviewedAt?: string;
+  /** Jazba's share of their ticket sales, in percent — set by an admin. */
+  feePercent?: number;
 }
 
 export interface ArtistProfile {

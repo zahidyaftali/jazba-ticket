@@ -13,6 +13,7 @@ import {
   RefreshCw,
   ShoppingBag,
   UserCog,
+  Wallet,
   X,
 } from "lucide-react";
 import brandMark from "../../../assets/images/Favicon.png";
@@ -23,6 +24,7 @@ const TITLES: Record<string, string> = {
   dashboard: "Dashboard",
   events: "Events",
   orders: "Orders & attendees",
+  payouts: "Payouts",
   profile: "Organiser profile",
   account: "Account",
 };
@@ -46,6 +48,7 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
       ],
     },
     { id: "orders", label: "Orders & attendees", icon: ShoppingBag, to: "/organizer/orders" },
+    { id: "payouts", label: "Payouts", icon: Wallet, to: "/organizer/payouts" },
     { id: "profile", label: "Organiser profile", icon: Building2, to: "/organizer/profile" },
     { id: "account", label: "Account", icon: UserCog, to: "/organizer/account" },
   ];

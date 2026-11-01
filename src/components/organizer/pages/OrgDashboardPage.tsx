@@ -167,6 +167,11 @@ export default function OrgDashboardPage() {
             <p>Buyers pay Jazba Tickets securely by card (Stripe) or Easypaisa. You never handle card details.</p>
             <p>After your event, the Jazba team settles your ticket earnings with you directly, as agreed when you were approved.</p>
             <p>
+              <button type="button" className="font-bold underline cursor-pointer" onClick={() => navigate("/organizer/payouts")}>
+                See your earnings and payouts
+              </button>
+            </p>
+            <p>
               Questions about a payout? Email <a className="font-bold underline" href="mailto:info@jazbatickets.com">info@jazbatickets.com</a>.
             </p>
           </div>

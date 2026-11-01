@@ -284,3 +284,114 @@ export function eventsOfOrganizer<T extends { organizerId?: string; organizerNam
   const name = (org.companyName || '').trim().toLowerCase();
   return name ? events.filter((e) => (e.organizerName || '').trim().toLowerCase() === name) : [];
 }
+
+// ── Delete with clean-up ──────────────────────────────────────────────────
+
+export interface DeleteOrganizerPlan {
+  /** Their events with no orders — deleted when `deleteUnsold` is set. */
+  unsoldEventIds: string[];
+  /** Their events that have orders — kept (orders point at them). */
+  soldEventIds: string[];
+  /** Follow documents pointing at this organiser — always removed. */
+  followIds: string[];
+  deleteUnsold: boolean;
+  /** Take events that have orders off sale (tickets already sold stay valid). */
+  takeSoldOffSale: boolean;
+  accountRole?: string;
+}
+
+/** Delete an organiser and tidy up after them, in batches of up to 400 writes. */
+export async function deleteOrganizerWithCleanup(org: OrganizerProfile, plan: DeleteOrganizerPlan): Promise<void> {
+  if (!org.id) throw new Error('This organiser has no id.');
+  const writes: ((b: ReturnType<typeof writeBatch>) => void)[] = [];
+  if (plan.deleteUnsold) for (const id of plan.unsoldEventIds) writes.push((b) => b.delete(doc(db, 'events', id)));
+  if (plan.takeSoldOffSale) {
+    for (const id of plan.soldEventIds) writes.push((b) => b.update(doc(db, 'events', id), { status: 'draft', reviewNote: 'Organiser removed from Jazba Tickets.' }));
+  }
+  for (const id of plan.followIds) writes.push((b) => b.delete(doc(db, 'follows', id)));
+  // The profile and the role change go last, so a half-finished clean-up can be re-run.
+  writes.push((b) => b.delete(doc(db, 'organizers', org.id!)));
+  if (isSelfRegistered(org) && org.userId && plan.accountRole === 'organizer') {
+    writes.push((b) => b.update(doc(db, 'users', org.userId), { role: 'user' }));
+  }
+  for (let i = 0; i < writes.length; i += 400) {
+    const batch = writeBatch(db);
+    writes.slice(i, i + 400).forEach((w) => w(batch));
+    await batch.commit();
+  }
+}
+
+// ── Fees & payouts (admin writes, organiser reads their own) ──────────────
+
+export interface Payout {
+  id: string;
+  organizerId: string;
+  amount: number;
+  currency: string;
+  /** The same amount in USD at the site's fixed rates, for totals. */
+  amountUsd: number;
+  method: string;
+  reference: string;
+  note: string;
+  /** yyyy-mm-dd */
+  paidAt: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+const PAYOUT_RATES: Record<string, number> = { USD: 1, GBP: 0.78, PKR: 280 };
+
+export async function getPayouts(organizerId: string): Promise<Payout[]> {
+  const snap = await getDocs(query(collection(db, 'payouts'), where('organizerId', '==', organizerId)));
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }) as Payout)
+    .sort((a, b) => String(b.paidAt || b.createdAt).localeCompare(String(a.paidAt || a.createdAt)));
+}
+
+export async function recordPayout(input: {
+  organizerId: string;
+  amount: number;
+  currency: string;
+  method: string;
+  reference: string;
+  note: string;
+  paidAt: string;
+}): Promise<Payout> {
+  const amount = Math.round(Number(input.amount) * 100) / 100;
+  if (!(amount > 0)) throw new Error('Enter the amount paid.');
+  const currency = PAYOUT_RATES[input.currency] ? input.currency : 'PKR';
+  const ref = doc(collection(db, 'payouts'));
+  const payout: Payout = {
+    id: ref.id,
+    organizerId: input.organizerId,
+    amount,
+    currency,
+    amountUsd: amount / PAYOUT_RATES[currency],
+    method: input.method.trim().slice(0, 80),
+    reference: input.reference.trim().slice(0, 120),
+    note: input.note.trim().slice(0, 500),
+    paidAt: /^\d{4}-\d{2}-\d{2}$/.test(input.paidAt) ? input.paidAt : new Date().toISOString().slice(0, 10),
+    createdAt: new Date().toISOString(),
+    createdBy: auth.currentUser?.email || '',
+  };
+  await setDoc(ref, payout);
+  return payout;
+}
+
+export async function deletePayout(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'payouts', id));
+}
+
+/** Jazba's share of an organiser's ticket sales, in percent (0–100). */
+export async function setOrganizerFee(organizerId: string, feePercent: number): Promise<void> {
+  const v = Math.min(100, Math.max(0, Math.round(Number(feePercent) * 100) / 100));
+  await updateDoc(doc(db, 'organizers', organizerId), { feePercent: v });
+}
+
+/** Gross sales → Jazba fee → organiser's share → paid → still owed (all USD). */
+export function earnings(grossUsd: number, feePercent: number | undefined, payouts: Pick<Payout, 'amountUsd'>[]) {
+  const fee = (grossUsd * (Number(feePercent) || 0)) / 100;
+  const net = grossUsd - fee;
+  const paid = payouts.reduce((s, p) => s + (Number(p.amountUsd) || 0), 0);
+  return { gross: grossUsd, fee, net, paid, owed: net - paid };
+}

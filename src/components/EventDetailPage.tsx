@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  ArrowLeft, Calendar, MapPin, Clock, Ticket, Check, Star,
+  ArrowLeft, Calendar, MapPin, Clock, Ticket, Check,
   Share2, ShieldCheck, Heart, Plus, Minus, ChevronDown, ChevronUp, Image as ImageIcon, X, ArrowRight, ExternalLink,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -54,12 +54,14 @@ export default function EventDetailPage({
   // Organizer — real profile + follow state from Firestore
   const [organizerProfile, setOrganizerProfile] = useState<OrganizerProfile | null>(null);
   const [isFollowingOrganizer, setIsFollowingOrganizer] = useState(false);
-  const [organizerRating] = useState(4.9);
   const [organizerFollowers, setOrganizerFollowers] = useState(0);
   const [organizerFollowBusy, setOrganizerFollowBusy] = useState(false);
 
   const organizerUserId = (event as any).organizerId as string | undefined;
   const organizerTargetId = organizerProfile?.id || organizerUserId || '';
+  // Their public page — only for a live (approved) organiser profile.
+  const organizerPageId =
+    organizerProfile?.id && (!organizerProfile.status || organizerProfile.status === 'approved') ? organizerProfile.id : '';
 
   useEffect(() => {
     let cancelled = false;
@@ -613,9 +615,14 @@ export default function EventDetailPage({
                       </h4>
                       <div className="flex items-center gap-5 mt-1.5 text-sm text-[#666]">
                         <span>{organizerFollowers.toLocaleString()} followers</span>
-                        <span className="flex items-center gap-1">
-                          <Star className="w-3.5 h-3.5 fill-black text-black" /> {organizerRating}
-                        </span>
+                        {organizerPageId && (
+                          <Link
+                            to={`/organizers/${encodeURIComponent(organizerPageId)}`}
+                            className="font-bold text-black underline underline-offset-2 hover:text-[#666]"
+                          >
+                            View organiser
+                          </Link>
+                        )}
                       </div>
                     </div>
                   </div>

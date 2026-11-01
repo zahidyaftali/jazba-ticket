@@ -6,9 +6,12 @@ import { useAdmin } from "../AdminContext";
 import { EditorHeader, EditorPanel, Field, Switch, btnOutline, btnPrimary, inputCls } from "../ui";
 import { ImageUrlField } from "../media/ImageField";
 import { OrganizerDetail, OrganizersList } from "./OrganizerReview";
+import { SOCIAL_KEYS, SOCIAL_LABELS } from "../../../services/organizerService";
 
 const BLANK_ORGANIZER_FORM = {
   companyName: "",
+  contactName: "",
+  socialLinks: {} as Record<string, string>,
   email: "",
   phone: "",
   logoUrl: "",
@@ -58,6 +61,8 @@ function OrganizerEditor({ organizerId }: { organizerId?: string }) {
     const org = editing;
     setOrganizerForm({
       companyName: org.companyName || "",
+      contactName: org.contactName || "",
+      socialLinks: { ...(org.socialLinks || {}) },
       email: org.email || "",
       phone: org.phone || "",
       logoUrl: org.logoUrl || "",
@@ -98,8 +103,15 @@ function OrganizerEditor({ organizerId }: { organizerId?: string }) {
       fail("Organiser name is required.");
       return;
     }
+    const socialLinks: Record<string, string> = {};
+    for (const k of SOCIAL_KEYS) {
+      const v = (organizerForm.socialLinks[k] || "").trim().slice(0, 300);
+      if (v) socialLinks[k] = v;
+    }
     const payload = {
       companyName: organizerForm.companyName.trim(),
+      contactName: organizerForm.contactName.trim().slice(0, 120),
+      socialLinks,
       email: organizerForm.email.trim(),
       phone: organizerForm.phone.trim(),
       logoUrl: organizerForm.logoUrl.trim(),
@@ -154,6 +166,9 @@ function OrganizerEditor({ organizerId }: { organizerId?: string }) {
               <Field label="Location">
                 <input className={inputCls} value={organizerForm.location} onChange={(e) => set("location", e.target.value)} placeholder="e.g. Birmingham, UK" />
               </Field>
+              <Field label="Contact name">
+                <input className={inputCls} value={organizerForm.contactName} onChange={(e) => set("contactName", e.target.value)} placeholder="Who to speak to" />
+              </Field>
               <Field label="Contact email">
                 <input type="email" className={inputCls} value={organizerForm.email} onChange={(e) => set("email", e.target.value)} placeholder="bookings@company.com" />
               </Field>
@@ -173,6 +188,20 @@ function OrganizerEditor({ organizerId }: { organizerId?: string }) {
                 placeholder="Who they are and the kind of events they run. Leave empty to hide the About section."
               />
             </Field>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {SOCIAL_KEYS.map((k) => (
+                <React.Fragment key={k}>
+                  <Field label={SOCIAL_LABELS[k]}>
+                    <input
+                      className={inputCls}
+                      value={organizerForm.socialLinks[k] || ""}
+                      onChange={(e) => set("socialLinks", { ...organizerForm.socialLinks, [k]: e.target.value })}
+                      placeholder={`https://${k}.com/…`}
+                    />
+                  </Field>
+                </React.Fragment>
+              ))}
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Website">
                 <input className={inputCls} value={organizerForm.website} onChange={(e) => set("website", e.target.value)} placeholder="https://company.com" />

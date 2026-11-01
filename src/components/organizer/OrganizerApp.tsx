@@ -8,6 +8,7 @@ import { OrgEventDetail, OrgEventsList } from "./pages/OrgEventsPage";
 import OrgEventEditor from "./pages/OrgEventEditor";
 import OrgOrdersPage from "./pages/OrgOrdersPage";
 import { OrgAccountPage, OrgProfilePage } from "./pages/OrgProfilePages";
+import OrgPayoutsPage from "./pages/OrgPayoutsPage";
 
 /** The portal for an approved organiser. */
 export default function OrganizerApp(props: { user: User; me: UserProfile | null; org: OrganizerProfile; onLogout: () => void }) {
@@ -41,6 +42,8 @@ function Page() {
       return <OrgEventsList />;
     case "orders":
       return <OrgOrdersPage />;
+    case "payouts":
+      return <OrgPayoutsPage />;
     case "profile":
       return <OrgProfilePage />;
     case "account":

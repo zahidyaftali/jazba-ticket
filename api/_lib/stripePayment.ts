@@ -4,6 +4,7 @@ import { USD_RATES } from './currencyRates.js';
 import { EMAIL_RE } from './sendEmail.js';
 import { newOrderId } from './orderId.js';
 import { WP_EVENT_PREFIX, fetchWordPressEvent, isWordPressEventOver } from './wordpressEvents.js';
+import { ticketsLeft } from './capacity.js';
 
 // Shared by the Vercel serverless functions (api/create-checkout-session.ts,
 // api/get-checkout-session.ts) and the Vite dev-server middleware
@@ -161,6 +162,8 @@ interface EventPricing {
   /** Ticket packages on sale, keyed by tier id. */
   tiers: Record<string, { price: number; name: string; offerPrice?: number }>;
   details: EventDetails;
+  /** Tickets available in total (site events only); 0 = not limited. */
+  capacity?: number;
 }
 
 /** Date line for a ticket, e.g. "15 November 2026". */
@@ -245,6 +248,7 @@ export async function fetchEventPricing(eventId: string, idToken: string): Promi
 
   // The page redirects an id link to its readable /events/<slug> URL.
   return {
+    capacity: Math.max(0, Math.floor(Number(fsValue(f.capacity)) || 0)),
     title: fsValue(f.title) || 'Event',
     path: `/events/${encodeURIComponent(eventId)}`,
     tiers,
@@ -319,6 +323,16 @@ export async function createCheckoutSession(
 
   const selected = Object.prototype.hasOwnProperty.call(event.tiers, tier) ? event.tiers[tier] : undefined;
   if (!selected) throw new PaymentError('That ticket package is not available for this event.');
+
+  if (event.capacity) {
+    const left = await ticketsLeft(eventId, event.capacity);
+    if (left !== null && quantity > left) {
+      throw new PaymentError(
+        left <= 0 ? 'Sorry — this event is sold out.' : `Only ${left} ticket${left === 1 ? '' : 's'} left for this event — please choose fewer.`,
+        409,
+      );
+    }
+  }
 
   const discount = orderDiscountRate(promoCode, eventId, tier, selected);
   const promoApplied = discount.code !== '';

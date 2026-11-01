@@ -23,7 +23,6 @@ import {
 } from "lucide-react";
 import { updateOrganizerProfile, type OrganizerProfile } from "../../../services/backendService";
 import {
-  deleteOrganizer,
   eventsOfOrganizer,
   getFollowers,
   isSelfRegistered,
@@ -37,6 +36,7 @@ import {
 } from "../../../services/organizerService";
 import { eventPath } from "../../../types";
 import { useAdmin, type AdminEvent } from "../AdminContext";
+import { DeleteOrganizerDialog, PayoutsPanel } from "./OrganizerMoney";
 import {
   Avatar,
   Badge,
@@ -131,6 +131,7 @@ export function OrganizersList({ initialTab = "all" }: { initialTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [query, setQuery] = useState("");
   const [featuring, setFeaturing] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<OrganizerProfile | null>(null);
   const organizers = data.organizers;
 
   const inTab = (o: OrganizerProfile, t: Tab) => t === "all" || statusOf(o) === t || (t === "approved" && statusOf(o) === "legacy");
@@ -270,6 +271,9 @@ export function OrganizersList({ initialTab = "all" }: { initialTab?: Tab }) {
                     <IconButton title="Edit profile" onClick={() => navigate(`/admin/organizers/edit/${encodeURIComponent(org.id!)}`)}>
                       <Edit3 className="w-4 h-4" />
                     </IconButton>
+                    <IconButton title="Delete organiser" danger onClick={() => setDeleting(org)}>
+                      <Trash2 className="w-4 h-4" />
+                    </IconButton>
                   </div>
                 </td>
               </tr>
@@ -285,6 +289,7 @@ export function OrganizersList({ initialTab = "all" }: { initialTab?: Tab }) {
         </DataTable>
         <TableFooter shown={filtered.length} total={organizers.length} noun="organisers" />
       </div>
+      {deleting && <DeleteOrganizerDialog org={deleting} onClose={() => setDeleting(null)} onDeleted={() => setDeleting(null)} />}
     </div>
   );
 }
@@ -297,6 +302,7 @@ export function OrganizerDetail({ organizerId }: { organizerId: string }) {
   const org = data.organizers.find((o) => o.id === organizerId);
   const [followers, setFollowers] = useState<FollowRow[] | null>(null);
   const [eventBusy, setEventBusy] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (!organizerId) return;
@@ -357,19 +363,6 @@ export function OrganizerDetail({ organizerId }: { organizerId: string }) {
       fail("Couldn’t update the event.");
     } finally {
       setEventBusy(null);
-    }
-  };
-
-  const remove = async () => {
-    const warn = events.length ? `\n\nTheir ${events.length} event(s) stay on the site — manage them under Events.` : "";
-    if (!window.confirm(`Delete ${org.companyName}’s organiser profile? This can’t be undone.${warn}`)) return;
-    try {
-      await deleteOrganizer(org, account?.role);
-      notify("Organiser deleted.");
-      navigate("/admin/organizers");
-      await reload();
-    } catch {
-      fail("Couldn’t delete the organiser.");
     }
   };
 
@@ -434,6 +427,13 @@ export function OrganizerDetail({ organizerId }: { organizerId: string }) {
               )}
               <button type="button" className={btnOutline} onClick={() => navigate(`/admin/organizers/edit/${encodeURIComponent(org.id!)}`)}>
                 <Edit3 className="w-4 h-4" /> Edit profile
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                className="inline-flex items-center gap-1.5 py-2.5 px-4 text-xs font-bold border border-[#be6464] text-[#7a2f2f] hover:bg-[#f7ecec] cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" /> Delete
               </button>
               {status !== "pending" && status !== "rejected" && (
                 <a href={`/organizers/${encodeURIComponent(org.id!)}`} target="_blank" rel="noopener noreferrer" className={btnDark}>
@@ -530,12 +530,14 @@ export function OrganizerDetail({ organizerId }: { organizerId: string }) {
             )}
           </Panel>
           <Panel title="Danger zone">
-            <button type="button" onClick={remove} className="text-xs font-bold text-[#7a2f2f] hover:bg-[#f7ecec] px-3 py-2 cursor-pointer flex items-center gap-1.5">
+            <button type="button" onClick={() => setConfirmDelete(true)} className="text-xs font-bold text-[#7a2f2f] hover:bg-[#f7ecec] px-3 py-2 cursor-pointer flex items-center gap-1.5">
               <Trash2 className="w-3.5 h-3.5" /> Delete organiser profile
             </button>
           </Panel>
         </div>
       </div>
+
+      <PayoutsPanel org={org} grossUsd={revenue} />
 
       <div className="bg-white border border-[#e4e4e4]">
         <div className="px-5 py-4 border-b border-[#f2f2f2]">
@@ -669,6 +671,9 @@ export function OrganizerDetail({ organizerId }: { organizerId: string }) {
           )}
         </Panel>
       </div>
+      {confirmDelete && (
+        <DeleteOrganizerDialog org={org} onClose={() => setConfirmDelete(false)} onDeleted={() => navigate("/admin/organizers")} />
+      )}
     </div>
   );
 }

@@ -106,7 +106,7 @@ service cloud.firestore {
     function isValidOrganizer(data) {
       return data.keys().hasOnly(['id', 'userId', 'companyName', 'contactName', 'email', 'phone', 'logoUrl',
             'bannerUrl', 'description', 'website', 'location', 'specialties', 'socialLinks', 'featured',
-            'status', 'applicationNote', 'reviewNote', 'createdAt', 'updatedAt', 'reviewedAt'])
+            'status', 'applicationNote', 'reviewNote', 'createdAt', 'updatedAt', 'reviewedAt', 'feePercent'])
         && data.userId is string
         && data.companyName is string && data.companyName.size() > 0 && data.companyName.size() <= 120
         && data.get('contactName', '') is string && data.get('contactName', '').size() <= 120
@@ -130,7 +130,7 @@ service cloud.firestore {
         && incoming().userId == request.auth.uid
         && incoming().status == 'pending'
         && incoming().get('featured', false) == false
-        && !incoming().keys().hasAny(['reviewNote', 'reviewedAt'])
+        && !incoming().keys().hasAny(['reviewNote', 'reviewedAt', 'feePercent'])
       ));
       allow update: if isValidId(organizerId) && (isAdmin() || (
         isSignedIn() && existing().userId == request.auth.uid
@@ -140,6 +140,7 @@ service cloud.firestore {
         && incoming().get('featured', false) == existing().get('featured', false)
         && incoming().get('reviewNote', '') == existing().get('reviewNote', '')
         && incoming().get('reviewedAt', '') == existing().get('reviewedAt', '')
+        && incoming().get('feePercent', 0) == existing().get('feePercent', 0)
         && (incoming().get('status', 'approved') == existing().get('status', 'approved')
             || (existing().get('status', '') == 'rejected' && incoming().get('status', '') == 'pending'))
       ));
@@ -208,6 +209,14 @@ service cloud.firestore {
     match /payments/{paymentId} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create, update: if isValidId(paymentId) && isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Money paid out to an organiser, recorded by an admin. Organisers can
+    // read their own; only admins write.
+    match /payouts/{payoutId} {
+      allow read: if isSignedIn() && (resource.data.organizerId == request.auth.uid || isAdmin());
+      allow create, update: if isValidId(payoutId) && isAdmin();
       allow delete: if isAdmin();
     }
 
