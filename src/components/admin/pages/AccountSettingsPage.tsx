@@ -11,7 +11,8 @@ import {
 import { getUserProfile, updateUserProfile } from "../../../services/backendService";
 import { useAdmin } from "../AdminContext";
 import { readCollapsedPref, writeCollapsedPref } from "../AdminLayout";
-import { Avatar, Badge, Detail, EditorPanel, Field, ImageUrlField, PageHeader, Switch, btnDark, btnOutline, btnPrimary, fmtDateTime, inputCls } from "../ui";
+import { Avatar, Badge, Detail, EditorPanel, Field, PageHeader, Switch, btnDark, btnOutline, btnPrimary, fmtDateTime, inputCls } from "../ui";
+import { ImageUrlField } from "../media/ImageField";
 
 const PROVIDER_NAMES: Record<string, string> = {
   password: "Email & password",
@@ -156,7 +157,7 @@ export default function AccountSettingsPage() {
                   <input className={inputCls} value={profile.city} onChange={(e) => setProfile({ ...profile, city: e.target.value })} maxLength={64} />
                 </Field>
               </div>
-              <ImageUrlField label="Profile photo URL" value={profile.profileImage} onChange={(v) => setProfile({ ...profile, profileImage: v })} />
+              <ImageUrlField label="Profile photo" folder="people" value={profile.profileImage} onChange={(v) => setProfile({ ...profile, profileImage: v })} />
               <div>
                 <button type="submit" disabled={savingProfile || !loaded} className={btnPrimary}>
                   {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}

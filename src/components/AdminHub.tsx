@@ -12,6 +12,7 @@ import { ClientsPage, UsersPage } from "./admin/pages/PeoplePages";
 import EventsPage from "./admin/pages/EventsPage";
 import ArtistsPage from "./admin/pages/ArtistsPage";
 import OrganizersPage from "./admin/pages/OrganizersPage";
+import MediaLibraryPage from "./admin/pages/MediaLibraryPage";
 import AccountSettingsPage from "./admin/pages/AccountSettingsPage";
 
 /**
@@ -63,6 +64,9 @@ function AdminShell() {
       break;
     case "organizers":
       page = <OrganizersPage />;
+      break;
+    case "media":
+      page = <MediaLibraryPage />;
       break;
     case "users":
       page = <UsersPage />;

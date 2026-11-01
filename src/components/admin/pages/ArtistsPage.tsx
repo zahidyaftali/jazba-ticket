@@ -21,7 +21,6 @@ import {
   Field,
   FilterTabs,
   IconButton,
-  ImageUrlField,
   PageHeader,
   SearchInput,
   Switch,
@@ -38,6 +37,7 @@ import {
   tdCls,
   thCls,
 } from "../ui";
+import { ImageUrlField } from "../media/ImageField";
 
 const BLANK_ARTIST_FORM = {
   stageName: "",
@@ -725,8 +725,8 @@ function ArtistEditor({ artistId }: { artistId?: string }) {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <ImageUrlField label="Profile image URL" value={artistForm.profileImage} onChange={(v) => set("profileImage", v)} />
-              <ImageUrlField label="Cover banner image URL" value={artistForm.coverImage} onChange={(v) => set("coverImage", v)} wide />
+              <ImageUrlField label="Profile image" folder="artists" value={artistForm.profileImage} onChange={(v) => set("profileImage", v)} />
+              <ImageUrlField label="Cover banner image" folder="artists" value={artistForm.coverImage} onChange={(v) => set("coverImage", v)} wide />
             </div>
 
             <Field label="Location">

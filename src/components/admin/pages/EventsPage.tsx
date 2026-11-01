@@ -15,7 +15,6 @@ import {
   Field,
   FilterTabs,
   IconButton,
-  ImageUrlField,
   PageHeader,
   SearchInput,
   StatusBadge,
@@ -33,6 +32,7 @@ import {
   tdCls,
   thCls,
 } from "../ui";
+import { ImageUrlField, MediaPickButton } from "../media/ImageField";
 
 const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const MONTHS_LONG = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -741,7 +741,7 @@ function EventEditor({ eventId }: { eventId?: string }) {
               </Field>
             </div>
 
-            <ImageUrlField label="Cover banner image URL" value={eventForm.bannerImage} onChange={(v) => set("bannerImage", v)} wide />
+            <ImageUrlField label="Cover banner image" folder="events" value={eventForm.bannerImage} onChange={(v) => set("bannerImage", v)} wide />
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Field label="City">
@@ -833,7 +833,10 @@ function EventEditor({ eventId }: { eventId?: string }) {
                 <div className="grid grid-cols-12 gap-2">
                   <input className={`col-span-4 ${rowInput}`} value={row.name} onChange={(e) => updateListRow("lineup", idx, "name", e.target.value)} placeholder="Performer name" />
                   <input className={`col-span-3 ${rowInput}`} value={row.role} onChange={(e) => updateListRow("lineup", idx, "role", e.target.value)} placeholder="Role (e.g. Lead vocalist)" />
-                  <input className={`col-span-4 ${rowInput}`} value={row.avatar} onChange={(e) => updateListRow("lineup", idx, "avatar", e.target.value)} placeholder="Photo URL (optional)" />
+                  <div className="col-span-4 flex gap-1.5 min-w-0">
+                    <input className={`flex-1 min-w-0 ${rowInput}`} value={row.avatar} onChange={(e) => updateListRow("lineup", idx, "avatar", e.target.value)} placeholder="Photo (optional)" />
+                    <MediaPickButton folder="artists" onSelect={(urls) => updateListRow("lineup", idx, "avatar", urls[0])} />
+                  </div>
                   <button type="button" onClick={() => removeListRow("lineup", idx)} className={removeBtn} title="Remove">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -848,7 +851,7 @@ function EventEditor({ eventId }: { eventId?: string }) {
               <Field label="Organiser name">
                 <input className={inputCls} value={eventForm.organizerName} onChange={(e) => set("organizerName", e.target.value)} placeholder="e.g. Jazba Entertainment" />
               </Field>
-              <ImageUrlField label="Organiser logo / image URL" value={eventForm.organizerImage} onChange={(v) => set("organizerImage", v)} />
+              <ImageUrlField label="Organiser logo / image" folder="organisers" value={eventForm.organizerImage} onChange={(v) => set("organizerImage", v)} />
             </div>
             <Field label="Organiser bio">
               <textarea className={`${inputCls} h-16`} value={eventForm.organizerBio} onChange={(e) => set("organizerBio", e.target.value)} placeholder="A line or two about the organiser" />
@@ -887,7 +890,21 @@ function EventEditor({ eventId }: { eventId?: string }) {
             </div>
           </EditorPanel>
 
-          <EditorPanel title="From past shows (photo gallery)" sub="One image URL per line. Leave empty to hide the gallery.">
+          <EditorPanel
+            title="From past shows (photo gallery)"
+            sub="Add photos from the media library (or upload new ones there), or paste image links one per line. Leave empty to hide the gallery."
+            action={
+              <MediaPickButton
+                multiple
+                folder="events"
+                label="Add photos"
+                onSelect={(urls) => {
+                  const current = parseLines(eventForm.galleryText);
+                  set("galleryText", [...current, ...urls.filter((u) => !current.includes(u))].join("\n"));
+                }}
+              />
+            }
+          >
             <textarea
               className={`${inputCls} h-24`}
               value={eventForm.galleryText}
@@ -896,8 +913,19 @@ function EventEditor({ eventId }: { eventId?: string }) {
             />
             {parseLines(eventForm.galleryText).length > 0 && (
               <div className="flex flex-wrap gap-2">
-                {parseLines(eventForm.galleryText).slice(0, 12).map((src, i) => (
-                  <img key={i} src={src} alt="" className="w-16 h-16 object-cover bg-[#f2f2f2]" referrerPolicy="no-referrer" />
+                {parseLines(eventForm.galleryText).map((src, i) => (
+                  <div key={`${i}-${src}`} className="relative">
+                    <img src={src} alt="" className="w-16 h-16 object-cover bg-[#f2f2f2]" referrerPolicy="no-referrer" />
+                    <button
+                      type="button"
+                      title="Remove from gallery"
+                      aria-label="Remove from gallery"
+                      onClick={() => set("galleryText", parseLines(eventForm.galleryText).filter((_, j) => j !== i).join("\n"))}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-black text-white text-xs leading-none flex items-center justify-center cursor-pointer"
+                    >
+                      ×
+                    </button>
+                  </div>
                 ))}
               </div>
             )}

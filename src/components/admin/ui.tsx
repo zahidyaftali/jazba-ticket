@@ -254,54 +254,6 @@ export function Field({
   );
 }
 
-/** An image URL input with a live thumbnail preview. */
-export function ImageUrlField({
-  label,
-  value,
-  onChange,
-  wide = false,
-  placeholder = "https://…",
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  wide?: boolean;
-  placeholder?: string;
-}) {
-  const [broken, setBroken] = useState(false);
-  useEffect(() => setBroken(false), [value]);
-  return (
-    <Field label={label}>
-      <div className="flex items-center gap-3">
-        <div
-          className={`shrink-0 bg-[#f2f2f2] border border-[#e4e4e4] overflow-hidden flex items-center justify-center ${wide ? "w-20 h-12" : "w-12 h-12"}`}
-        >
-          {value && !broken ? (
-            <img
-              src={value}
-              alt=""
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-              onError={() => setBroken(true)}
-            />
-          ) : (
-            <span className="text-[9px] font-bold text-[#8a8a8a]">{value ? "Bad URL" : "None"}</span>
-          )}
-        </div>
-        <input
-          type="text"
-          className={inputCls}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-        />
-      </div>
-    </Field>
-  );
-}
-
-// ── Stat tiles ─────────────────────────────────────────────────────────────
-
 export function StatTile({
   label,
   value,

@@ -8,6 +8,7 @@ import {
   CalendarDays,
   MicVocal,
   Building2,
+  Images,
   Users,
   Settings,
   ChevronsLeft,
@@ -69,6 +70,7 @@ const PAGE_TITLES: Record<string, string> = {
   events: "Events",
   artists: "Artists",
   organizers: "Organisers",
+  media: "Media library",
   users: "Users",
   settings: "Account settings",
 };
@@ -162,6 +164,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             { label: "Add new", to: "/admin/organizers/new" },
           ],
         },
+        { id: "media", label: "Media", icon: Images, to: "/admin/media" },
       ],
     },
     { heading: "People", items: [{ id: "users", label: "Users", icon: Users, to: "/admin/users", count: data.users.length }] },
@@ -423,7 +426,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
 
       {/* ── Toasts ────────────────────────────────────────────────── */}
-      <div className="fixed bottom-4 right-4 z-[80] flex flex-col gap-2 w-[calc(100%-2rem)] max-w-sm" aria-live="polite">
+      <div className="fixed bottom-4 right-4 z-[90] flex flex-col gap-2 w-[calc(100%-2rem)] max-w-sm" aria-live="polite">
         {toasts.map((t) => (
           <div
             key={t.id}

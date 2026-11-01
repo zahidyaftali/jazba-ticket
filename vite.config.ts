@@ -11,6 +11,7 @@ import {HttpError, verifyAdmin} from './api/_lib/adminAuth';
 import {listAuthUsers, serviceAccountFromEnv} from './api/_lib/firebaseAuthUsers';
 import {listCardPayments} from './api/_lib/stripeLedger';
 import {getRulesStatus, publishRules} from './api/_lib/securityRules';
+import {deleteMedia, listMedia, mediaConfigured, uploadMedia} from './api/_lib/mediaLibrary';
 import {mailConfigFromEnv, type MailConfig} from './api/_lib/sendEmail';
 import {fetchWordPressEvents, fetchWordPressSlug} from './api/_lib/wordpressEvents';
 import {SHARE_BOT_UA, renderEventSharePage} from './api/_lib/eventShare';
@@ -162,6 +163,33 @@ const devApi = (secrets: { stripeSecretKey: string; mail: MailConfig | null; env
       } catch (err: any) {
         res.statusCode = err instanceof HttpError ? err.status : 502;
         res.end(JSON.stringify({ error: err?.message || 'Could not check the security rules.' }));
+      }
+    });
+
+    server.middlewares.use('/api/admin-media', async (req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method !== 'POST') {
+        res.statusCode = 405;
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
+      }
+      try {
+        const body = await readJsonBody(req);
+        await verifyAdmin(typeof body.idToken === 'string' ? body.idToken : '', 'Only admins can manage the media library.');
+        // The Blob SDK reads its token from process.env.
+        if (secrets.env.BLOB_READ_WRITE_TOKEN) process.env.BLOB_READ_WRITE_TOKEN = secrets.env.BLOB_READ_WRITE_TOKEN;
+        if (!mediaConfigured(process.env)) {
+          res.end(JSON.stringify({ configured: false, items: [] }));
+          return;
+        }
+        if (body.action === 'upload') res.end(JSON.stringify({ configured: true, item: await uploadMedia(body) }));
+        else if (body.action === 'delete') {
+          await deleteMedia(body.url);
+          res.end(JSON.stringify({ configured: true, deleted: true }));
+        } else res.end(JSON.stringify({ configured: true, items: await listMedia() }));
+      } catch (err: any) {
+        res.statusCode = err instanceof HttpError ? err.status : 502;
+        res.end(JSON.stringify({ error: err?.message || 'Could not reach the media library.' }));
       }
     });
 

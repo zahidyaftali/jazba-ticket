@@ -16,7 +16,6 @@ import {
   EmptyRow,
   Field,
   IconButton,
-  ImageUrlField,
   PageHeader,
   SearchInput,
   Switch,
@@ -28,6 +27,7 @@ import {
   tdCls,
   thCls,
 } from "../ui";
+import { ImageUrlField } from "../media/ImageField";
 
 const BLANK_ORGANIZER_FORM = {
   companyName: "",
@@ -326,8 +326,8 @@ function OrganizerEditor({ organizerId }: { organizerId?: string }) {
               </Field>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <ImageUrlField label="Logo image URL" value={organizerForm.logoUrl} onChange={(v) => set("logoUrl", v)} />
-              <ImageUrlField label="Banner image URL" value={organizerForm.bannerUrl} onChange={(v) => set("bannerUrl", v)} wide />
+              <ImageUrlField label="Logo image" folder="organisers" value={organizerForm.logoUrl} onChange={(v) => set("logoUrl", v)} />
+              <ImageUrlField label="Banner image" folder="organisers" value={organizerForm.bannerUrl} onChange={(v) => set("bannerUrl", v)} wide />
             </div>
             <Field label="Description / about">
               <textarea
