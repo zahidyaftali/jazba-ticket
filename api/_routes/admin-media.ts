@@ -2,8 +2,8 @@
 // Body: { idToken, action: 'list' | 'upload' | 'delete', ... }. The image
 // library — see api/_lib/mediaLibrary.ts. Admins see and manage every image;
 // an approved organiser only their own folder.
-import { HttpError, verifyAccount } from './_lib/adminAuth.js';
-import { deleteMedia, listMedia, mediaConfigured, uploadMedia } from './_lib/mediaLibrary.js';
+import { HttpError, verifyAccount } from '../_lib/adminAuth.js';
+import { deleteMedia, listMedia, mediaConfigured, uploadMedia } from '../_lib/mediaLibrary.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {

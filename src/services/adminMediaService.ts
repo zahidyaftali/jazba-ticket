@@ -1,4 +1,4 @@
-// Admin portal → POST /api/admin-media (see api/admin-media.ts): the image
+// Admin portal → POST /api/admin-media (see api/_routes/admin-media.ts): the image
 // library behind every image field in the admin. Photos are shrunk in the
 // browser before upload, so a 6 MB phone photo goes up as ~300 KB.
 

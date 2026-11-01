@@ -1,10 +1,10 @@
 // Vercel serverless function: POST /api/organizer-notify
 // Body: { idToken, action, eventId?, organizerId?, note? }. Emails about
 // organiser applications and event reviews — see api/_lib/organizerEmails.ts.
-import { HttpError, verifyAccount } from './_lib/adminAuth.js';
-import { serviceAccountFromEnv } from './_lib/firebaseAuthUsers.js';
-import { sendOrganizerNotice } from './_lib/organizerEmails.js';
-import { mailConfigFromEnv } from './_lib/sendEmail.js';
+import { HttpError, verifyAccount } from '../_lib/adminAuth.js';
+import { serviceAccountFromEnv } from '../_lib/firebaseAuthUsers.js';
+import { sendOrganizerNotice } from '../_lib/organizerEmails.js';
+import { mailConfigFromEnv } from '../_lib/sendEmail.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {

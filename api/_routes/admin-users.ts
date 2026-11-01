@@ -1,7 +1,7 @@
 // The .js extension is required: this repo is ESM ("type": "module") and
 // Vercel compiles each TS file separately, so Node needs the exact path.
-import { HttpError, verifyAdmin } from './_lib/adminAuth.js';
-import { listAuthUsers, serviceAccountFromEnv } from './_lib/firebaseAuthUsers.js';
+import { HttpError, verifyAdmin } from '../_lib/adminAuth.js';
+import { listAuthUsers, serviceAccountFromEnv } from '../_lib/firebaseAuthUsers.js';
 
 // Vercel serverless function: POST /api/admin-users   Body: { idToken }
 // Admin-only. Returns every sign-in account's email and sign-in method from

@@ -2,9 +2,9 @@
 // Body: { idToken, organizerId? }. An approved organiser gets the sales
 // report for their own events; an admin may pass organizerId to see any
 // organiser's. See api/_lib/organizerPortal.ts.
-import { HttpError, verifyAccount } from './_lib/adminAuth.js';
-import { serviceAccountFromEnv } from './_lib/firebaseAuthUsers.js';
-import { organizerReport } from './_lib/organizerPortal.js';
+import { HttpError, verifyAccount } from '../_lib/adminAuth.js';
+import { serviceAccountFromEnv } from '../_lib/firebaseAuthUsers.js';
+import { organizerReport } from '../_lib/organizerPortal.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {

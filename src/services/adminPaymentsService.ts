@@ -1,4 +1,4 @@
-// Admin portal → POST /api/admin-payments (see api/admin-payments.ts):
+// Admin portal → POST /api/admin-payments (see api/_routes/admin-payments.ts):
 // every card payment, read straight from Stripe.
 
 import { auth } from '../firebase';

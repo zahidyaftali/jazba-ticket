@@ -2,9 +2,9 @@
 // Body: { idToken, publish?: true }. Admins only. Says whether the database's
 // live security rules match the tested firestore.rules, and publishes them
 // when asked. See api/_lib/securityRules.ts.
-import { HttpError, verifyAdmin } from './_lib/adminAuth.js';
-import { serviceAccountFromEnv } from './_lib/firebaseAuthUsers.js';
-import { getRulesStatus, publishRules } from './_lib/securityRules.js';
+import { HttpError, verifyAdmin } from '../_lib/adminAuth.js';
+import { serviceAccountFromEnv } from '../_lib/firebaseAuthUsers.js';
+import { getRulesStatus, publishRules } from '../_lib/securityRules.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {

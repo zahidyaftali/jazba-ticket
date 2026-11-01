@@ -1,4 +1,4 @@
-// Admin portal → POST /api/admin-security-rules (see api/admin-security-rules.ts):
+// Admin portal → POST /api/admin-security-rules (see api/_routes/admin-security-rules.ts):
 // are the database's live security rules the tested ones, and publish them.
 
 import { auth } from '../firebase';

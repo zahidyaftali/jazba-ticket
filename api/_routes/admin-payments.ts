@@ -1,6 +1,6 @@
 // The .js extensions are required: Vercel runs these as native ESM.
-import { HttpError, verifyAdmin } from './_lib/adminAuth.js';
-import { listCardPayments } from './_lib/stripeLedger.js';
+import { HttpError, verifyAdmin } from '../_lib/adminAuth.js';
+import { listCardPayments } from '../_lib/stripeLedger.js';
 
 // Vercel serverless function: POST /api/admin-payments   Body: { idToken }
 // Admin-only. Every card payment on the Stripe account, for the admin

@@ -1,4 +1,4 @@
-// Admin portal → POST /api/admin-users (see api/admin-users.ts): every
+// Admin portal → POST /api/admin-users (see api/_routes/admin-users.ts): every
 // sign-in account's email and sign-in method, straight from Firebase
 // Authentication. Works once FIREBASE_SERVICE_ACCOUNT is set on the server.
 
