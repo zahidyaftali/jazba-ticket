@@ -1,7 +1,8 @@
 // Vercel serverless function: POST /api/admin-media
-// Body: { idToken, action: 'list' | 'upload' | 'delete', ... }. Admins only.
-// The admin portal's image library — see api/_lib/mediaLibrary.ts.
-import { HttpError, verifyAdmin } from './_lib/adminAuth.js';
+// Body: { idToken, action: 'list' | 'upload' | 'delete', ... }. The image
+// library — see api/_lib/mediaLibrary.ts. Admins see and manage every image;
+// an approved organiser only their own folder.
+import { HttpError, verifyAccount } from './_lib/adminAuth.js';
 import { deleteMedia, listMedia, mediaConfigured, uploadMedia } from './_lib/mediaLibrary.js';
 
 export default async function handler(req: any, res: any) {
@@ -12,25 +13,27 @@ export default async function handler(req: any, res: any) {
   res.setHeader('Cache-Control', 'no-store');
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
-    const admin = await verifyAdmin(typeof body.idToken === 'string' ? body.idToken : '', 'Only admins can manage the media library.');
+    const caller = await verifyAccount(typeof body.idToken === 'string' ? body.idToken : '');
+    if (!caller.isAdmin && !caller.isOrganizer) throw new HttpError('Only admins and approved organisers can upload images.', 403);
+    const owner = caller.isAdmin ? undefined : caller.uid;
     if (!mediaConfigured(process.env)) {
       res.status(200).json({ configured: false, items: [] });
       return;
     }
     switch (body.action) {
       case 'upload': {
-        const item = await uploadMedia(body);
-        console.log(`Media uploaded by ${admin.email}: ${item.pathname} (${item.size} bytes)`);
+        const item = await uploadMedia(body, owner);
+        console.log(`Media uploaded by ${caller.email}: ${item.pathname} (${item.size} bytes)`);
         res.status(200).json({ configured: true, item });
         return;
       }
       case 'delete':
-        await deleteMedia(body.url);
-        console.log(`Media deleted by ${admin.email}: ${body.url}`);
+        await deleteMedia(body.url, owner);
+        console.log(`Media deleted by ${caller.email}: ${body.url}`);
         res.status(200).json({ configured: true, deleted: true });
         return;
       default:
-        res.status(200).json({ configured: true, items: await listMedia() });
+        res.status(200).json({ configured: true, items: await listMedia(owner) });
     }
   } catch (err: any) {
     if (!(err instanceof HttpError)) console.error('admin-media failed:', err?.message || err);

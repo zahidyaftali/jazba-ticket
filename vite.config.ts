@@ -7,7 +7,9 @@ import {confirmCheckoutSession} from './api/_lib/orderConfirmation';
 import {sendFormEmail, FormEmailError} from './api/_lib/formEmail';
 import {submitEasypaisaOrder} from './api/_lib/easypaisaOrder';
 import {sendTicketEmail, ticketPdfForAdmin, TicketEmailError} from './api/_lib/ticketEmail';
-import {HttpError, verifyAdmin} from './api/_lib/adminAuth';
+import {HttpError, verifyAccount, verifyAdmin} from './api/_lib/adminAuth';
+import {organizerReport} from './api/_lib/organizerPortal';
+import {sendOrganizerNotice} from './api/_lib/organizerEmails';
 import {listAuthUsers, serviceAccountFromEnv} from './api/_lib/firebaseAuthUsers';
 import {listCardPayments} from './api/_lib/stripeLedger';
 import {getRulesStatus, publishRules} from './api/_lib/securityRules';
@@ -166,6 +168,48 @@ const devApi = (secrets: { stripeSecretKey: string; mail: MailConfig | null; env
       }
     });
 
+    server.middlewares.use('/api/organizer-portal', async (req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method !== 'POST') {
+        res.statusCode = 405;
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
+      }
+      try {
+        const body = await readJsonBody(req);
+        const account = await verifyAccount(typeof body.idToken === 'string' ? body.idToken : '', 'Please sign in to the organiser portal again.');
+        let target = account.uid;
+        if (account.isAdmin && typeof body.organizerId === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(body.organizerId)) target = body.organizerId;
+        else if (!account.isOrganizer && !account.isAdmin) throw new HttpError('Your organiser account hasn’t been approved yet.', 403);
+        res.end(JSON.stringify(await organizerReport(serviceAccountFromEnv(secrets.env), target)));
+      } catch (err: any) {
+        res.statusCode = err instanceof HttpError ? err.status : 502;
+        res.end(JSON.stringify({ error: err?.message || 'Could not load your sales right now.' }));
+      }
+    });
+
+    server.middlewares.use('/api/organizer-notify', async (req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method !== 'POST') {
+        res.statusCode = 405;
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
+      }
+      try {
+        const body = await readJsonBody(req);
+        const account = await verifyAccount(typeof body.idToken === 'string' ? body.idToken : '');
+        if (!secrets.mail) {
+          res.end(JSON.stringify({ sent: false }));
+          return;
+        }
+        await sendOrganizerNotice(secrets.mail, serviceAccountFromEnv(secrets.env), account, body);
+        res.end(JSON.stringify({ sent: true }));
+      } catch (err: any) {
+        res.statusCode = err instanceof HttpError ? err.status : 502;
+        res.end(JSON.stringify({ error: err?.message || 'Could not send the email right now.' }));
+      }
+    });
+
     server.middlewares.use('/api/admin-media', async (req, res) => {
       res.setHeader('Content-Type', 'application/json');
       if (req.method !== 'POST') {
@@ -175,18 +219,20 @@ const devApi = (secrets: { stripeSecretKey: string; mail: MailConfig | null; env
       }
       try {
         const body = await readJsonBody(req);
-        await verifyAdmin(typeof body.idToken === 'string' ? body.idToken : '', 'Only admins can manage the media library.');
+        const caller = await verifyAccount(typeof body.idToken === 'string' ? body.idToken : '');
+        if (!caller.isAdmin && !caller.isOrganizer) throw new HttpError('Only admins and approved organisers can upload images.', 403);
+        const owner = caller.isAdmin ? undefined : caller.uid;
         // The Blob SDK reads its token from process.env.
         if (secrets.env.BLOB_READ_WRITE_TOKEN) process.env.BLOB_READ_WRITE_TOKEN = secrets.env.BLOB_READ_WRITE_TOKEN;
         if (!mediaConfigured(process.env)) {
           res.end(JSON.stringify({ configured: false, items: [] }));
           return;
         }
-        if (body.action === 'upload') res.end(JSON.stringify({ configured: true, item: await uploadMedia(body) }));
+        if (body.action === 'upload') res.end(JSON.stringify({ configured: true, item: await uploadMedia(body, owner) }));
         else if (body.action === 'delete') {
-          await deleteMedia(body.url);
+          await deleteMedia(body.url, owner);
           res.end(JSON.stringify({ configured: true, deleted: true }));
-        } else res.end(JSON.stringify({ configured: true, items: await listMedia() }));
+        } else res.end(JSON.stringify({ configured: true, items: await listMedia(owner) }));
       } catch (err: any) {
         res.statusCode = err instanceof HttpError ? err.status : 502;
         res.end(JSON.stringify({ error: err?.message || 'Could not reach the media library.' }));

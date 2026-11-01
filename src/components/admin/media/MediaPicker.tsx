@@ -7,7 +7,7 @@ import {
   type MediaFolder,
   type MediaItem,
 } from "../../../services/adminMediaService";
-import { useAdmin } from "../AdminContext";
+import { useMediaScope, useNotify } from "../notify";
 import { EmptyState, FilterTabs, SearchInput, Toolbar, btnDark, btnOutline, btnPrimary, fmtDate } from "../ui";
 import { fmtBytes, uploadToLibrary, useMediaLibrary } from "./mediaStore";
 
@@ -15,7 +15,7 @@ export type FolderTab = "all" | MediaFolder;
 
 /** Uploads files one after another, reporting failures as toasts. */
 export function useUploader() {
-  const { fail } = useAdmin();
+  const { fail } = useNotify();
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
   const uploadFiles = async (files: FileList | File[] | null, folder: MediaFolder): Promise<MediaItem[]> => {
@@ -79,6 +79,16 @@ export function UploadButton({
 }
 
 export function NotConfiguredNotice() {
+  if (useMediaScope() === "organizer") {
+    return (
+      <div className="max-w-xl mx-auto bg-[#fff8c2] border border-[#e6d200] p-5 text-sm text-black">
+        <p className="font-bold flex items-center gap-2">
+          <ImageOff className="w-4 h-4" /> Image uploads aren’t available yet
+        </p>
+        <p className="mt-2 text-black/75">You can paste a link to an image instead, or email your images to info@jazbatickets.com.</p>
+      </div>
+    );
+  }
   return (
     <div className="max-w-xl mx-auto bg-[#fff8c2] border border-[#e6d200] p-5 text-sm text-black">
       <p className="font-bold flex items-center gap-2">
@@ -155,9 +165,11 @@ export function MediaGrid({
 }
 
 export function folderTabs(items: MediaItem[]): { id: FolderTab; label: string; count: number }[] {
+  const partners = items.filter((i) => i.folder === "partners").length;
   return [
     { id: "all" as FolderTab, label: "All", count: items.length },
     ...MEDIA_FOLDERS.map((f) => ({ id: f as FolderTab, label: MEDIA_FOLDER_LABELS[f], count: items.filter((i) => i.folder === f).length })),
+    ...(partners ? [{ id: "partners" as FolderTab, label: MEDIA_FOLDER_LABELS.partners, count: partners }] : []),
   ];
 }
 
@@ -180,6 +192,7 @@ export function MediaPicker({
 }) {
   const lib = useMediaLibrary();
   const uploader = useUploader();
+  const scope = useMediaScope();
   const [tab, setTab] = useState<FolderTab>("all");
   const [q, setQ] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
@@ -257,8 +270,12 @@ export function MediaPicker({
           <div className="min-w-0">
             <h2 className="font-display font-bold text-lg leading-tight text-black">Media library</h2>
             <p className="text-xs text-[#666] mt-0.5">
-              {multiple ? "Pick one or more images, or upload new ones." : "Pick an image, or upload a new one."} New uploads go to{" "}
-              <span className="font-bold">{MEDIA_FOLDER_LABELS[folder]}</span>.
+              {multiple ? "Pick one or more images, or upload new ones." : "Pick an image, or upload a new one."}
+              {scope === "admin" && (
+                <>
+                  {" "}New uploads go to <span className="font-bold">{MEDIA_FOLDER_LABELS[folder]}</span>.
+                </>
+              )}
             </p>
           </div>
           <button
@@ -273,7 +290,7 @@ export function MediaPicker({
 
         {lib.configured && (
           <>
-            <FilterTabs tabs={folderTabs(lib.items)} value={tab} onChange={setTab} />
+            {scope === "admin" && <FilterTabs tabs={folderTabs(lib.items)} value={tab} onChange={setTab} />}
             <Toolbar>
               <SearchInput value={q} onChange={setQ} placeholder="Search images…" />
               <div className="ml-auto">

@@ -5,7 +5,8 @@
 import { auth } from '../firebase';
 
 export const MEDIA_FOLDERS = ['events', 'artists', 'organisers', 'people', 'other'] as const;
-export type MediaFolder = (typeof MEDIA_FOLDERS)[number];
+/** 'partners' holds each organiser's own uploads (media/partners/<uid>/). */
+export type MediaFolder = (typeof MEDIA_FOLDERS)[number] | 'partners';
 
 export const MEDIA_FOLDER_LABELS: Record<MediaFolder, string> = {
   events: 'Events',
@@ -13,6 +14,7 @@ export const MEDIA_FOLDER_LABELS: Record<MediaFolder, string> = {
   organisers: 'Organisers',
   people: 'People',
   other: 'Other',
+  partners: 'Organiser uploads',
 };
 
 export interface MediaItem {

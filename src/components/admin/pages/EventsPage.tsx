@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { PlusCircle, Trash2, Edit3, Calendar, Loader2, ExternalLink, Copy, Send, Download, Globe } from "lucide-react";
+import { PlusCircle, Trash2, Edit3, Calendar, Loader2, ExternalLink, Copy, Send, Download, Globe, Check, X } from "lucide-react";
+import { notifyOrganizerEmail, reviewEvent } from "../../../services/organizerService";
 import { createEvent, updateEvent, deleteEvent, purgeCollection } from "../../../services/backendService";
 import { categories } from "../../../data";
 import { SEED_PAST_EVENTS } from "../../../seedPastEvents";
@@ -98,7 +99,11 @@ export default function EventsPage() {
       </React.Fragment>
     );
   }
-  return <EventsList />;
+  return (
+    <React.Fragment key={route.sub}>
+      <EventsList />
+    </React.Fragment>
+  );
 }
 
 // ── List ───────────────────────────────────────────────────────────────────
@@ -106,7 +111,33 @@ export default function EventsPage() {
 function EventsList() {
   const { data, allEvents, eventInfo, navigate, notify, fail, reload, wpLoading, route } = useAdmin();
   const [source, setSource] = useState<"site" | "wordpress">(route.query.get("source") === "wordpress" ? "wordpress" : "site");
-  const [status, setStatus] = useState<"all" | "published" | "draft" | "cancelled" | "completed">("all");
+  const [status, setStatus] = useState<"all" | "pending" | "published" | "draft" | "cancelled" | "completed">(
+    route.sub === "review" || route.query.get("status") === "pending" ? "pending" : "all",
+  );
+  const [reviewing, setReviewing] = useState<string | null>(null);
+  // Who's behind an event an organiser created themselves.
+  const organizerOf = (e: AdminEvent) => data.organizers.find((o) => o.status && o.userId === e.organizerId);
+
+  const review = async (evt: AdminEvent, decision: "publish" | "decline") => {
+    let note = "";
+    if (decision === "decline") {
+      const typed = window.prompt(`What should the organiser change before “${evt.title}” can go on sale? (They’ll get this by email.)`);
+      if (typed === null) return;
+      note = typed.trim();
+    } else if (!window.confirm(`Publish “${evt.title}”? It goes on sale straight away and the organiser gets an email.`)) {
+      return;
+    }
+    setReviewing(evt.id);
+    try {
+      await reviewEvent(evt.id, decision, note);
+      notify(decision === "publish" ? "Event published — the organiser has been emailed." : "Sent back to the organiser with your note.");
+      await reload();
+    } catch {
+      fail("Couldn’t update the event.");
+    } finally {
+      setReviewing(null);
+    }
+  };
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulk, setBulk] = useState("");
@@ -176,7 +207,7 @@ function EventsList() {
     for (const id of ids) {
       try {
         if (bulk === "delete") await deleteEvent(id);
-        else await updateEvent(id, { status: bulk });
+        else await updateEvent(id, { status: bulk, ...(bulk === "published" ? { everPublished: true } : {}) });
       } catch {
         failed++;
       }
@@ -319,6 +350,7 @@ function EventsList() {
           <FilterTabs
             tabs={[
               { id: "all" as const, label: "All", count: count("all") },
+              { id: "pending" as const, label: "In review", count: count("pending") },
               { id: "published" as const, label: "Published", count: count("published") },
               { id: "draft" as const, label: "Draft", count: count("draft") },
               { id: "cancelled" as const, label: "Cancelled", count: count("cancelled") },
@@ -389,6 +421,15 @@ function EventsList() {
                         <span className="block text-[11px] text-[#8a8a8a] capitalize">
                           {categories.find((c) => c.id === evt.category)?.name || evt.category} · from {money(evt.price)}
                         </span>
+                        {organizerOf(evt) && (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/admin/organizers/view/${encodeURIComponent(organizerOf(evt)!.id!)}`)}
+                            className="block text-[11px] font-bold text-black hover:underline cursor-pointer"
+                          >
+                            by {organizerOf(evt)!.companyName}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -409,6 +450,19 @@ function EventsList() {
                   </td>
                   <td className={`${tdCls} text-right`}>
                     <div className="flex items-center justify-end">
+                      {evt.status === "pending" &&
+                        (reviewing === evt.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin mx-2" />
+                        ) : (
+                          <>
+                            <IconButton title="Approve & publish" onClick={() => review(evt, "publish")}>
+                              <Check className="w-4 h-4 text-[#15803d]" />
+                            </IconButton>
+                            <IconButton title="Send back with a note" onClick={() => review(evt, "decline")} danger>
+                              <X className="w-4 h-4" />
+                            </IconButton>
+                          </>
+                        ))}
                       <IconButton title="Edit event" onClick={() => navigate(`/admin/events/edit/${encodeURIComponent(evt.id)}`)}>
                         <Edit3 className="w-4 h-4" />
                       </IconButton>
@@ -696,7 +750,10 @@ function EventEditor({ eventId }: { eventId?: string }) {
     setSaving(true);
     try {
       if (eventId) {
-        await updateEvent(eventId, payload);
+        const publishing = payload.status === "published";
+        await updateEvent(eventId, { ...payload, ...(publishing ? { everPublished: true } : {}) });
+        // An organiser's event approved from the editor: tell them it's live.
+        if (publishing && editing?.status === "pending") notifyOrganizerEmail("event-decision", { eventId });
         notify("Event updated successfully.");
       } else {
         await createEvent({ ...payload, organizerId: auth.currentUser?.uid || "admin" });
@@ -961,6 +1018,7 @@ function EventEditor({ eventId }: { eventId?: string }) {
             <Field label="Publication status">
               <select value={eventForm.status} onChange={(e: any) => set("status", e.target.value)} className={inputCls}>
                 <option value="draft">Draft (hidden from public)</option>
+                <option value="pending">In review (submitted by an organiser)</option>
                 <option value="published">Published (live on site)</option>
                 <option value="cancelled">Cancelled</option>
                 <option value="completed">Completed</option>

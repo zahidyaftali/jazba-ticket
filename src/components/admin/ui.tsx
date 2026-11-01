@@ -332,6 +332,7 @@ export const PASS_STATUS: Record<string, { label: string; tone: Tone }> = {
 };
 export const EVENT_STATUS: Record<string, { label: string; tone: Tone }> = {
   published: { label: "Published", tone: "positive" },
+  pending: { label: "In review", tone: "warning" },
   draft: { label: "Draft", tone: "neutral" },
   cancelled: { label: "Cancelled", tone: "negative" },
   completed: { label: "Completed", tone: "info" },
@@ -341,6 +342,13 @@ export function StatusBadge({ map, value }: { map: Record<string, { label: strin
   const s = map[value || ""] || { label: value || "—", tone: "neutral" as Tone };
   return <Badge tone={s.tone}>{s.label}</Badge>;
 }
+
+export const ORGANIZER_STATUS: Record<string, { label: string; tone: Tone }> = {
+  pending: { label: "Awaiting approval", tone: "warning" },
+  approved: { label: "Approved", tone: "positive" },
+  rejected: { label: "Changes requested", tone: "negative" },
+  suspended: { label: "Suspended", tone: "dark" },
+};
 
 // ── Lists & tables ─────────────────────────────────────────────────────────
 

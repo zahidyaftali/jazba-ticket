@@ -1,33 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { PlusCircle, Trash2, Edit3, Loader2, ExternalLink, Star, Globe, Mail, Phone } from "lucide-react";
-import {
-  createOrganizerProfile,
-  updateOrganizerProfile,
-  deleteOrganizerProfile,
-  OrganizerProfile,
-} from "../../../services/backendService";
+import { Loader2, ExternalLink, Phone } from "lucide-react";
+import { createOrganizerProfile, updateOrganizerProfile } from "../../../services/backendService";
 import { auth } from "../../../firebase";
 import { useAdmin } from "../AdminContext";
-import {
-  Avatar,
-  DataTable,
-  EditorHeader,
-  EditorPanel,
-  EmptyRow,
-  Field,
-  IconButton,
-  PageHeader,
-  SearchInput,
-  Switch,
-  TableFooter,
-  Toolbar,
-  btnOutline,
-  btnPrimary,
-  inputCls,
-  tdCls,
-  thCls,
-} from "../ui";
+import { EditorHeader, EditorPanel, Field, Switch, btnOutline, btnPrimary, inputCls } from "../ui";
 import { ImageUrlField } from "../media/ImageField";
+import { OrganizerDetail, OrganizersList } from "./OrganizerReview";
 
 const BLANK_ORGANIZER_FORM = {
   companyName: "",
@@ -53,159 +31,17 @@ export default function OrganizersPage() {
       </React.Fragment>
     );
   }
-  return <OrganizersList />;
-}
-
-function OrganizersList() {
-  const { data, navigate, notify, fail, reload } = useAdmin();
-  const organizers = data.organizers;
-  const [query, setQuery] = useState("");
-  const [busyId, setBusyId] = useState<string | null>(null);
-
-  const q = query.trim().toLowerCase();
-  const filtered = [...organizers]
-    .sort((a, b) => (a.companyName || "").localeCompare(b.companyName || ""))
-    .filter((o) => !q || [o.companyName, o.location, o.email, o.phone, ...(o.specialties || [])].some((v) => (v || "").toLowerCase().includes(q)));
-
-  const handleDelete = async (orgId: string) => {
-    if (!window.confirm("Delete this organiser? This action cannot be undone.")) return;
-    try {
-      await deleteOrganizerProfile(orgId);
-      notify("Organiser profile deleted.");
-      reload();
-    } catch {
-      fail("Failed to delete organiser profile.");
-    }
-  };
-
-  const toggleFeatured = async (org: OrganizerProfile) => {
-    if (!org.id) return;
-    setBusyId(org.id);
-    try {
-      await updateOrganizerProfile(org.id, { featured: !org.featured });
-      notify(org.featured ? `${org.companyName} removed from featured.` : `${org.companyName} is now featured.`);
-      await reload();
-    } catch {
-      fail("Failed to update the organiser.");
-    } finally {
-      setBusyId(null);
-    }
-  };
-
+  if (route.sub === "view") {
+    return (
+      <React.Fragment key={route.id}>
+        <OrganizerDetail organizerId={route.id} />
+      </React.Fragment>
+    );
+  }
   return (
-    <div>
-      <PageHeader
-        title="Organisers"
-        sub="Promoters and companies shown on the Organisers pages."
-        actions={
-          <button type="button" onClick={() => navigate("/admin/organizers/new")} className={btnPrimary}>
-            <PlusCircle className="w-4 h-4" /> Add organiser
-          </button>
-        }
-      />
-      <div className="bg-white border border-[#e4e4e4]">
-        <Toolbar>
-          <SearchInput value={query} onChange={setQuery} placeholder="Search name, location, email…" />
-        </Toolbar>
-        <DataTable
-          head={
-            <>
-              <th className={thCls}>Company</th>
-              <th className={thCls}>Location</th>
-              <th className={thCls}>Contact</th>
-              <th className={thCls}>Specialties</th>
-              <th className={thCls}>Featured</th>
-              <th className={`${thCls} text-right`}>Actions</th>
-            </>
-          }
-        >
-          {filtered.map((org) => (
-            <tr key={org.id || org.userId} className="hover:bg-[#fafafa]">
-              <td className={tdCls}>
-                <div className="flex items-center gap-3 min-w-[200px]">
-                  <Avatar src={org.logoUrl} name={org.companyName || "?"} size={38} square />
-                  <div className="min-w-0">
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/admin/organizers/edit/${encodeURIComponent(org.id!)}`)}
-                      className="font-bold hover:underline cursor-pointer text-left"
-                    >
-                      {org.companyName || "—"}
-                    </button>
-                    {org.website && (
-                      <a href={org.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[11px] text-[#8a8a8a] hover:text-black truncate max-w-[220px]">
-                        <Globe className="w-3 h-3 shrink-0" /> {org.website.replace(/^https?:\/\//, "")}
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </td>
-              <td className={`${tdCls} whitespace-nowrap`}>{org.location || "—"}</td>
-              <td className={tdCls}>
-                {org.email ? (
-                  <a href={`mailto:${org.email}`} className="flex items-center gap-1.5 hover:underline">
-                    <Mail className="w-3 h-3 shrink-0" /> {org.email}
-                  </a>
-                ) : (
-                  "—"
-                )}
-                {org.phone && (
-                  <a href={`tel:${org.phone}`} className="flex items-center gap-1.5 text-[11px] text-[#8a8a8a] hover:text-black">
-                    <Phone className="w-3 h-3 shrink-0" /> {org.phone}
-                  </a>
-                )}
-              </td>
-              <td className={tdCls}>
-                <div className="flex flex-wrap gap-1 max-w-[240px]">
-                  {(org.specialties || []).slice(0, 3).map((s) => (
-                    <span key={s} className="text-[10px] font-bold bg-[#f2f2f2] px-1.5 py-0.5">
-                      {s}
-                    </span>
-                  ))}
-                  {(org.specialties || []).length === 0 && <span className="text-[#8a8a8a]">—</span>}
-                </div>
-              </td>
-              <td className={tdCls}>
-                {busyId === org.id ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => toggleFeatured(org)}
-                    className="w-8 h-8 flex items-center justify-center cursor-pointer hover:bg-[#f2f2f2]"
-                    title={org.featured ? "Featured — click to remove" : "Click to feature"}
-                    aria-label={org.featured ? "Remove from featured" : "Feature organiser"}
-                  >
-                    <Star className={`w-4 h-4 ${org.featured ? "fill-black text-black" : "text-[#c4c4c4]"}`} />
-                  </button>
-                )}
-              </td>
-              <td className={`${tdCls} text-right`}>
-                <div className="flex items-center justify-end">
-                  <IconButton title="Edit organiser" onClick={() => navigate(`/admin/organizers/edit/${encodeURIComponent(org.id!)}`)}>
-                    <Edit3 className="w-4 h-4" />
-                  </IconButton>
-                  <IconButton title="View organiser page" href={`/organizers/${encodeURIComponent(org.id || "")}`}>
-                    <ExternalLink className="w-4 h-4" />
-                  </IconButton>
-                  <IconButton title="Delete organiser" onClick={() => handleDelete(org.id!)} danger>
-                    <Trash2 className="w-4 h-4" />
-                  </IconButton>
-                </div>
-              </td>
-            </tr>
-          ))}
-          {filtered.length === 0 && (
-            <EmptyRow
-              colSpan={6}
-              title={organizers.length ? "No organisers match your search" : "No organiser profiles yet."}
-              sub={organizers.length ? undefined : 'Click "Add organiser" to create the first one.'}
-            />
-          )}
-        </DataTable>
-        <TableFooter shown={filtered.length} total={organizers.length} noun="organisers" />
-      </div>
-    </div>
+    <React.Fragment key={route.sub}>
+      <OrganizersList initialTab={route.sub === "applications" ? "pending" : "all"} />
+    </React.Fragment>
   );
 }
 
@@ -287,7 +123,7 @@ function OrganizerEditor({ organizerId }: { organizerId?: string }) {
         notify("Organiser profile created successfully.");
       }
       reload();
-      navigate("/admin/organizers");
+      navigate(organizerId ? `/admin/organizers/view/${encodeURIComponent(organizerId)}` : "/admin/organizers");
     } catch {
       setFormError("Failed to save organiser profile. Make sure updated Firestore rules have been deployed.");
       fail("Failed to save organiser profile.");

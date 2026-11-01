@@ -66,3 +66,80 @@ export async function createDocuments(sa: ServiceAccount | null, writes: CreateW
   console.error('Firestore commit failed:', res.status, status, data?.error?.message);
   throw new HttpError('Could not save the order to the database.', 502);
 }
+
+/** A Firestore REST value back to plain JS. */
+export function fromFirestoreValue(v: any): any {
+  if (!v || typeof v !== 'object') return undefined;
+  if ('stringValue' in v) return v.stringValue;
+  if ('integerValue' in v) return Number(v.integerValue);
+  if ('doubleValue' in v) return Number(v.doubleValue);
+  if ('booleanValue' in v) return v.booleanValue;
+  if ('timestampValue' in v) return v.timestampValue;
+  if ('nullValue' in v) return null;
+  if ('arrayValue' in v) return (v.arrayValue.values || []).map(fromFirestoreValue);
+  if ('mapValue' in v) return fromFirestoreFields(v.mapValue.fields || {});
+  return undefined;
+}
+
+export function fromFirestoreFields(fields: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(fields || {})) out[k] = fromFirestoreValue(v);
+  return out;
+}
+
+export type DocData = Record<string, any> & { id: string };
+
+function docFrom(d: any): DocData {
+  return { ...fromFirestoreFields(d.fields || {}), id: String(d.name || '').split('/').pop() || '' };
+}
+
+/** One document by path ("organizers/abc"), or null when it doesn't exist. */
+export async function getDocument(sa: ServiceAccount | null, path: string): Promise<DocData | null> {
+  const { docs, auth } = await endpoint(sa);
+  const res = await fetch(`${docs}/${path.split('/').map(encodeURIComponent).join('/')}`, { headers: { Authorization: auth } });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    console.error('Firestore get failed:', res.status, path);
+    throw new HttpError('Could not read the database.', 502);
+  }
+  return docFrom(await res.json());
+}
+
+export type QueryFilter = { field: string; op: 'EQUAL' | 'IN'; value: unknown };
+
+/** Documents of one collection matching every filter (an IN list is split
+ *  into groups of 30, Firestore's limit). */
+export async function queryDocuments(sa: ServiceAccount | null, collection: string, filters: QueryFilter[]): Promise<DocData[]> {
+  const inFilter = filters.find((f) => f.op === 'IN');
+  if (inFilter) {
+    const values = Array.isArray(inFilter.value) ? inFilter.value : [];
+    if (!values.length) return [];
+    const rest = filters.filter((f) => f !== inFilter);
+    const out: DocData[] = [];
+    for (let i = 0; i < values.length; i += 30) {
+      out.push(...(await runQuery(sa, collection, [...rest, { ...inFilter, value: values.slice(i, i + 30) }])));
+    }
+    return out;
+  }
+  return runQuery(sa, collection, filters);
+}
+
+async function runQuery(sa: ServiceAccount | null, collection: string, filters: QueryFilter[]): Promise<DocData[]> {
+  const { docs, auth } = await endpoint(sa);
+  const conditions = filters.map((f) => ({
+    fieldFilter: { field: { fieldPath: f.field }, op: f.op, value: toFirestoreValue(f.value) },
+  }));
+  const where = conditions.length === 1 ? conditions[0] : conditions.length ? { compositeFilter: { op: 'AND', filters: conditions } } : undefined;
+  const res = await fetch(`${docs}:runQuery`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: auth },
+    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: collection }], ...(where ? { where } : {}) } }),
+  });
+  if (!res.ok) {
+    const data: any = await res.json().catch(() => ({}));
+    console.error('Firestore query failed:', res.status, collection, data?.error?.message);
+    throw new HttpError('Could not read the database.', 502);
+  }
+  const rows: any[] = await res.json();
+  return rows.filter((r) => r.document).map((r) => docFrom(r.document));
+}

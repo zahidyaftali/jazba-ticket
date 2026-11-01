@@ -19,9 +19,19 @@ export class HttpError extends Error {
   }
 }
 
-/** Verify a Firebase ID token and confirm the account is an admin. */
-export async function verifyAdmin(idToken: string, forbiddenMessage = 'Only admins can do that.'): Promise<{ uid: string; email: string }> {
-  if (!idToken) throw new HttpError('Please sign in to the admin portal again.', 401);
+export interface Account {
+  uid: string;
+  email: string;
+  /** 'admin' | 'organizer' | 'artist' | 'user' — '' when the profile can't be read. */
+  role: string;
+  isAdmin: boolean;
+  /** An approved organiser (the role is given on approval, taken away on suspension). */
+  isOrganizer: boolean;
+}
+
+/** Verify a Firebase ID token and read the caller's role from their profile. */
+export async function verifyAccount(idToken: string, signInMessage = 'Please sign in again.'): Promise<Account> {
+  if (!idToken) throw new HttpError(signInMessage, 401);
   const lookup = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE.apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -29,9 +39,9 @@ export async function verifyAdmin(idToken: string, forbiddenMessage = 'Only admi
   });
   const data: any = await lookup.json().catch(() => ({}));
   const user = data?.users?.[0];
-  if (!lookup.ok || !user?.localId) throw new HttpError('Please sign in to the admin portal again.', 401);
+  if (!lookup.ok || !user?.localId) throw new HttpError(signInMessage, 401);
   const email = String(user.email || '').toLowerCase();
-  if (email === BOOTSTRAP_ADMIN_EMAIL) return { uid: user.localId, email };
+  if (email === BOOTSTRAP_ADMIN_EMAIL) return { uid: user.localId, email, role: 'admin', isAdmin: true, isOrganizer: false };
 
   // Read the caller's own profile as the caller — security rules allow that.
   const url =
@@ -40,6 +50,14 @@ export async function verifyAdmin(idToken: string, forbiddenMessage = 'Only admi
     `?key=${FIREBASE.apiKey}`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${idToken}` } });
   const profile: any = await res.json().catch(() => ({}));
-  if (!res.ok || profile?.fields?.role?.stringValue !== 'admin') throw new HttpError(forbiddenMessage, 403);
-  return { uid: user.localId, email };
+  const role = res.ok ? String(profile?.fields?.role?.stringValue || '') : '';
+  const active = res.ok && profile?.fields?.status?.stringValue !== 'suspended';
+  return { uid: user.localId, email, role, isAdmin: active && role === 'admin', isOrganizer: active && role === 'organizer' };
+}
+
+/** Verify a Firebase ID token and confirm the account is an admin. */
+export async function verifyAdmin(idToken: string, forbiddenMessage = 'Only admins can do that.'): Promise<{ uid: string; email: string }> {
+  const account = await verifyAccount(idToken, 'Please sign in to the admin portal again.');
+  if (!account.isAdmin) throw new HttpError(forbiddenMessage, 403);
+  return { uid: account.uid, email: account.email };
 }

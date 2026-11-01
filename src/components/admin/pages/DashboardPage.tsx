@@ -65,6 +65,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <SecurityRulesCard />
+      <ReviewQueue />
 
       {/* Greeting + quick actions */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -458,5 +459,37 @@ function SalesChart() {
         </div>
       )}
     </Panel>
+  );
+}
+
+/** Organiser applications and organiser events waiting for an admin. */
+function ReviewQueue() {
+  const { data, navigate } = useAdmin();
+  const apps = data.organizers.filter((o) => o.status === "pending").length;
+  const evts = data.events.filter((e) => e.status === "pending").length;
+  if (!apps && !evts) return null;
+  return (
+    <div className="bg-black text-white p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div>
+        <span className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#ffed00]">Needs your review</span>
+        <p className="font-display font-bold text-lg mt-1">
+          {[apps ? `${apps} organiser application${apps === 1 ? "" : "s"}` : "", evts ? `${evts} event${evts === 1 ? "" : "s"} waiting to go on sale` : ""]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2 shrink-0">
+        {apps > 0 && (
+          <button type="button" onClick={() => navigate("/admin/organizers/applications")} className="bg-[#ffed00] hover:bg-[#e6d200] text-black text-xs font-bold px-4 py-2.5 cursor-pointer">
+            Review applications
+          </button>
+        )}
+        {evts > 0 && (
+          <button type="button" onClick={() => navigate("/admin/events/review")} className="border border-white/40 hover:border-white text-white text-xs font-bold px-4 py-2.5 cursor-pointer">
+            Review events
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

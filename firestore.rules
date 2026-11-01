@@ -96,10 +96,53 @@ service cloud.firestore {
     }
 
     // ── Public profiles and events ──────────────────────────────────────
+    // ── Organisers ──────────────────────────────────────────────────────
+    // Anyone signed in may apply: the application is their own
+    // organizers/<uid> profile, created as "pending". Only an admin approves,
+    // rejects, suspends or features an organiser — and approving also gives
+    // the account the organiser role, which is what allows creating events.
+    // Profiles made by admins before sign-ups existed have no status and
+    // count as approved.
+    function isValidOrganizer(data) {
+      return data.keys().hasOnly(['id', 'userId', 'companyName', 'contactName', 'email', 'phone', 'logoUrl',
+            'bannerUrl', 'description', 'website', 'location', 'specialties', 'socialLinks', 'featured',
+            'status', 'applicationNote', 'reviewNote', 'createdAt', 'updatedAt', 'reviewedAt'])
+        && data.userId is string
+        && data.companyName is string && data.companyName.size() > 0 && data.companyName.size() <= 120
+        && data.get('contactName', '') is string && data.get('contactName', '').size() <= 120
+        && data.get('email', '') is string && data.get('email', '').size() <= 254
+        && data.get('phone', '') is string && data.get('phone', '').size() <= 40
+        && data.get('logoUrl', '') is string && data.get('logoUrl', '').size() <= 1024
+        && data.get('bannerUrl', '') is string && data.get('bannerUrl', '').size() <= 1024
+        && data.get('description', '') is string && data.get('description', '').size() <= 5000
+        && data.get('website', '') is string && data.get('website', '').size() <= 512
+        && data.get('location', '') is string && data.get('location', '').size() <= 120
+        && data.get('applicationNote', '') is string && data.get('applicationNote', '').size() <= 3000
+        && data.get('specialties', []) is list && data.get('specialties', []).size() <= 12
+        && data.get('socialLinks', {}) is map && data.get('socialLinks', {}).size() <= 8
+        && data.get('status', 'approved') in ['pending', 'approved', 'rejected', 'suspended'];
+    }
+
     match /organizers/{organizerId} {
       allow read: if true;
-      allow create: if isValidId(organizerId) && incoming().userId == request.auth.uid && (isOrganizer() || isAdmin());
-      allow update: if isValidId(organizerId) && (existing().userId == request.auth.uid || isAdmin()) && incoming().userId == existing().userId;
+      allow create: if isValidId(organizerId) && (isAdmin() || (
+        isOwner(organizerId) && isValidOrganizer(incoming())
+        && incoming().userId == request.auth.uid
+        && incoming().status == 'pending'
+        && incoming().get('featured', false) == false
+        && !incoming().keys().hasAny(['reviewNote', 'reviewedAt'])
+      ));
+      allow update: if isValidId(organizerId) && (isAdmin() || (
+        isSignedIn() && existing().userId == request.auth.uid
+        && isValidOrganizer(incoming())
+        && incoming().userId == existing().userId
+        && existing().get('status', 'approved') != 'suspended'
+        && incoming().get('featured', false) == existing().get('featured', false)
+        && incoming().get('reviewNote', '') == existing().get('reviewNote', '')
+        && incoming().get('reviewedAt', '') == existing().get('reviewedAt', '')
+        && (incoming().get('status', 'approved') == existing().get('status', 'approved')
+            || (existing().get('status', '') == 'rejected' && incoming().get('status', '') == 'pending'))
+      ));
       allow delete: if isAdmin();
     }
 
@@ -110,12 +153,39 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Organisers manage only their own events; admins manage all.
+    // Organisers manage only their own events, and only an admin can put
+    // one on sale: an organiser saves drafts and submits them for review
+    // ("pending"); an admin publishes. Organisers can take their own event
+    // off sale (back to draft) but never publish, feature or promote it,
+    // and can delete it only while it has never been on sale.
+    function isValidOrganizerEvent(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && data.get('type', 'upcoming') == 'upcoming'
+        && data.get('featured', false) == false
+        && data.get('everPublished', false) == false;
+    }
+
     match /events/{eventId} {
       allow read: if true;
-      allow create: if isValidId(eventId) && (isAdmin() || (isOrganizer() && incoming().organizerId == request.auth.uid));
-      allow update: if isValidId(eventId) && (isAdmin() || (isOrganizer() && existing().organizerId == request.auth.uid && incoming().organizerId == existing().organizerId));
-      allow delete: if isAdmin() || (isOrganizer() && existing().organizerId == request.auth.uid);
+      allow create: if isValidId(eventId) && (isAdmin() || (
+        isOrganizer() && incoming().organizerId == request.auth.uid
+        && incoming().status in ['draft', 'pending']
+        && isValidOrganizerEvent(incoming())
+      ));
+      allow update: if isValidId(eventId) && (isAdmin() || (
+        isOrganizer() && existing().organizerId == request.auth.uid
+        && incoming().organizerId == existing().organizerId
+        && (incoming().status == existing().status || incoming().status in ['draft', 'pending'])
+        && incoming().get('type', 'upcoming') == existing().get('type', 'upcoming')
+        && incoming().get('featured', false) == existing().get('featured', false)
+        && incoming().get('everPublished', false) == existing().get('everPublished', false)
+        && incoming().title is string && incoming().title.size() > 0 && incoming().title.size() <= 200
+      ));
+      allow delete: if isAdmin() || (
+        isOrganizer() && existing().organizerId == request.auth.uid
+        && existing().get('status', 'draft') in ['draft', 'pending']
+        && existing().get('everPublished', false) == false
+      );
     }
 
     // ── Orders ──────────────────────────────────────────────────────────
@@ -171,7 +241,7 @@ service cloud.firestore {
     match /follows/{followId} {
       allow read: if true;
       allow create: if isSignedIn() && isValidId(followId) && isValidFollow(incoming(), followId);
-      allow delete: if isSignedIn() && existing().followerId == request.auth.uid;
+      allow delete: if isSignedIn() && (existing().followerId == request.auth.uid || isAdmin());
       allow update: if false;
     }
   }

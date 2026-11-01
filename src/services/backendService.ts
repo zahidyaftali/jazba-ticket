@@ -41,6 +41,17 @@ export interface OrganizerProfile {
   location?: string;
   specialties?: string[];
   featured?: boolean;
+
+  // ---- Self sign-up (see src/services/organizerService.ts). Profiles made
+  // by an admin before sign-ups existed have no status: treat as approved.
+  status?: 'pending' | 'approved' | 'rejected' | 'suspended';
+  contactName?: string;
+  applicationNote?: string;
+  /** The admin's message back to the organiser (why rejected / suspended). */
+  reviewNote?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  reviewedAt?: string;
 }
 
 export interface ArtistProfile {

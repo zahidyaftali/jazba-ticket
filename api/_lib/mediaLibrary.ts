@@ -7,7 +7,10 @@ import { del, list, put } from '@vercel/blob';
 import { HttpError } from './adminAuth.js';
 
 export const MEDIA_FOLDERS = ['events', 'artists', 'organisers', 'people', 'other'] as const;
-export type MediaFolder = (typeof MEDIA_FOLDERS)[number];
+/** Admins pick one of MEDIA_FOLDERS; each approved organiser's uploads live
+ *  in their own media/partners/<uid>/ folder, the only one they can see. */
+export type MediaFolder = (typeof MEDIA_FOLDERS)[number] | 'partners';
+const PARTNERS = 'partners';
 
 /** Largest file accepted (the browser shrinks photos well below this first). */
 export const MAX_MEDIA_BYTES = 3 * 1024 * 1024;
@@ -55,12 +58,18 @@ function asFolder(value: unknown): MediaFolder {
   return (MEDIA_FOLDERS as readonly string[]).includes(String(value)) ? (value as MediaFolder) : 'other';
 }
 
+/** Where an organiser's own images live. */
+function ownerPrefix(owner: string): string {
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(owner)) throw new HttpError('Not allowed.', 403);
+  return `${ROOT}${PARTNERS}/${owner}/`;
+}
+
 function toItem(b: { url: string; pathname: string; size: number; uploadedAt: Date | string }): MediaItem {
   const parts = b.pathname.split('/');
   return {
     url: b.url,
     pathname: b.pathname,
-    folder: asFolder(parts[1]),
+    folder: parts[1] === PARTNERS ? PARTNERS : asFolder(parts[1]),
     name: parts[parts.length - 1] || b.pathname,
     size: b.size,
     uploadedAt: new Date(b.uploadedAt).toISOString(),
@@ -83,12 +92,14 @@ function storageError(err: any): HttpError {
   return new HttpError('Vercel image storage is not responding right now. Please try again.', 502);
 }
 
-export async function listMedia(): Promise<MediaItem[]> {
+/** Every library image — or, given an organiser's uid, only theirs. */
+export async function listMedia(owner?: string): Promise<MediaItem[]> {
   const items: MediaItem[] = [];
+  const prefix = owner ? ownerPrefix(owner) : ROOT;
   let cursor: string | undefined;
   try {
     for (let page = 0; page < 10; page++) {
-      const res = await list({ prefix: ROOT, limit: 1000, cursor });
+      const res = await list({ prefix, limit: 1000, cursor });
       for (const b of res.blobs) if (!b.pathname.endsWith('/')) items.push(toItem(b));
       if (!res.hasMore || !res.cursor) break;
       cursor = res.cursor;
@@ -99,7 +110,7 @@ export async function listMedia(): Promise<MediaItem[]> {
   return items.sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
 }
 
-export async function uploadMedia(input: { folder?: unknown; name?: unknown; data?: unknown }): Promise<MediaItem> {
+export async function uploadMedia(input: { folder?: unknown; name?: unknown; data?: unknown }, owner?: string): Promise<MediaItem> {
   const data = typeof input.data === 'string' ? input.data : '';
   if (!data) throw new HttpError('No image was sent.');
   if (data.length > Math.ceil((MAX_MEDIA_BYTES * 4) / 3) + 8) throw new HttpError('That image is too large (3 MB max).', 413);
@@ -109,9 +120,9 @@ export async function uploadMedia(input: { folder?: unknown; name?: unknown; dat
   const kind = sniffImage(buf);
   if (!kind) throw new HttpError('Only JPG, PNG, WebP, GIF or AVIF images can be uploaded.', 415);
 
-  const folder = asFolder(input.folder);
+  const dir = owner ? ownerPrefix(owner) : `${ROOT}${asFolder(input.folder)}/`;
   try {
-    const blob = await put(`${ROOT}${folder}/${slugName(String(input.name || ''))}.${kind.ext}`, buf, {
+    const blob = await put(`${dir}${slugName(String(input.name || ''))}.${kind.ext}`, buf, {
       access: 'public',
       contentType: kind.type,
       addRandomSuffix: true,
@@ -124,7 +135,7 @@ export async function uploadMedia(input: { folder?: unknown; name?: unknown; dat
   }
 }
 
-export async function deleteMedia(url: unknown): Promise<void> {
+export async function deleteMedia(url: unknown, owner?: string): Promise<void> {
   let parsed: URL;
   try {
     parsed = new URL(String(url || ''));
@@ -134,7 +145,7 @@ export async function deleteMedia(url: unknown): Promise<void> {
   if (
     parsed.protocol !== 'https:' ||
     !parsed.hostname.endsWith('.public.blob.vercel-storage.com') ||
-    !parsed.pathname.startsWith(`/${ROOT}`)
+    !parsed.pathname.startsWith(`/${owner ? ownerPrefix(owner) : ROOT}`)
   ) {
     throw new HttpError('That is not a media library image.');
   }

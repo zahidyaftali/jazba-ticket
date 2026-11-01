@@ -15,7 +15,8 @@ export default function OrganizersPage() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     getAllOrganizers()
-      .then((list) => setOrganizers(list))
+      // Applications still in review (or paused organisers) stay hidden.
+      .then((list) => setOrganizers(list.filter((o) => !o.status || o.status === 'approved')))
       .finally(() => setLoading(false));
   }, []);
 

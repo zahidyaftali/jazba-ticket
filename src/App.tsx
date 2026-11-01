@@ -43,6 +43,7 @@ import TicketSafetyPage from './components/TicketSafetyPage';
 import PrivacyPolicyPage from './components/PrivacyPolicyPage';
 import OrganizersPage from './components/OrganizersPage';
 import OrganizerDetailPage from './components/OrganizerDetailPage';
+import ForOrganizersPage from './components/ForOrganizersPage';
 import { EventGridSkeleton, DetailPageSkeleton } from './components/Skeletons';
 import { categories, faqs } from './data';
 import { EventItem, TicketTier, eventPath, getAvailableTiers, isPastEvent, withEventSlugs } from './types';
@@ -83,6 +84,7 @@ const PAGE_TITLES: Array<{ match: (path: string) => boolean; title: string }> = 
   { match: (p) => p === '/ticket-safety', title: 'Ticket Safety — Jazba Tickets' },
   { match: (p) => p === '/privacy', title: 'Privacy Policy — Jazba Tickets' },
   { match: (p) => p === '/organizers', title: 'Event Organisers — Jazba Tickets' },
+  { match: (p) => p === '/for-organizers', title: 'Sell Tickets to Your Events — Jazba Tickets' },
   { match: (p) => p.startsWith('/organizers/'), title: 'Organiser Profile — Jazba Tickets' },
   { match: (p) => p === '/login', title: 'Sign In — Jazba Tickets' },
   { match: (p) => p === '/signup', title: 'Sign Up — Jazba Tickets' },
@@ -601,6 +603,7 @@ function AppShell() {
     if (id === 'ticket-safety') return navigate('/ticket-safety');
     if (id === 'privacy') return navigate('/privacy');
     if (id === 'organizers') return navigate('/organizers');
+    if (id === 'for-organizers') return navigate('/for-organizers');
     if (id === 'top') {
       if (location.pathname !== '/') navigate('/');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -644,6 +647,7 @@ function AppShell() {
         <Route path="/artists" element={<ArtistsView events={events} />} />
         <Route path="/artists/:id" element={<ArtistDetailView events={events} />} />
         <Route path="/organizers" element={<OrganizersPage />} />
+        <Route path="/for-organizers" element={<ForOrganizersPage />} />
         <Route path="/organizers/:id" element={<OrganizerDetailPage allEvents={events} onRequireLogin={() => navigate('/login')} />} />
         <Route path="/dashboard" element={<DashboardView events={events} currentUser={currentUser} onLogout={handleLogout} />} />
         <Route path="/help" element={<HelpPage onBackToHome={() => navigate('/')} onExploreEvents={() => navigate('/events')} />} />

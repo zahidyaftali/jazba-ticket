@@ -129,6 +129,7 @@ export default function Footer({ onScrollToSection, onSubscribe, onViewRefundPol
             <ul className="space-y-3 text-sm">
               <li><button onClick={() => onScrollToSection('about')} className={linkClass}>About us</button></li>
               <li><button onClick={() => onScrollToSection('contact')} className={linkClass}>Contact</button></li>
+              <li><button onClick={() => onScrollToSection('for-organizers')} className={linkClass}>Sell tickets with Jazba</button></li>
               <li><button onClick={() => onScrollToSection('affiliates')} className={linkClass}>Affiliate programme</button></li>
             </ul>
           </div>

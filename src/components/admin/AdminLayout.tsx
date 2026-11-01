@@ -80,6 +80,9 @@ const SUB_TITLES: Record<string, string> = {
   upcoming: "Upcoming",
   "check-in": "Check-in",
   "tickets/new": "Issue ticket",
+  "events/review": "In review",
+  view: "Details",
+  applications: "Applications",
 };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -105,6 +108,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   const upcomingTicketsCount = data.bookings.length;
+  const pendingEvents = data.events.filter((e) => e.status === "pending").length;
+  const pendingOrganizers = data.organizers.filter((o) => o.status === "pending").length;
   const nav: NavGroup[] = [
     { items: [{ id: "dashboard", label: "Dashboard", icon: LayoutDashboard, to: "/admin" }] },
     {
@@ -139,6 +144,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           count: data.events.length + data.wpEvents.length,
           children: [
             { label: "All events", to: "/admin/events" },
+            { label: `In review${pendingEvents ? ` (${pendingEvents})` : ""}`, to: "/admin/events/review" },
             { label: "Add new", to: "/admin/events/new" },
           ],
         },
@@ -161,6 +167,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           count: data.organizers.length,
           children: [
             { label: "All organisers", to: "/admin/organizers" },
+            { label: `Applications${pendingOrganizers ? ` (${pendingOrganizers})` : ""}`, to: "/admin/organizers/applications" },
             { label: "Add new", to: "/admin/organizers/new" },
           ],
         },

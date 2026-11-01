@@ -10,7 +10,9 @@
     "api/event-share.ts": { "maxDuration": 30 },
     "api/stripe-webhook.ts": { "maxDuration": 30 },
     "api/admin-security-rules.ts": { "maxDuration": 30, "includeFiles": "firestore.rules" },
-    "api/admin-media.ts": { "maxDuration": 30 }
+    "api/admin-media.ts": { "maxDuration": 30 },
+    "api/organizer-portal.ts": { "maxDuration": 30 },
+    "api/organizer-notify.ts": { "maxDuration": 30 }
   },
   "rewrites": [
     { "source": "/__/auth/:path*", "destination": "https://gen-lang-client-0037466749.firebaseapp.com/__/auth/:path*" },

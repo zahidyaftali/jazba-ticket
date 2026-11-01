@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { NotifyContext } from "./notify";
 import {
   getAllUsers,
   getBookings,
@@ -385,7 +386,7 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
       list.push(t);
       m.set(t.bookingId, list);
     }
-    for (const list of m.values()) list.sort((a, b) => a.ticketNumber.localeCompare(b.ticketNumber, undefined, { numeric: true }));
+    for (const list of m.values()) list.sort((a, b) => String(a.ticketNumber || a.id || "").localeCompare(String(b.ticketNumber || b.id || ""), undefined, { numeric: true }));
     return m;
   }, [data.tickets]);
 
@@ -640,7 +641,12 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
     ticketDataFor,
   };
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  const notifier = useMemo(() => ({ notify, fail }), [notify, fail]);
+  return (
+    <Ctx.Provider value={value}>
+      <NotifyContext.Provider value={notifier}>{children}</NotifyContext.Provider>
+    </Ctx.Provider>
+  );
 }
 
 /** "Google" / "Facebook" when a member's photo shows how they signed up. */

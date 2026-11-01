@@ -24,6 +24,7 @@ const NAV_LINKS = [
   { id: 'organizers', label: 'Organisers' },
   { id: 'help', label: 'Help' },
   { id: 'about', label: 'About' },
+  { id: 'for-organizers', label: 'Sell tickets' },
 ];
 
 export default function Navbar({ onScrollToSection, onOpenAuth, currentUser, onGoToDashboard, onLogout }: NavbarProps) {

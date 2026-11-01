@@ -36,7 +36,6 @@ import {
   updateUserProfile,
   getBookings,
 } from "../services/backendService";
-import OrganizerHub from "./OrganizerHub";
 import ArtistHub from "./ArtistHub";
 import TicketPrintSheet, { QrCode, TicketPrintData, printWhenReady } from "./TicketPrintSheet";
 import brandMark from "../../assets/images/Favicon.png";
@@ -1404,7 +1403,30 @@ export default function UserDashboardPage({
                   </div>
                 )}
                 {activeTab === "organizer" && userRole === "organizer" && (
-                  <OrganizerHub />
+                  <div>
+                    {sectionHead(
+                      "Organiser portal",
+                      "Your events, sales, attendees and organiser profile live in the organiser portal.",
+                    )}
+                    <div className="bg-black text-white p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                      <div>
+                        <span className={`${overline} text-[#ffed00]`}>Organiser</span>
+                        <p className="font-display font-bold text-2xl leading-tight mt-2">
+                          Open the organiser portal
+                        </p>
+                        <p className="text-sm text-white/60 mt-2 max-w-md">
+                          Create events, follow ticket sales, download your
+                          attendee list and update your public page.
+                        </p>
+                      </div>
+                      <a
+                        href="/organizer"
+                        className="inline-flex items-center justify-center gap-2 bg-[#ffed00] hover:bg-[#e6d200] text-black font-bold text-sm px-6 py-3.5 shrink-0"
+                      >
+                        Go to organiser portal <ArrowRight className="w-4 h-4" />
+                      </a>
+                    </div>
+                  </div>
                 )}
                 {activeTab === "artist" && userRole === "artist" && (
                   <ArtistHub />

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { shareOrCopy } from '../share';
 import {
-  ArrowLeft, Check, Share2, Globe, MapPin, Mail, PhoneCall, Building2, Loader2,
+  ArrowLeft, Check, Share2, Globe, MapPin, Mail, PhoneCall, Building2, Loader2, ExternalLink,
 } from 'lucide-react';
 import { EventItem, eventPath } from '../types';
 import EventCard from './EventCard';
@@ -23,6 +23,24 @@ interface OrganizerDetailPageProps {
 
 const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
 
+/** Only plain web links: "instagram.com/x" → https://instagram.com/x; anything
+ *  else (javascript:, data:…) is dropped. Organisers type these themselves. */
+function webLink(value?: string): string {
+  const v = (value || '').trim();
+  if (!v) return '';
+  if (/^https?:\/\//i.test(v)) return v;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(v)) return '';
+  return `https://${v}`;
+}
+
+const SOCIALS: { key: string; label: string }[] = [
+  { key: 'instagram', label: 'Instagram' },
+  { key: 'facebook', label: 'Facebook' },
+  { key: 'tiktok', label: 'TikTok' },
+  { key: 'youtube', label: 'YouTube' },
+  { key: 'x', label: 'X (Twitter)' },
+];
+
 export default function OrganizerDetailPage({ allEvents, onRequireLogin }: OrganizerDetailPageProps) {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -39,7 +57,8 @@ export default function OrganizerDetailPage({ allEvents, onRequireLogin }: Organ
     if (!id) return;
     setLoading(true);
     getOrganizerById(id)
-      .then((org) => setOrganizer(org))
+      // Applications still in review (or paused organisers) aren't public.
+      .then((org) => setOrganizer(org && (!org.status || org.status === 'approved') ? org : null))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -100,15 +119,20 @@ export default function OrganizerDetailPage({ allEvents, onRequireLogin }: Organ
     }
   };
 
-  // Events this organiser is behind — matched by creator id or by the
-  // organiser name entered on the event in the admin.
+  // Events this organiser is behind. A self-registered organiser's events
+  // carry their account id; for profiles an admin created (whose userId is
+  // the admin's own) match the organiser name entered on the event instead.
   const organizerEvents = useMemo(() => {
     if (!organizer) return [];
+    const selfRegistered = !!organizer.status && organizer.id === organizer.userId;
     return allEvents.filter((evt: any) =>
-      (organizer.userId && evt.organizerId === organizer.userId) ||
-      (organizer.companyName && (evt.organizerName || '').toLowerCase() === organizer.companyName.toLowerCase()),
+      selfRegistered
+        ? evt.organizerId === organizer.userId
+        : !!organizer.companyName && (evt.organizerName || '').toLowerCase() === organizer.companyName.toLowerCase(),
     );
   }, [organizer, allEvents]);
+
+  const socials = SOCIALS.map((sl) => ({ ...sl, href: webLink(organizer?.socialLinks?.[sl.key]) })).filter((sl) => sl.href);
 
   if (loading) {
     return (
@@ -178,9 +202,9 @@ export default function OrganizerDetailPage({ allEvents, onRequireLogin }: Organ
                   {organizer.location && (
                     <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {organizer.location}</span>
                   )}
-                  {organizer.website && (
+                  {webLink(organizer.website) && (
                     <a
-                      href={organizer.website}
+                      href={webLink(organizer.website)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1.5 hover:text-white transition-colors"
@@ -302,7 +326,7 @@ export default function OrganizerDetailPage({ allEvents, onRequireLogin }: Organ
           <div className="lg:col-span-4 lg:sticky lg:top-20 lg:self-start space-y-6">
 
             {/* Contact tile — only rows that exist */}
-            {(organizer.email || organizer.phone || organizer.website) && (
+            {(organizer.email || organizer.phone || webLink(organizer.website) || socials.length > 0) && (
               <div className="border border-black">
                 <div className="px-6 py-5 border-b border-[#f2f2f2]">
                   <span className={`${overline} text-[#666]`}>Get in touch</span>
@@ -319,12 +343,18 @@ export default function OrganizerDetailPage({ allEvents, onRequireLogin }: Organ
                     <span className="text-sm font-bold">{organizer.phone}</span>
                   </a>
                 )}
-                {organizer.website && (
-                  <a href={organizer.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-6 py-4 hover:bg-[#f7f7f7] transition-colors">
+                {webLink(organizer.website) && (
+                  <a href={webLink(organizer.website)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-6 py-4 border-b border-[#f2f2f2] hover:bg-[#f7f7f7] transition-colors">
                     <Globe className="w-4 h-4 shrink-0" />
-                    <span className="text-sm font-bold truncate">{organizer.website.replace(/^https?:\/\//, '')}</span>
+                    <span className="text-sm font-bold truncate">{organizer.website!.replace(/^https?:\/\//, '')}</span>
                   </a>
                 )}
+                {socials.map((sl) => (
+                  <a key={sl.key} href={sl.href} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-6 py-4 border-b border-[#f2f2f2] last:border-b-0 hover:bg-[#f7f7f7] transition-colors">
+                    <ExternalLink className="w-4 h-4 shrink-0" />
+                    <span className="text-sm font-bold">{sl.label}</span>
+                  </a>
+                ))}
               </div>
             )}
 
@@ -338,7 +368,7 @@ export default function OrganizerDetailPage({ allEvents, onRequireLogin }: Organ
                 List your show, sell tickets securely and get your own organiser profile — free to start.
               </p>
               <button
-                onClick={() => navigate('/contact')}
+                onClick={() => navigate('/for-organizers')}
                 className="mt-5 bg-black text-white text-sm font-bold px-6 py-3.5 cursor-pointer hover:bg-neutral-800 transition-colors"
               >
                 Talk to us
