@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Mail, Printer, Send, Loader2, Phone, UserRound, ExternalLink, FileDown, Trash2 } from "lucide-react";
-import { Booking, deleteBooking, updateBookingDetails, updateBookingStatus, updateTicketStatus } from "../../services/backendService";
+import { Booking, deleteBooking, setPassPeopleIn, updateBookingDetails, updateBookingStatus, updateTicketStatus } from "../../services/backendService";
 import { sendTicketEmail, downloadTicketPdf, TicketEmailPayload } from "../../services/ticketEmailService";
 import { eventPath, isSeatedTier, ticketSeat } from "../../types";
 import { useAdmin } from "./AdminContext";
@@ -97,6 +97,7 @@ export default function BookingDrawer() {
     customerFor,
     eventInfo,
     passesFor,
+    peopleOnPass,
     tierName,
     amountLabel,
     ticketDataFor,
@@ -132,7 +133,10 @@ export default function BookingDrawer() {
   const info = eventInfo(b.eventId, b);
   const passes = passesFor(b.id || "");
   const orderId = b.orderId || b.bookingNumber || b.id;
-  const checkedIn = passes.filter((p) => p.status === "scanned").length;
+  const counts = new Map(passes.map((p) => [p.id || "", peopleOnPass(p)]));
+  const live = passes.filter((p) => p.status !== "cancelled");
+  const peopleIn = live.reduce((n, p) => n + (counts.get(p.id || "")?.inside || 0), 0);
+  const peopleTotal = live.reduce((n, p) => n + (counts.get(p.id || "")?.total || 1), 0);
 
   const changeBooking = async (update: { paymentStatus?: any; bookingStatus?: any }) => {
     try {
@@ -141,6 +145,20 @@ export default function BookingDrawer() {
       reload();
     } catch {
       fail("Failed to update the order.");
+    }
+  };
+
+  /** Correct how many people have come in on a group pass. */
+  const changePeopleIn = async (id: string, inside: number, total: number) => {
+    setBusyPass(id);
+    try {
+      await setPassPeopleIn(id, inside, total);
+      notify(`${inside} of ${total} people marked as in.`);
+      await reload();
+    } catch {
+      fail("Failed to update the ticket.");
+    } finally {
+      setBusyPass(null);
     }
   };
 
@@ -195,8 +213,8 @@ export default function BookingDrawer() {
           <StatusBadge map={PAYMENT_STATUS} value={b.paymentStatus} />
           <StatusBadge map={BOOKING_STATUS} value={b.bookingStatus || "active"} />
           {passes.length > 0 && (
-            <Badge tone={checkedIn ? "positive" : "neutral"}>
-              {checkedIn}/{passes.length} checked in
+            <Badge tone={peopleIn ? "positive" : "neutral"}>
+              {peopleIn}/{peopleTotal} {peopleTotal === 1 ? "person" : "people"} checked in
             </Badge>
           )}
         </div>
@@ -356,13 +374,39 @@ export default function BookingDrawer() {
           <p className="text-xs text-[#8a8a8a] mt-2">No individual passes were created for this order.</p>
         ) : (
           <div className="mt-3 border border-[#efefef] divide-y divide-[#f2f2f2]">
-            {passes.map((p) => (
-              <div key={p.id} className="flex items-center gap-3 px-3 py-2.5">
+            {passes.map((p) => {
+              const c = counts.get(p.id || "") || { total: 1, inside: 0, left: 1 };
+              const partly = p.status === "active" && c.inside > 0;
+              return (
+              <div key={p.id} className="flex items-center gap-3 px-3 py-2.5 flex-wrap">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-bold">{p.ticketNumber}</p>
-                  {p.scannedAt && <p className="text-[11px] text-[#8a8a8a]">Checked in {fmtDateTime(p.scannedAt)}</p>}
+                  <p className="text-[13px] font-bold">
+                    {p.ticketNumber}
+                    {c.total > 1 && <span className="font-normal text-[#666]"> · admits {c.total}</span>}
+                  </p>
+                  {p.scannedAt && c.inside > 0 && (
+                    <p className="text-[11px] text-[#8a8a8a]">
+                      {c.total > 1 ? `${c.inside} of ${c.total} in · last ` : "Checked in "}
+                      {fmtDateTime(p.scannedAt)}
+                    </p>
+                  )}
                 </div>
-                <StatusBadge map={PASS_STATUS} value={p.status} />
+                {partly ? <Badge tone="warning">{c.inside} of {c.total} in</Badge> : <StatusBadge map={PASS_STATUS} value={p.status} />}
+                {c.total > 1 && p.status !== "cancelled" && busyPass !== p.id && (
+                  <select
+                    aria-label="People in"
+                    title="People in on this pass"
+                    value={c.inside}
+                    onChange={(e) => changePeopleIn(p.id!, Number(e.target.value), c.total)}
+                    className="text-[11px] font-bold border border-[#d4d4d4] px-1.5 py-1 cursor-pointer"
+                  >
+                    {Array.from({ length: c.total + 1 }, (_, k) => (
+                      <option key={k} value={k}>
+                        {k} in
+                      </option>
+                    ))}
+                  </select>
+                )}
                 {busyPass === p.id ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : p.status === "active" ? (
@@ -392,7 +436,8 @@ export default function BookingDrawer() {
                   </button>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

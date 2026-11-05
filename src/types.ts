@@ -137,6 +137,34 @@ export function ticketSeat(b: { seat?: string; tier?: string; ticketType?: strin
   return b.source === 'admin' || isSeatedTier(b.tier || b.ticketType) ? seat : '';
 }
 
+/** People one admission pass lets in: 4 on a "Group of 4" package, else 1.
+ *  The event's package says so (its name, e.g. "Standard Group", often
+ *  doesn't); "Group of N" in the package name is the fallback. */
+export function peoplePerPass(
+  b: { tier?: string; ticketType?: string; tierName?: string } | null | undefined,
+  event?: { ticketOptions?: TicketOption[] } | null,
+): number {
+  const tier = b?.tier || b?.ticketType || '';
+  const size = tier ? Number(event?.ticketOptions?.find((o) => o.id === tier)?.groupSize) : 0;
+  if (size > 1) return Math.min(100, Math.floor(size));
+  const named = Number((b?.tierName || '').match(/\bgroups?\s+of\s+(\d{1,3})\b/i)?.[1]);
+  return named > 1 ? named : 1;
+}
+
+/** A pass's door check-in in people. `perPass` is peoplePerPass() for its
+ *  order; a number saved on the pass at its first check-in wins. A pass
+ *  marked 'scanned' is used up, however it got there. */
+export function passPeople(
+  pass: { status: string; people?: number; peopleIn?: number },
+  perPass: number,
+): { total: number; inside: number; left: number } {
+  const total = Math.max(1, Math.floor(Number(pass.people) || perPass || 1));
+  if (pass.status === 'cancelled') return { total, inside: 0, left: 0 };
+  if (pass.status === 'scanned') return { total, inside: total, left: 0 };
+  const inside = Math.min(total, Math.max(0, Math.floor(Number(pass.peopleIn) || 0)));
+  return { total, inside, left: total - inside };
+}
+
 /** Display name for a booked tier: the event's own package name, else the
  *  default label for general/vip/elite. */
 export function tierDisplayName(tier: string, event?: EventItem): string {

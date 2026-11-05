@@ -30,9 +30,17 @@ import {
 const DAY = 86_400_000;
 
 export default function DashboardPage() {
-  const { data, analytics, allEvents, eventInfo, customerFor, tierName, amountLabel, navigate, openBooking, admin, notify, fail, reload } =
+  const { data, analytics, allEvents, eventInfo, customerFor, tierName, amountLabel, navigate, openBooking, admin, notify, fail, reload, peopleOnPass } =
     useAdmin();
   const { users, bookings, payments, tickets, artists } = data;
+  const doorCount = tickets.reduce(
+    (n, t) => {
+      if (t.status === "cancelled") return n;
+      const c = peopleOnPass(t);
+      return { inside: n.inside + c.inside, total: n.total + c.total };
+    },
+    { inside: 0, total: 0 },
+  );
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
@@ -290,7 +298,7 @@ export default function DashboardPage() {
               { k: "Pending bookings", v: pendingCount },
               { k: "Failed payments", v: failedCount },
               { k: "Issued in the portal", v: bookings.filter((b) => b.source === "admin").length },
-              { k: "Passes checked in", v: `${tickets.filter((t) => t.status === "scanned").length} of ${tickets.length}` },
+              { k: "People checked in", v: `${doorCount.inside} of ${doorCount.total}` },
             ].map((row) => (
               <div key={row.k} className="flex justify-between py-2.5 first:pt-0 last:pb-0">
                 <dt className="text-[#666]">{row.k}</dt>

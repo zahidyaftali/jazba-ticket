@@ -33,7 +33,7 @@ type StatusFilter = "all" | "active" | "completed" | "cancelled";
 
 /** All tickets / Upcoming — one row per ticket order. */
 export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
-  const { data, route, navigate, eventInfo, customerFor, tierName, amountLabel, openBooking, printTicket, ticketDataFor, passesFor, notify, fail } =
+  const { data, route, navigate, eventInfo, customerFor, tierName, amountLabel, openBooking, printTicket, ticketDataFor, passesFor, peopleOnPass, notify, fail } =
     useAdmin();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -73,13 +73,17 @@ export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
       cur.orders += 1;
       if (r.b.bookingStatus !== "cancelled") cur.sold += Number(r.b.quantity) || 1;
       if (r.b.paymentStatus === "paid") cur.revenue += Number(r.b.amount ?? r.b.pricePaid) || 0;
-      const passes = passesFor(r.b.id || "").filter((p) => p.status !== "cancelled");
-      cur.passes += passes.length;
-      cur.checkedIn += passes.filter((p) => p.status === "scanned").length;
+      // Counted in people: a group pass admits several.
+      for (const p of passesFor(r.b.id || "")) {
+        if (p.status === "cancelled") continue;
+        const c = peopleOnPass(p);
+        cur.passes += c.total;
+        cur.checkedIn += c.inside;
+      }
       m.set(r.b.eventId, cur);
     }
     return [...m.values()].sort((a, b) => (a.ts ?? Infinity) - (b.ts ?? Infinity));
-  }, [rows, passesFor]);
+  }, [rows, passesFor, peopleOnPass]);
 
   const q = query.trim().toLowerCase();
   const filtered = rows.filter(({ b, info, c }) => {
@@ -192,7 +196,7 @@ export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
                         {ev.checkedIn}
                         <span className="text-xs text-[#8a8a8a]">/{ev.passes}</span>
                       </p>
-                      <p className="text-[10px] text-[#8a8a8a] mt-1">checked in</p>
+                      <p className="text-[10px] text-[#8a8a8a] mt-1">people in</p>
                     </div>
                     <div>
                       <p className="text-lg font-bold leading-none">{ev.orders}</p>
@@ -332,7 +336,7 @@ export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
 
 /** Door check-in: look up a code, then check passes in. Also lists every pass. */
 export function CheckInPage() {
-  const { data, bookingById, eventInfo, customerFor, tierName, passesFor, openBooking, notify, fail, reload } = useAdmin();
+  const { data, bookingById, eventInfo, customerFor, tierName, passesFor, peopleOnPass, openBooking, notify, fail, reload } = useAdmin();
   const [code, setCode] = useState("");
   const [lookup, setLookup] = useState<{ booking?: Booking; passes: TicketPass[] } | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -412,8 +416,11 @@ export function CheckInPage() {
 
   const exportCsv = () =>
     downloadCsv(`jazba-passes-${new Date().toISOString().slice(0, 10)}.csv`, [
-      ["Ticket no.", "Order", "Event", "Holder", "Email", "Status", "Checked in at"],
-      ...filtered.map(({ t, info, c }) => [t.ticketNumber, t.bookingId, info.title, c?.name || "", c?.email || "", PASS_STATUS[t.status]?.label || t.status, t.scannedAt ? fmtDateTime(t.scannedAt) : ""]),
+      ["Ticket no.", "Order", "Event", "Holder", "Email", "Status", "People in", "Checked in at"],
+      ...filtered.map(({ t, info, c }) => {
+        const n = peopleOnPass(t);
+        return [t.ticketNumber, t.bookingId, info.title, c?.name || "", c?.email || "", PASS_STATUS[t.status]?.label || t.status, `${n.inside} of ${n.total}`, t.scannedAt && n.inside ? fmtDateTime(t.scannedAt) : ""];
+      }),
     ]);
 
   const lookupInfo = live?.booking ? eventInfo(live.booking.eventId, live.booking) : live?.passes[0] ? eventInfo(live.passes[0].eventId) : null;
@@ -497,9 +504,12 @@ export function CheckInPage() {
               {live.passes.length === 0 && <p className="px-3 py-3 text-xs text-[#8a8a8a]">This order has no admission passes.</p>}
               {live.passes.map((p) => (
                 <div key={p.id} className="flex items-center gap-3 px-3 py-2.5 flex-wrap">
-                  <span className="font-bold text-sm flex-1 min-w-[140px]">{p.ticketNumber}</span>
-                  <StatusBadge map={PASS_STATUS} value={p.status} />
-                  {p.status === "scanned" && p.scannedAt && (
+                  <span className="font-bold text-sm flex-1 min-w-[140px]">
+                    {p.ticketNumber}
+                    {peopleOnPass(p).total > 1 && <span className="font-normal text-[#666]"> · admits {peopleOnPass(p).total}</span>}
+                  </span>
+                  <PassStatus p={p} c={peopleOnPass(p)} />
+                  {p.scannedAt && peopleOnPass(p).inside > 0 && (
                     <span className="text-[11px] text-[#8a8a8a]">
                       at {fmtDateTime(p.scannedAt)}
                       {p.scannedBy ? ` by ${p.scannedBy}` : ""}
@@ -513,7 +523,7 @@ export function CheckInPage() {
                       onClick={() => setPass([p.id!], "scanned")}
                       className="text-xs font-bold px-3 py-2 bg-black text-white hover:bg-neutral-800 cursor-pointer"
                     >
-                      Check in
+                      {peopleOnPass(p).left > 1 ? `Check in all ${peopleOnPass(p).left}` : "Check in"}
                     </button>
                   ) : p.status === "scanned" ? (
                     <span className="text-xs font-bold text-[#7a4f0e]">Already admitted</span>
@@ -585,8 +595,8 @@ export function CheckInPage() {
                 <p className="text-[11px] text-[#8a8a8a]">{c?.email || "—"}</p>
               </td>
               <td className={tdCls}>
-                <StatusBadge map={PASS_STATUS} value={t.status} />
-                {t.scannedAt && <span className="block text-[11px] text-[#8a8a8a] mt-1">{fmtDateTime(t.scannedAt)}</span>}
+                <PassStatus p={t} c={peopleOnPass(t)} />
+                {t.scannedAt && peopleOnPass(t).inside > 0 && <span className="block text-[11px] text-[#8a8a8a] mt-1">{fmtDateTime(t.scannedAt)}</span>}
               </td>
               <td className={tdCls}>
                 <select
@@ -610,4 +620,17 @@ export function CheckInPage() {
       </div>
     </div>
   );
+}
+
+/** A pass's status; a group pass part-way in shows how many have come. */
+function PassStatus({ p, c }: { p: TicketPass; c: { total: number; inside: number } }) {
+  if (p.status === "active" && c.inside > 0) {
+    return (
+      <Badge tone="warning">
+        {c.inside} of {c.total} in
+      </Badge>
+    );
+  }
+  if (p.status === "scanned" && c.total > 1) return <Badge tone="positive">All {c.total} in</Badge>;
+  return <StatusBadge map={PASS_STATUS} value={p.status} />;
 }

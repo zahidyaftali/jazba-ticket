@@ -19,7 +19,7 @@ import {
 import { getWordPressEvents } from "../../services/wordpressEventsService";
 import { fetchAuthUsers, AuthUserInfo } from "../../services/adminUsersService";
 import { fetchCardPayments, CardPayment } from "../../services/adminPaymentsService";
-import { EventItem, getEventTimestamp, isPastEvent, tierDisplayName, ticketSeat, withEventSlugs } from "../../types";
+import { EventItem, getEventTimestamp, isPastEvent, passPeople, peoplePerPass, tierDisplayName, ticketSeat, withEventSlugs } from "../../types";
 import { auth, accountEmail } from "../../firebase";
 import { printWhenReady, type TicketPrintData } from "../TicketPrintSheet";
 import { money } from "./ui";
@@ -128,6 +128,8 @@ interface AdminCtx {
   customerFor: (b: Booking) => Customer;
   bookingById: (id: string) => Booking | undefined;
   passesFor: (bookingId: string) => TicketPass[];
+  /** A pass's door check-in in people (a group pass admits several). */
+  peopleOnPass: (p: TicketPass) => { total: number; inside: number; left: number };
   tierName: (b: Booking) => string;
   amountLabel: (b: Booking) => string;
   clients: Client[];
@@ -403,6 +405,13 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
   const userById = useCallback((uid: string) => userMap.get(uid), [userMap]);
   const bookingById = useCallback((id: string) => bookingMap.get(id), [bookingMap]);
   const passesFor = useCallback((id: string) => passMap.get(id) || [], [passMap]);
+  const peopleOnPass = useCallback(
+    (p: TicketPass) => {
+      const b = bookingMap.get(p.bookingId);
+      return passPeople(p, peoplePerPass(b, eventMap.get(p.eventId || b?.eventId || "")));
+    },
+    [bookingMap, eventMap],
+  );
 
   const authUserFor = useCallback((uid: string) => authUsers.get(uid), [authUsers]);
 
@@ -623,6 +632,7 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
     customerFor,
     bookingById,
     passesFor,
+    peopleOnPass,
     tierName,
     amountLabel,
     clients,

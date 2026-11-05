@@ -24,11 +24,11 @@ import {
 import { accountEmail, auth, onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from '../firebase';
 import { getEvents, getUserProfile, isUserBootstrappedAdmin, type Booking, type TicketPass } from '../services/backendService';
 import { getWordPressEvents } from '../services/wordpressEventsService';
-import { getEventTimestamp, ticketSeat, tierDisplayName, type EventItem } from '../types';
+import { getEventTimestamp, passPeople, peoplePerPass, ticketSeat, tierDisplayName, type EventItem } from '../types';
 import { money } from '../components/admin/ui';
 import brandMark from '../../assets/images/Favicon.png';
 import { QrCamera } from './QrCamera';
-import { CheckInConflict, checkInPasses, checkInWithoutPasses, cleanCode, lookupCode, watchEventCheckIns, type EventCheckIns, type OrderLookup } from './checkIn';
+import { CheckInConflict, checkInPeople, checkInWithoutPasses, cleanCode, lookupCode, watchEventCheckIns, type EventCheckIns, type OrderLookup } from './checkIn';
 import { feedback, isSoundOn, setSoundOn, unlockAudio, useInstallPrompt, useScannerKeyboard, type Feedback } from './feedback';
 
 const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
@@ -230,14 +230,18 @@ interface ScanView {
   reason: string;
   booking: Booking | null;
   passes: TicketPass[];
-  /** Passes not used yet. */
+  /** Passes with people still to come in. */
   open: TicketPass[];
   /** The order has no passes saved; checking in creates them. */
   noPasses: boolean;
+  /** People the ticket admits in all, already in, and still to come. */
+  peopleTotal: number;
+  peopleIn: number;
+  peopleLeft: number;
   holder: { name: string; email: string; phone: string };
   event: { title: string; when: string; venue: string };
   tier: string;
-  /** People per ticket: 4 on a "Group of 4" ticket, else 1. */
+  /** People per pass: 4 on a "Group of 4" package, else 1. */
   perTicket: number;
   seat: string;
   payment: string;
@@ -295,6 +299,9 @@ async function buildView(code: string, found: OrderLookup | null, events: Map<st
     passes: [],
     open: [],
     noPasses: false,
+    peopleTotal: 0,
+    peopleIn: 0,
+    peopleLeft: 0,
     holder: { name: '', email: '', phone: '' },
     event: { title: '', when: '', venue: '' },
     tier: '',
@@ -321,10 +328,18 @@ async function buildView(code: string, found: OrderLookup | null, events: Map<st
   }
 
   const tier = b ? b.tierName || tierDisplayName(b.tier || b.ticketType || 'general', e) : 'Admission pass';
-  const group = tier.match(/group\s+of\s+(\d{1,3})/i);
-  const open = passes.filter((p) => p.status === 'active');
-  const used = passes.filter((p) => p.status === 'scanned').sort((x, y) => (y.scannedAt || '').localeCompare(x.scannedAt || ''));
+  const perTicket = b ? peoplePerPass(b, e) : Math.max(1, Number(passes[0]?.people) || 1);
+  const counts = passes.map((p) => passPeople(p, perTicket));
+  const open = passes.filter((_, i) => counts[i].left > 0);
   const noPasses = !!b && passes.length === 0;
+  const peopleTotal = noPasses
+    ? Math.max(1, Number(b?.quantity) || 1) * perTicket
+    : counts.reduce((n, c, i) => n + (passes[i].status === 'cancelled' ? 0 : c.total), 0);
+  const peopleIn = counts.reduce((n, c) => n + c.inside, 0);
+  const peopleLeft = noPasses ? peopleTotal : counts.reduce((n, c) => n + c.left, 0);
+  const lastIn = passes
+    .filter((p, i) => counts[i].inside > 0 && p.scannedAt)
+    .sort((x, y) => (y.scannedAt || '').localeCompare(x.scannedAt || ''))[0];
   const title = e?.title || b?.eventTitle || 'Unknown event';
 
   let verdict: Verdict = 'valid';
@@ -339,16 +354,18 @@ async function buildView(code: string, found: OrderLookup | null, events: Map<st
     verdict = 'wrong-event';
     const when = eventWhen(e, b);
     reason = `This ticket is for ${title}${when ? ` (${when})` : ''}, not this event.`;
-  } else if (!noPasses && open.length === 0) {
+  } else if (!noPasses && peopleLeft === 0) {
     verdict = 'used';
-    const last = used[0];
-    reason = last?.scannedAt ? `Checked in ${whenLabel(last.scannedAt)}${last.scannedBy ? ` by ${last.scannedBy}` : ''}.` : 'This ticket has already been used.';
+    const all = peopleTotal > 1 ? `All ${peopleTotal} people are in. ` : '';
+    reason = lastIn?.scannedAt
+      ? `${all}Last check-in ${whenLabel(lastIn.scannedAt)}${lastIn.scannedBy ? ` by ${lastIn.scannedBy}` : ''}.`
+      : `${all}This ticket has already been used.`;
   } else if (b && b.paymentStatus !== 'paid' && b.paymentMethod !== 'complimentary') {
     verdict = 'unpaid';
     reason = 'Payment isn’t confirmed for this order. Only admit once it’s paid.';
-  } else if (used.length > 0) {
+  } else if (peopleIn > 0) {
     verdict = 'partial';
-    reason = `${used.length} of ${passes.length} already checked in. ${open.length} still to come in.`;
+    reason = `${peopleIn} of ${peopleTotal} people already in${lastIn?.scannedAt ? ` (last ${whenLabel(lastIn.scannedAt)})` : ''}. ${peopleLeft} still to come in.`;
   } else {
     reason = 'Not used yet.';
   }
@@ -361,10 +378,13 @@ async function buildView(code: string, found: OrderLookup | null, events: Map<st
     passes,
     open,
     noPasses,
+    peopleTotal,
+    peopleIn,
+    peopleLeft,
     holder: { name: name || (email ? email.split('@')[0] : 'Guest'), email, phone },
     event: { title, when: eventWhen(e, b), venue: eventVenue(e as any, b) },
     tier,
-    perTicket: group ? Math.max(1, Number(group[1])) : 1,
+    perTicket,
     seat: b ? ticketSeat(b) : '',
     payment: b ? paymentLabel(b) : '',
   };
@@ -384,6 +404,9 @@ function errorView(code: string, err?: unknown): ScanView {
     passes: [],
     open: [],
     noPasses: false,
+    peopleTotal: 0,
+    peopleIn: 0,
+    peopleLeft: 0,
     holder: { name: '', email: '', phone: '' },
     event: { title: '', when: '', venue: '' },
     tier: '',
@@ -423,11 +446,12 @@ function Scanner({ user }: { user: User }) {
   const [stats, setStats] = useState<EventCheckIns | null>(null);
   const [looking, setLooking] = useState('');
   const [view, setView] = useState<ScanView | null>(null);
-  const [admitCount, setAdmitCount] = useState(1);
+  /** People to let in now; 0 until door staff choose (tickets for more than one). */
+  const [admitCount, setAdmitCount] = useState(0);
   const [confirmUnpaid, setConfirmUnpaid] = useState(false);
   const [admitting, setAdmitting] = useState(false);
   const [admitError, setAdmitError] = useState('');
-  const [admitted, setAdmitted] = useState<{ name: string; people: number; tier: string } | null>(null);
+  const [admitted, setAdmitted] = useState<{ name: string; people: number; left: number; tier: string } | null>(null);
   const [recent, setRecent] = useState<RecentScan[]>([]);
   const [phoneCount, setPhoneCount] = useState(0);
   const [manual, setManual] = useState('');
@@ -456,8 +480,8 @@ function Scanner({ user }: { user: User }) {
   useEffect(() => {
     setStats(null);
     if (!eventId) return;
-    return watchEventCheckIns(eventId, setStats, () => setStats(null));
-  }, [eventId]);
+    return watchEventCheckIns(eventId, selected, setStats, () => setStats(null));
+  }, [eventId, selected]);
 
   // The camera calls back with whatever it sees; read the latest state here.
   const latest = useRef({ eventMap, eventId });
@@ -468,7 +492,9 @@ function Scanner({ user }: { user: User }) {
 
   const showView = (v: ScanView) => {
     setView(v);
-    setAdmitCount(v.noPasses ? Math.max(1, Number(v.booking?.quantity) || 1) : Math.max(1, v.open.length));
+    // One person: ready to go. More: staff must say how many are here now,
+    // so a group isn't used up by mistake when only some of it has come.
+    setAdmitCount(v.peopleLeft === 1 ? 1 : 0);
     setConfirmUnpaid(false);
     setAdmitError('');
     const sound = TONE[v.verdict].sound;
@@ -521,7 +547,7 @@ function Scanner({ user }: { user: User }) {
     return () => clearTimeout(t);
   }, [admitted, closeAdmitted]);
 
-  const maxAdmit = view ? (view.noPasses ? Math.max(1, Number(view.booking?.quantity) || 1) : view.open.length) : 0;
+  const maxAdmit = view ? view.peopleLeft : 0;
 
   const admit = async () => {
     if (!view || admitting || !CAN_ADMIT.includes(view.verdict)) return;
@@ -529,23 +555,24 @@ function Scanner({ user }: { user: User }) {
       setConfirmUnpaid(true);
       return;
     }
-    const n = Math.max(1, Math.min(admitCount, maxAdmit));
+    const people = Math.min(admitCount, maxAdmit);
+    if (people < 1) return;
     setAdmitting(true);
     setAdmitError('');
     try {
-      if (view.noPasses && view.booking) await checkInWithoutPasses(view.booking, n, staff);
-      else await checkInPasses(view.open.slice(0, n).map((p) => p.id!), staff);
-      const people = n * view.perTicket;
+      if (view.noPasses && view.booking) await checkInWithoutPasses(view.booking, view.perTicket, people, staff);
+      else await checkInPeople(view.open.map((p) => p.id!), view.perTicket, people, staff);
+      const left = maxAdmit - people;
       feedback('ok');
       setPhoneCount((c) => c + people);
       pushRecent({
         code: view.code,
         name: view.holder.name,
         verdict: 'admitted',
-        detail: `${people} ${people === 1 ? 'person' : 'people'} in · ${view.tier}`,
+        detail: `${people} ${people === 1 ? 'person' : 'people'} in${left ? `, ${left} still to come` : ''} · ${view.tier}`,
       });
       setView(null);
-      setAdmitted({ name: view.holder.name, people, tier: view.tier });
+      setAdmitted({ name: view.holder.name, people, left, tier: view.tier });
     } catch (err) {
       if (err instanceof CheckInConflict) {
         // Someone checked it in meanwhile: show the ticket as it is now.
@@ -632,10 +659,10 @@ function Scanner({ user }: { user: User }) {
               <span className="text-white/70">
                 {stats ? (
                   <>
-                    <b className="text-white text-sm">{stats.inside}</b> of {stats.total} tickets checked in
+                    <b className="text-white text-sm">{stats.inside}</b> of {stats.total} people checked in
                   </>
                 ) : (
-                  'Counting tickets…'
+                  'Counting people…'
                 )}
               </span>
               <span className="text-white/45">This phone: {phoneCount}</span>
@@ -730,7 +757,7 @@ function Scanner({ user }: { user: User }) {
 // ── Checked in ────────────────────────────────────────────────────────────
 
 /** Full-screen green confirmation; closes itself after a moment. */
-function AdmittedScreen({ name, people, tier, onClose }: { name: string; people: number; tier: string; onClose: () => void }) {
+function AdmittedScreen({ name, people, left, tier, onClose }: { name: string; people: number; left: number; tier: string; onClose: () => void }) {
   return (
     <button
       type="button"
@@ -743,6 +770,11 @@ function AdmittedScreen({ name, people, tier, onClose }: { name: string; people:
       <p className="mt-2 text-white/85">
         {people} {people === 1 ? 'person' : 'people'} · {tier}
       </p>
+      {left > 0 && (
+        <p className="mt-4 bg-white/15 px-4 py-2 font-bold">
+          {left} more can still come in on this ticket
+        </p>
+      )}
       <p className="mt-12 text-sm text-white/70">Tap to scan the next ticket</p>
       <span className="scan-countdown absolute left-0 bottom-0 h-2 bg-white/60" />
     </button>
@@ -776,8 +808,8 @@ function ResultSheet({
   const Icon = tone.icon;
   const b = view.booking;
   const canAdmit = CAN_ADMIT.includes(view.verdict);
-  const n = Math.max(1, Math.min(admitCount, maxAdmit));
-  const people = n * view.perTicket;
+  /** People chosen to come in now; 0 = not chosen yet. */
+  const n = Math.max(0, Math.min(admitCount, maxAdmit));
   const totalTickets = view.noPasses ? Math.max(1, Number(b?.quantity) || 1) : view.passes.length;
 
   return (
@@ -818,9 +850,9 @@ function ResultSheet({
                   )}
                 </div>
                 <div className="bg-black text-white px-3 py-2 text-center shrink-0">
-                  <p className={`${overline} text-white/60`}>Admits</p>
+                  <p className={`${overline} text-white/60`}>{canAdmit && view.peopleIn > 0 ? 'Left' : 'Admits'}</p>
                   <p className="font-display font-extrabold text-3xl leading-none text-[#ffed00] mt-1">
-                    {canAdmit ? people : totalTickets * view.perTicket}
+                    {canAdmit ? maxAdmit : view.peopleTotal}
                   </p>
                 </div>
               </div>
@@ -841,18 +873,40 @@ function ResultSheet({
                 <div className="mt-5">
                   <p className={`${overline} text-[#8a8a8a] mb-2`}>Tickets on this order</p>
                   <ul className="border border-[#e4e4e4] divide-y divide-[#eee]">
-                    {view.passes.map((p) => (
-                      <li key={p.id} className="flex items-center gap-3 px-3 py-2.5 text-sm">
-                        <span className="font-bold flex-1 min-w-0 truncate">{p.ticketNumber}</span>
-                        {p.status === 'scanned' ? (
-                          <span className="text-xs text-[#b91c1c] font-bold text-right">In {whenLabel(p.scannedAt)}</span>
-                        ) : p.status === 'cancelled' ? (
-                          <span className="text-xs text-[#b91c1c] font-bold">Cancelled</span>
-                        ) : (
-                          <span className="text-xs text-[#15803d] font-bold">Not used</span>
-                        )}
-                      </li>
-                    ))}
+                    {view.passes.map((p) => {
+                      const c = passPeople(p, view.perTicket);
+                      const history = c.total > 1 && Array.isArray(p.checkIns) ? p.checkIns : [];
+                      return (
+                        <li key={p.id} className="px-3 py-2.5 text-sm">
+                          <div className="flex items-center gap-3">
+                            <span className="font-bold flex-1 min-w-0 truncate">{p.ticketNumber}</span>
+                            {p.status === 'cancelled' ? (
+                              <span className="text-xs text-[#b91c1c] font-bold">Cancelled</span>
+                            ) : c.left === 0 ? (
+                              <span className="text-xs text-[#b91c1c] font-bold text-right">
+                                {c.total > 1 ? `All ${c.total} in` : 'In'} {whenLabel(p.scannedAt)}
+                              </span>
+                            ) : c.inside > 0 ? (
+                              <span className="text-xs text-[#a16207] font-bold text-right">
+                                {c.inside} of {c.total} in · {c.left} to come
+                              </span>
+                            ) : (
+                              <span className="text-xs text-[#15803d] font-bold">{c.total > 1 ? `Not used · admits ${c.total}` : 'Not used'}</span>
+                            )}
+                          </div>
+                          {history.length > 0 && (
+                            <ul className="mt-1 text-[11px] text-[#666] space-y-0.5">
+                              {history.map((h, i) => (
+                                <li key={i}>
+                                  {h.people} in {whenLabel(h.at)}
+                                  {h.by ? ` · ${h.by}` : ''}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               )}
@@ -864,20 +918,46 @@ function ResultSheet({
       <div className="border-t border-[#e4e4e4] bg-white px-5 pt-3" style={SAFE_BOTTOM}>
         <div className="max-w-md mx-auto">
           {canAdmit && maxAdmit > 1 && (
-            <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="mb-3">
               <p className="text-sm font-bold leading-tight">
-                How many tickets now?
-                <span className="block text-xs text-[#666] font-medium">{maxAdmit} not used yet</span>
+                How many people are coming in now?
+                <span className="block text-xs text-[#666] font-medium">
+                  {maxAdmit} can still come in on this ticket. Others can come later.
+                </span>
               </p>
-              <div className="flex items-center">
-                <button type="button" aria-label="One fewer" onClick={() => setAdmitCount(Math.max(1, n - 1))} disabled={n <= 1} className="w-12 h-12 border-2 border-black flex items-center justify-center cursor-pointer disabled:opacity-30">
-                  <Minus className="w-5 h-5" />
-                </button>
-                <span className="w-12 text-center font-display font-extrabold text-2xl">{n}</span>
-                <button type="button" aria-label="One more" onClick={() => setAdmitCount(Math.min(maxAdmit, n + 1))} disabled={n >= maxAdmit} className="w-12 h-12 border-2 border-black flex items-center justify-center cursor-pointer disabled:opacity-30">
-                  <Plus className="w-5 h-5" />
-                </button>
-              </div>
+              {maxAdmit <= 8 ? (
+                <div className="grid grid-cols-4 gap-2 mt-2.5">
+                  {Array.from({ length: maxAdmit }, (_, i) => i + 1).map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      aria-pressed={n === k}
+                      onClick={() => setAdmitCount(k)}
+                      className={`h-12 border-2 border-black font-display font-extrabold text-xl cursor-pointer ${n === k ? 'bg-black text-[#ffed00]' : 'bg-white text-black'}`}
+                    >
+                      {k}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 mt-2.5">
+                  <button type="button" aria-label="One fewer" onClick={() => setAdmitCount(Math.max(1, n - 1))} disabled={n <= 1} className="w-12 h-12 border-2 border-black flex items-center justify-center cursor-pointer disabled:opacity-30">
+                    <Minus className="w-5 h-5" />
+                  </button>
+                  <span className="w-14 text-center font-display font-extrabold text-2xl">{n || '–'}</span>
+                  <button type="button" aria-label="One more" onClick={() => setAdmitCount(Math.min(maxAdmit, n + 1))} disabled={n >= maxAdmit} className="w-12 h-12 border-2 border-black flex items-center justify-center cursor-pointer disabled:opacity-30">
+                    <Plus className="w-5 h-5" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={n === maxAdmit}
+                    onClick={() => setAdmitCount(maxAdmit)}
+                    className={`flex-1 h-12 border-2 border-black font-bold cursor-pointer ${n === maxAdmit ? 'bg-black text-[#ffed00]' : 'bg-white text-black'}`}
+                  >
+                    All {maxAdmit}
+                  </button>
+                </div>
+              )}
             </div>
           )}
           {admitError && <p className="text-sm font-bold text-[#b91c1c] mb-3">{admitError}</p>}
@@ -885,11 +965,15 @@ function ResultSheet({
             <button
               type="button"
               onClick={onAdmit}
-              disabled={admitting}
-              className={`w-full flex items-center justify-center gap-2 font-extrabold text-lg py-4 cursor-pointer disabled:opacity-60 ${confirmUnpaid ? 'bg-[#f59e0b] text-black' : 'bg-[#ffed00] text-black'}`}
+              disabled={admitting || n === 0}
+              className={`w-full flex items-center justify-center gap-2 font-extrabold text-lg py-4 cursor-pointer disabled:cursor-default ${n === 0 ? 'bg-[#e4e4e4] text-[#555]' : confirmUnpaid ? 'bg-[#f59e0b] text-black' : 'bg-[#ffed00] text-black'} ${admitting ? 'opacity-60' : ''}`}
             >
               {admitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" strokeWidth={3} />}
-              {confirmUnpaid ? 'Tap again to admit without payment' : `Check in · admit ${people} ${people === 1 ? 'person' : 'people'}`}
+              {n === 0
+                ? 'Choose how many people'
+                : confirmUnpaid
+                  ? 'Tap again to admit without payment'
+                  : `Check in · admit ${n} ${n === 1 ? 'person' : 'people'}`}
             </button>
           )}
           <button

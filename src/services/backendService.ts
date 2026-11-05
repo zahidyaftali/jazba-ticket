@@ -140,6 +140,13 @@ export interface TicketPass {
   scannedAt?: string;
   /** Email of the admin whose scanner checked it in (Jazba Scan app). */
   scannedBy?: string;
+  /** People this pass admits (4 on a group package). Saved at its first
+   *  check-in; before that it comes from the order's package. */
+  people?: number;
+  /** People let in on this pass so far. It stays 'active' until all are in. */
+  peopleIn?: number;
+  /** Each time people came in on this pass. */
+  checkIns?: { at: string; by: string; people: number }[];
 }
 
 export interface PaymentDetails {
@@ -592,6 +599,27 @@ export async function updateTicketStatus(id: string, status: 'active' | 'cancell
     await updateDoc(doc(db, 'tickets', id), {
       status,
       ...(status === 'scanned' ? { scannedAt: new Date().toISOString() } : {}),
+      // Back to unused: nobody on it has come in.
+      ...(status === 'active' ? { peopleIn: 0 } : {}),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+    throw error;
+  }
+}
+
+/** Correct how many people have come in on a group pass (e.g. after a
+ *  wrong number at the door). All of them in marks the pass used. */
+export async function setPassPeopleIn(id: string, peopleIn: number, people: number): Promise<void> {
+  const path = `tickets/${id}`;
+  const total = Math.max(1, Math.floor(people));
+  const inside = Math.min(total, Math.max(0, Math.floor(peopleIn)));
+  try {
+    await updateDoc(doc(db, 'tickets', id), {
+      people: total,
+      peopleIn: inside,
+      status: inside >= total ? 'scanned' : 'active',
+      ...(inside > 0 ? { scannedAt: new Date().toISOString() } : {}),
     });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
