@@ -32,6 +32,8 @@ import { CheckInConflict, checkInPeople, checkInWithoutPasses, cleanCode, lookup
 import { feedback, isSoundOn, setSoundOn, unlockAudio, useInstallPrompt, useScannerKeyboard, type Feedback } from './feedback';
 
 const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
+/** Shown on screen, so door staff can tell the phone runs the latest app. */
+const SCAN_VERSION = 'Version 2 · group tickets';
 const SAFE_TOP = { paddingTop: 'env(safe-area-inset-top)' } as const;
 const SAFE_BOTTOM = { paddingBottom: 'max(14px, env(safe-area-inset-bottom))' } as const;
 
@@ -178,6 +180,7 @@ function SignIn({ denied }: { denied: boolean }) {
       </div>
       <div className="px-6 max-w-sm w-full mx-auto" style={SAFE_BOTTOM}>
         <InstallTip />
+        <p className="text-center text-[11px] text-white/35 mt-4">{SCAN_VERSION}</p>
       </div>
     </div>
   );
@@ -461,18 +464,23 @@ function Scanner({ user }: { user: User }) {
   const busy = useRef(false);
   const lastScan = useRef({ code: '', at: 0 });
 
-  useEffect(() => {
-    let off = false;
-    Promise.all([getWordPressEvents(), getEvents().catch(() => [] as EventItem[])]).then(([wp, site]) => {
-      if (off) return;
+  /** The event list, loading or loaded. A scan waits for it: it says how
+   *  many people a group package admits. */
+  const eventsLoad = useRef<Promise<Map<string, EventItem>> | null>(null);
+  const loadEvents = useCallback(() => {
+    const p = Promise.all([getWordPressEvents(), getEvents().catch(() => [] as EventItem[])]).then(([wp, site]) => {
       const m = new Map<string, EventItem>();
       for (const e of [...wp, ...site]) if (e?.id && !m.has(e.id)) m.set(e.id, e);
       setEvents([...m.values()]);
+      return m;
     });
-    return () => {
-      off = true;
-    };
+    eventsLoad.current = p;
+    return p;
   }, []);
+
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
 
   const eventMap = useMemo(() => new Map(events.map((e) => [e.id, e])), [events]);
   const selected = eventId ? eventMap.get(eventId) || null : null;
@@ -515,7 +523,11 @@ function Scanner({ user }: { user: User }) {
     let v: ScanView;
     try {
       const found = await lookupCode(code);
-      v = await buildView(code, found, latest.current.eventMap, latest.current.eventId);
+      let events = await (eventsLoad.current || loadEvents());
+      const ticketEvent = found?.booking?.eventId || found?.passes[0]?.eventId || '';
+      // Not in the list (it failed to load, or is out of date): load it again.
+      if (ticketEvent && !events.has(ticketEvent)) events = await loadEvents();
+      v = await buildView(code, found, events, latest.current.eventId);
     } catch (err) {
       console.error('Ticket lookup failed:', err);
       v = errorView(code, err);
@@ -629,7 +641,9 @@ function Scanner({ user }: { user: User }) {
           <img src={brandMark} alt="" className="w-8 h-8 object-contain" />
           <div className="flex-1 min-w-0">
             <p className="font-display font-extrabold leading-none">Jazba Scan</p>
-            <p className="text-[11px] text-white/50 truncate mt-1">{staff}</p>
+            <p className="text-[11px] text-white/50 truncate mt-1">
+              {staff} · <span className="text-[#ffed00]/80">{SCAN_VERSION}</span>
+            </p>
           </div>
           <button type="button" onClick={toggleSound} aria-label={sound ? 'Turn sound off' : 'Turn sound on'} className="w-10 h-10 flex items-center justify-center text-white/70 cursor-pointer">
             {sound ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}

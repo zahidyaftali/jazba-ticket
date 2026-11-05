@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Send, Printer, Eye, Download, Mail, ScanLine, Loader2, CircleCheck, TriangleAlert, FileDown } from "lucide-react";
 import { Booking, TicketPass, updateTicketStatus } from "../../../services/backendService";
 import { useAdmin, byNewest } from "../AdminContext";
+import { CheckInConflict, checkInPeople } from "../../../scanner/checkIn";
 import { useEmailTicket } from "../BookingDrawer";
 import {
   Avatar,
@@ -336,7 +337,7 @@ export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
 
 /** Door check-in: look up a code, then check passes in. Also lists every pass. */
 export function CheckInPage() {
-  const { data, bookingById, eventInfo, customerFor, tierName, passesFor, peopleOnPass, openBooking, notify, fail, reload } = useAdmin();
+  const { data, admin, bookingById, eventInfo, customerFor, tierName, passesFor, peopleOnPass, openBooking, notify, fail, reload } = useAdmin();
   const [code, setCode] = useState("");
   const [lookup, setLookup] = useState<{ booking?: Booking; passes: TicketPass[] } | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -384,6 +385,20 @@ export function CheckInPage() {
       await reload();
     } catch {
       fail("Failed to update the ticket.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Let some of a group pass's people in now; the rest can come later. */
+  const admitPeople = async (p: TicketPass, people: number) => {
+    setBusy(p.id!);
+    try {
+      await checkInPeople([p.id!], peopleOnPass(p).total, people, admin.email || "admin portal");
+      notify(`${people} ${people === 1 ? "person" : "people"} checked in.`);
+      await reload();
+    } catch (err) {
+      fail(err instanceof CheckInConflict ? err.message : "Failed to check in.");
     } finally {
       setBusy(null);
     }
@@ -517,13 +532,15 @@ export function CheckInPage() {
                   )}
                   {busy?.includes(p.id!) ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : p.status === "active" && peopleOnPass(p).left > 1 ? (
+                    <GroupAdmit left={peopleOnPass(p).left} onAdmit={(n) => admitPeople(p, n)} />
                   ) : p.status === "active" ? (
                     <button
                       type="button"
                       onClick={() => setPass([p.id!], "scanned")}
                       className="text-xs font-bold px-3 py-2 bg-black text-white hover:bg-neutral-800 cursor-pointer"
                     >
-                      {peopleOnPass(p).left > 1 ? `Check in all ${peopleOnPass(p).left}` : "Check in"}
+                      Check in
                     </button>
                   ) : p.status === "scanned" ? (
                     <span className="text-xs font-bold text-[#7a4f0e]">Already admitted</span>
@@ -633,4 +650,30 @@ function PassStatus({ p, c }: { p: TicketPass; c: { total: number; inside: numbe
   }
   if (p.status === "scanned" && c.total > 1) return <Badge tone="positive">All {c.total} in</Badge>;
   return <StatusBadge map={PASS_STATUS} value={p.status} />;
+}
+
+/** Door check-in for a group pass: how many of its people are here now. */
+function GroupAdmit({ left, onAdmit }: { left: number; onAdmit: (people: number) => void }) {
+  const [people, setPeople] = useState(0);
+  return (
+    <span className="flex items-center gap-2">
+      <select value={people} onChange={(e) => setPeople(Number(e.target.value))} className={selectCls} aria-label="People coming in now">
+        <option value={0}>How many now?</option>
+        {Array.from({ length: left }, (_, i) => i + 1).map((n) => (
+          <option key={n} value={n}>
+            {n} {n === 1 ? "person" : "people"}
+            {n === left ? " (all)" : ""}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        disabled={!people}
+        onClick={() => onAdmit(people)}
+        className="text-xs font-bold px-3 py-2 bg-black text-white hover:bg-neutral-800 cursor-pointer disabled:opacity-40 disabled:cursor-default"
+      >
+        Check in
+      </button>
+    </span>
+  );
 }
