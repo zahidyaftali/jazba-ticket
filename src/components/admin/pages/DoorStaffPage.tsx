@@ -1,12 +1,34 @@
-import React, { useMemo, useState } from "react";
-import { Check, CircleCheck, CircleX, Copy, KeyRound, Loader2, PauseCircle, PlayCircle, ScanLine, Trash2, UserPlus, Wand2 } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  CalendarDays,
+  Check,
+  CircleCheck,
+  CircleX,
+  Copy,
+  KeyRound,
+  Loader2,
+  PauseCircle,
+  PlayCircle,
+  ScanLine,
+  Trash2,
+  UserPlus,
+  Wand2,
+} from "lucide-react";
 import { updateUserRoleAndStatus, type UserProfile } from "../../../services/backendService";
-import { createDoorStaff, deleteDoorStaff, setDoorStaffPassword, suggestPassword } from "../../../services/doorStaffService";
+import {
+  createDoorStaff,
+  deleteDoorStaff,
+  getDoorStaffEvents,
+  setDoorStaffEvents,
+  setDoorStaffPassword,
+  suggestPassword,
+} from "../../../services/doorStaffService";
 import { useAdmin } from "../AdminContext";
 import {
   Avatar,
   Badge,
   DataTable,
+  Drawer,
   EmptyRow,
   Field,
   IconButton,
@@ -17,6 +39,7 @@ import {
   btnPrimary,
   fmtDateTime,
   inputCls,
+  overline,
   tdCls,
   thCls,
 } from "../ui";
@@ -32,17 +55,38 @@ interface Handover {
 
 /**
  * Door staff: logins for the people at the gate. They sign in to Jazba Scan
- * and check tickets in — nothing else (firestore.rules → isDoorCheckIn; the
- * admin portal and every other page refuse them).
+ * and check tickets in — only for the events given to them here, nothing
+ * else (firestore.rules → isDoorStaffFor / isDoorCheckIn; the admin portal
+ * and every other page refuse them).
  */
 export default function DoorStaffPage() {
-  const { data, notify, fail, reload, peopleOnPass } = useAdmin();
+  const { data, notify, fail, reload, peopleOnPass, eventInfo } = useAdmin();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState(suggestPassword);
+  const [newEvents, setNewEvents] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [handover, setHandover] = useState<Handover | null>(null);
+  /** Each login's events (null while loading). */
+  const [assigned, setAssigned] = useState<Map<string, string[]> | null>(null);
+  const [editing, setEditing] = useState<UserProfile | null>(null);
+
+  const failRef = useRef(fail);
+  failRef.current = fail;
+  const loadAssigned = useCallback(async () => {
+    try {
+      setAssigned(await getDoorStaffEvents());
+    } catch (err) {
+      console.error("Door staff events could not be loaded:", err);
+      setAssigned(new Map());
+      failRef.current("Couldn't load which events each login can check. Refresh the page to try again.");
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAssigned();
+  }, [loadAssigned]);
 
   const staff = useMemo(
     () => data.users.filter((u) => u.role === "staff").sort((a, b) => (a.name || "").localeCompare(b.name || "")),
@@ -77,19 +121,35 @@ export default function DoorStaffPage() {
       fail("The password needs at least 8 characters.");
       return;
     }
+    if (!newEvents.length && !window.confirm("No events chosen. This login won't be able to scan anything until you give it an event. Create it anyway?")) return;
     setCreating(true);
     try {
-      const made = await createDoorStaff(name.trim(), email.trim(), password);
+      const made = await createDoorStaff(name.trim(), email.trim(), password, newEvents);
       setHandover({ name: made.name, email: made.email, password });
       notify(`Door staff login created for ${made.name}.`);
       setName("");
       setEmail("");
       setPassword(suggestPassword());
-      await reload();
+      setNewEvents([]);
+      await Promise.all([reload(), loadAssigned()]);
     } catch (err: any) {
       fail(err?.message || "Could not create the login.");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const saveEvents = async (u: UserProfile, events: string[]) => {
+    setBusy(u.uid);
+    try {
+      await setDoorStaffEvents(u.uid, events);
+      notify(events.length ? `${u.name} can now check ${events.length} event${events.length === 1 ? "" : "s"}.` : `${u.name} has no events now, so can't scan.`);
+      setEditing(null);
+      await loadAssigned();
+    } catch {
+      fail("Could not save the events. Try again.");
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -147,7 +207,7 @@ export default function DoorStaffPage() {
       await deleteDoorStaff(u.uid);
       if (handover?.email === u.email) setHandover(null);
       notify(`Login for ${u.name} deleted.`);
-      await reload();
+      await Promise.all([reload(), loadAssigned()]);
     } catch (err: any) {
       fail(err?.message || "Could not delete the login.");
     } finally {
@@ -159,7 +219,7 @@ export default function DoorStaffPage() {
     <div>
       <PageHeader
         title="Door staff"
-        sub="Logins for the people at the gate. They can only sign in to the Jazba Scan app and check tickets in. They can't open this portal or see payments, and they can't change any order."
+        sub="Logins for the people at the gate. Each one can only sign in to the Jazba Scan app and check tickets for the events you give it. They can't open this portal or see payments, and they can't change any order."
         actions={
           <>
             <a href="/scan" target="_blank" rel="noopener" className={btnOutline}>
@@ -194,6 +254,13 @@ export default function DoorStaffPage() {
                   </button>
                 </div>
               </Field>
+              <Field
+                label={`Events they can check${newEvents.length ? ` (${newEvents.length})` : ""}`}
+                hint="Tick one or more. You can change them any time, and the scanner updates straight away."
+                className="sm:col-span-2"
+              >
+                <EventChecklist selected={newEvents} onChange={setNewEvents} />
+              </Field>
               <div className="sm:col-span-2">
                 <button type="submit" className={btnPrimary} disabled={creating}>
                   {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />} Create login
@@ -207,7 +274,7 @@ export default function DoorStaffPage() {
               head={
                 <>
                   <th className={thCls}>Staff member</th>
-                  <th className={thCls}>Status</th>
+                  <th className={thCls}>Events</th>
                   <th className={thCls}>Checked in</th>
                   <th className={`${thCls} text-right`}>Manage</th>
                 </>
@@ -216,22 +283,51 @@ export default function DoorStaffPage() {
               {staff.map((u) => {
                 const a = activity.get((u.email || "").toLowerCase());
                 const suspended = u.status === "suspended";
+                const events = assigned?.get(u.uid) || [];
                 return (
-                  <tr key={u.uid} className="hover:bg-[#fafafa]">
+                  <tr key={u.uid} className="hover:bg-[#fafafa] align-top">
                     <td className={tdCls}>
                       <div className="flex items-center gap-3 min-w-0">
                         <Avatar name={u.name || u.email} size={32} />
                         <div className="min-w-0">
                           <p className="font-bold truncate">{u.name || "—"}</p>
                           <p className="text-[11px] text-[#8a8a8a] truncate">{u.email}</p>
+                          <span className="inline-block mt-1">
+                            <Badge tone={suspended ? "negative" : "positive"}>{suspended ? "Suspended" : "Can scan"}</Badge>
+                          </span>
                         </div>
                       </div>
                     </td>
-                    <td className={tdCls}>
-                      <Badge tone={suspended ? "negative" : "positive"}>{suspended ? "Suspended" : "Can scan"}</Badge>
+                    <td className={`${tdCls} min-w-[200px]`}>
+                      {!assigned ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-[#8a8a8a]" />
+                      ) : events.length === 0 ? (
+                        <Badge tone="warning">No events: can't scan</Badge>
+                      ) : (
+                        <ul className="space-y-1">
+                          {events.map((id) => {
+                            const info = eventInfo(id);
+                            return (
+                              <li key={id} className="text-[12px] leading-tight">
+                                <span className="font-bold">{info.title || id}</span>
+                                {info.date && <span className="text-[#8a8a8a]"> · {info.date}</span>}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setEditing(u)}
+                        disabled={!!busy || !assigned}
+                        className="mt-2 flex items-center gap-1.5 text-[11px] font-bold underline cursor-pointer disabled:opacity-40"
+                      >
+                        <CalendarDays className="w-3.5 h-3.5" /> {events.length ? "Change events" : "Give events"}
+                      </button>
                     </td>
                     <td className={`${tdCls} whitespace-nowrap`}>
-                      <span className="font-bold">{a?.people || 0}</span> <span className="text-[#8a8a8a]">{a?.people === 1 ? "person" : "people"}</span>
+                      <span className="font-bold">{a?.people || 0}</span>{" "}
+                      <span className="text-[#8a8a8a]">{a?.people === 1 ? "person" : "people"}</span>
                       {a?.last && <span className="block text-[11px] text-[#8a8a8a]">last {fmtDateTime(a.last)}</span>}
                     </td>
                     <td className={`${tdCls} text-right`}>
@@ -269,7 +365,7 @@ export default function DoorStaffPage() {
           <ul className="space-y-2.5 text-sm">
             {[
               "Sign in to the Jazba Scan app",
-              "Scan tickets or type an order number",
+              "Scan tickets or type an order number, only for the events you give it",
               "See the holder's name, package and how many people the ticket admits",
               "Check people in: a whole group at once, or one by one",
             ].map((t) => (
@@ -278,10 +374,11 @@ export default function DoorStaffPage() {
               </li>
             ))}
           </ul>
-          <p className={`text-[11px] font-bold tracking-[0.14em] uppercase text-[#8a8a8a] mt-5 mb-2.5`}>Can't</p>
+          <p className={`${overline} text-[#8a8a8a] mt-5 mb-2.5`}>Can't</p>
           <ul className="space-y-2.5 text-sm">
             {[
               "Open the admin portal",
+              "See or check tickets for any other event",
               "Issue, edit, cancel, delete or reset tickets",
               "Admit unpaid or cancelled tickets",
               "Let in more people than a ticket admits",
@@ -297,7 +394,112 @@ export default function DoorStaffPage() {
           </p>
         </Panel>
       </div>
+
+      {editing && (
+        <EventsDrawer
+          user={editing}
+          initial={assigned?.get(editing.uid) || []}
+          saving={busy === editing.uid}
+          onSave={(events) => saveEvents(editing, events)}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </div>
+  );
+}
+
+/** Tick the events a login may check: upcoming first, past ones on request. */
+function EventChecklist({ selected, onChange }: { selected: string[]; onChange: (ids: string[]) => void }) {
+  const { allEvents, eventInfo } = useAdmin();
+  const [showPast, setShowPast] = useState(false);
+
+  const { upcoming, past, missing } = useMemo(() => {
+    const rows = allEvents.map((e) => ({ id: e.id, info: eventInfo(e.id) }));
+    const ids = new Set(rows.map((r) => r.id));
+    return {
+      upcoming: rows.filter((r) => r.info.upcoming).sort((a, b) => (a.info.timestamp ?? Infinity) - (b.info.timestamp ?? Infinity)),
+      past: rows.filter((r) => !r.info.upcoming).sort((a, b) => (b.info.timestamp ?? 0) - (a.info.timestamp ?? 0)),
+      // Given earlier but no longer listed (e.g. the event was removed).
+      missing: selected.filter((id) => !ids.has(id)),
+    };
+  }, [allEvents, eventInfo, selected]);
+
+  const toggle = (id: string) => onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+
+  const row = (id: string, title: string, sub: string) => {
+    const on = selected.includes(id);
+    return (
+      <label key={id} className={`flex items-start gap-3 px-3 py-2.5 cursor-pointer ${on ? "bg-[#fffbd1]" : "hover:bg-[#fafafa]"}`}>
+        <input type="checkbox" checked={on} onChange={() => toggle(id)} className="mt-0.5 w-4 h-4 accent-black shrink-0" />
+        <span className="min-w-0">
+          <span className="block text-sm font-bold leading-tight">{title}</span>
+          {sub && <span className="block text-[11px] text-[#8a8a8a] mt-0.5">{sub}</span>}
+        </span>
+      </label>
+    );
+  };
+
+  const pastSelected = past.filter((r) => selected.includes(r.id));
+  const pastShown = showPast ? past : pastSelected;
+
+  return (
+    <div className="border border-[#e4e4e4] max-h-72 overflow-y-auto divide-y divide-[#f2f2f2] bg-white">
+      {upcoming.length === 0 && <p className="px-3 py-3 text-xs text-[#8a8a8a]">No upcoming events.</p>}
+      {upcoming.map((r) => row(r.id, r.info.title, [r.info.date, r.info.venue].filter(Boolean).join(" · ")))}
+      {missing.map((id) => row(id, `Event ${id}`, "No longer listed: untick to remove"))}
+      {pastShown.length > 0 && <p className={`${overline} text-[#8a8a8a] px-3 pt-3 pb-1.5`}>Past events</p>}
+      {pastShown.map((r) => row(r.id, r.info.title, [r.info.date, r.info.venue].filter(Boolean).join(" · ")))}
+      {past.length > pastSelected.length && (
+        <button type="button" onClick={() => setShowPast(!showPast)} className="w-full text-left px-3 py-2.5 text-[11px] font-bold underline cursor-pointer">
+          {showPast ? "Hide past events" : `Show past events (${past.length})`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Side panel to change one login's events. */
+function EventsDrawer({
+  user,
+  initial,
+  saving,
+  onSave,
+  onClose,
+}: {
+  user: UserProfile;
+  initial: string[];
+  saving: boolean;
+  onSave: (events: string[]) => void;
+  onClose: () => void;
+}) {
+  const [events, setEvents] = useState<string[]>(initial);
+  const changed = events.length !== initial.length || events.some((id) => !initial.includes(id));
+  return (
+    <Drawer
+      open
+      onClose={onClose}
+      eyebrow="Door staff"
+      title={`Events for ${user.name || user.email}`}
+      sub={<p className="text-sm text-[#666]">{user.email}</p>}
+      footer={
+        <div className="flex items-center gap-2">
+          <button type="button" className={btnPrimary} disabled={saving || !changed} onClick={() => onSave(events)}>
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save events
+          </button>
+          <button type="button" className={btnOutline} onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+      }
+    >
+      <p className="text-sm text-[#555] mb-3">
+        This login can only scan and check in tickets for the events ticked here. A phone already signed in updates straight away.
+      </p>
+      <EventChecklist selected={events} onChange={setEvents} />
+      <p className="text-xs text-[#8a8a8a] mt-3">
+        {events.length === 0 ? "No events ticked: this login won't be able to scan anything." : `${events.length} event${events.length === 1 ? "" : "s"} ticked.`}
+      </p>
+    </Drawer>
   );
 }
 

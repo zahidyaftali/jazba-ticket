@@ -36,48 +36,93 @@ export interface OrderLookup {
 const byTicketNumber = (a: TicketPass, b: TicketPass) =>
   (a.ticketNumber || '').localeCompare(b.ticketNumber || '', undefined, { numeric: true });
 
-async function bookingById(id: string): Promise<Booking | null> {
+const isDenied = (err: unknown) => (err as { code?: string } | undefined)?.code === 'permission-denied';
+
+/** `scoped`: a door staff lookup. Their login can't read other events'
+ *  orders (nor ones that don't exist), which counts as "not found" here. */
+async function bookingById(id: string, scoped = false): Promise<Booking | null> {
   if (!VALID_ID.test(id)) return null;
-  const snap = await getDoc(doc(db, 'bookings', id));
-  return snap.exists() ? ({ ...snap.data(), id: snap.id } as Booking) : null;
+  try {
+    const snap = await getDoc(doc(db, 'bookings', id));
+    return snap.exists() ? ({ ...snap.data(), id: snap.id } as Booking) : null;
+  } catch (err) {
+    if (scoped && isDenied(err)) return null;
+    throw err;
+  }
 }
 
-async function firstWhere<T>(coll: 'bookings' | 'tickets', field: string, value: string): Promise<T | null> {
-  const snap = await getDocs(query(collection(db, coll), where(field, '==', value), limit(1)));
-  const d = snap.docs[0];
-  return d ? ({ ...d.data(), id: d.id } as T) : null;
+/** `events`: only search these events (door staff — their queries must say
+ *  which events, or the security rules refuse them). */
+async function firstWhere<T>(coll: 'bookings' | 'tickets', field: string, value: string, events?: string[]): Promise<T | null> {
+  const filters = [where(field, '==', value), ...(events ? [where('eventId', 'in', events)] : [])];
+  try {
+    const snap = await getDocs(query(collection(db, coll), ...filters, limit(1)));
+    const d = snap.docs[0];
+    return d ? ({ ...d.data(), id: d.id } as T) : null;
+  } catch (err) {
+    // A door staff fallback search that can't run just finds nothing; the
+    // main lookup (the QR's order number) doesn't depend on it.
+    if (events) {
+      console.warn(`Lookup by ${field} skipped:`, err);
+      return null;
+    }
+    throw err;
+  }
 }
 
-async function passesFor(bookingId: string): Promise<TicketPass[]> {
-  const snap = await getDocs(query(collection(db, 'tickets'), where('bookingId', '==', bookingId)));
+/** An order's passes. `eventId` is given for door staff (see firstWhere). */
+async function passesFor(bookingId: string, eventId?: string): Promise<TicketPass[]> {
+  const filters = [where('bookingId', '==', bookingId), ...(eventId !== undefined ? [where('eventId', '==', eventId)] : [])];
+  const snap = await getDocs(query(collection(db, 'tickets'), ...filters));
   return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as TicketPass).sort(byTicketNumber);
 }
 
-/** The order (and its passes) a scanned or typed code belongs to, or null. */
-export async function lookupCode(raw: string): Promise<OrderLookup | null> {
+/** The order (and its passes) a scanned or typed code belongs to, or null.
+ *  `events`: a door staff login's events — only those are searched, and a
+ *  ticket for any other event is simply not found. */
+export async function lookupCode(raw: string, events?: string[]): Promise<OrderLookup | null> {
   const code = cleanCode(raw);
   if (!code || code.length > 200) return null;
+  if (events && events.length === 0) return null;
+  const scope = events?.slice(0, 30);
   const variants = [...new Set([code, code.toUpperCase()])];
+  const passesOf = (b: Booking) => passesFor(b.id!, scope ? b.eventId || '' : undefined);
 
   // The QR on every ticket is the order number, which is also the booking's id.
   for (const v of variants) {
-    const booking = await bookingById(v);
-    if (booking) return { booking, passes: await passesFor(booking.id!) };
+    const booking = await bookingById(v, !!scope);
+    if (booking) return { booking, passes: await passesOf(booking) };
   }
 
   // Older orders, and codes typed from elsewhere on the ticket.
   const [bookingHits, passHits] = await Promise.all([
-    Promise.all(variants.flatMap((v) => ['orderId', 'bookingNumber', 'barCode', 'qrCode'].map((f) => firstWhere<Booking>('bookings', f, v)))),
-    Promise.all(variants.flatMap((v) => ['ticketNumber', 'qrCode'].map((f) => firstWhere<TicketPass>('tickets', f, v)))),
+    Promise.all(variants.flatMap((v) => ['orderId', 'bookingNumber', 'barCode', 'qrCode'].map((f) => firstWhere<Booking>('bookings', f, v, scope)))),
+    Promise.all(variants.flatMap((v) => ['ticketNumber', 'qrCode'].map((f) => firstWhere<TicketPass>('tickets', f, v, scope)))),
   ]);
   const booking = bookingHits.find(Boolean);
-  if (booking) return { booking, passes: await passesFor(booking.id!) };
+  if (booking) return { booking, passes: await passesOf(booking) };
 
   // One admission pass's own code: just that pass.
   const pass = passHits.find(Boolean);
-  if (pass) return { booking: await bookingById(pass.bookingId), passes: [pass], passId: pass.id };
+  if (pass) return { booking: await bookingById(pass.bookingId, !!scope), passes: [pass], passId: pass.id };
 
   return null;
+}
+
+/** The events a door staff login may check tickets for, live (an admin can
+ *  change them during a shift). [] when none are given yet. */
+export function watchStaffEvents(uid: string, onChange: (events: string[]) => void): () => void {
+  return onSnapshot(
+    doc(db, 'doorStaff', uid),
+    (snap) => {
+      const list = snap.exists() ? snap.data().events : [];
+      onChange(Array.isArray(list) ? list.filter((e): e is string => typeof e === 'string') : []);
+    },
+    (err) => {
+      console.error('Door staff events could not be read:', err);
+      onChange([]);
+    },
+  );
 }
 
 /** A check-in that can't go ahead: the ticket was used or cancelled since it

@@ -64,9 +64,15 @@ service cloud.firestore {
     }
 
     // Door staff: a login made by an admin for the gate. It can only look
-    // tickets up and check people in (Jazba Scan) — nothing else.
+    // tickets up and check people in (Jazba Scan) — nothing else, and only
+    // for the events an admin gave it (doorStaff/<uid>.events).
     function isDoorStaff() {
       return hasRole('staff');
+    }
+
+    function isDoorStaffFor(eventId) {
+      let path = /databases/$(database)/documents/doorStaff/$(request.auth.uid);
+      return isDoorStaff() && exists(path) && eventId in get(path).data.get('events', []);
     }
 
     function isValidUser(data) {
@@ -198,11 +204,12 @@ service cloud.firestore {
     // ── Orders ──────────────────────────────────────────────────────────
     // Buyers can see their own orders and passes. Only admins (and the
     // server, after a confirmed payment) can create or change them.
-    // Door staff may read orders and passes (to look a ticket up at the gate)
-    // and check people in on a pass — see isDoorCheckIn().
+    // Door staff may read the orders and passes of their own events (to look
+    // a ticket up at the gate) and check people in — see isDoorCheckIn().
+    // Their queries must name the event (where eventId == …).
     match /bookings/{bookingId} {
-      allow get: if isValidId(bookingId) && isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isDoorStaff());
-      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isDoorStaff());
+      allow get: if isValidId(bookingId) && isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isDoorStaffFor(resource.data.eventId));
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isDoorStaffFor(resource.data.eventId));
       allow create, update: if isValidId(bookingId) && isAdmin();
       allow delete: if isAdmin();
     }
@@ -217,7 +224,7 @@ service cloud.firestore {
       let admits = before.get('people', after.get('people', 0));
       let wasIn = before.get('peopleIn', 0);
       let order = get(/databases/$(database)/documents/bookings/$(before.bookingId)).data;
-      return isDoorStaff()
+      return isDoorStaffFor(before.eventId)
         && after.diff(before).affectedKeys().hasOnly(['status', 'people', 'peopleIn', 'scannedAt', 'scannedBy', 'checkIns'])
         && before.status == 'active'
         && admits is int && admits >= 1 && admits <= 20
@@ -238,10 +245,21 @@ service cloud.firestore {
     }
 
     match /tickets/{ticketId} {
-      allow get: if isValidId(ticketId) && isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isDoorStaff());
-      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isDoorStaff());
+      allow get: if isValidId(ticketId) && isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isDoorStaffFor(resource.data.eventId));
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isDoorStaffFor(resource.data.eventId));
       allow create: if isValidId(ticketId) && isAdmin();
       allow update: if isValidId(ticketId) && (isAdmin() || isDoorCheckIn());
+      allow delete: if isAdmin();
+    }
+
+    // Which events each door staff login may check tickets for. Only admins
+    // set it; a staff login can read its own.
+    match /doorStaff/{staffId} {
+      allow get: if isOwner(staffId) || isAdmin();
+      allow list: if isAdmin();
+      allow create, update: if isValidId(staffId) && isAdmin()
+        && incoming().keys().hasOnly(['uid', 'events', 'updatedAt', 'updatedBy'])
+        && incoming().events is list && incoming().events.size() <= 50;
       allow delete: if isAdmin();
     }
 

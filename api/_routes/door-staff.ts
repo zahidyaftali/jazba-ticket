@@ -5,16 +5,27 @@ import { createAuthUser, deleteAuthUser, serviceAccountFromEnv, setAuthPassword,
 import { createDocuments, deleteDocument, getDocument } from '../_lib/firestoreAdmin.js';
 
 // Vercel serverless function: POST /api/door-staff
-// Body: { idToken, action: 'create', name, email, password }
+// Body: { idToken, action: 'create', name, email, password, events? }
 //     | { idToken, action: 'password', uid, password }
 //     | { idToken, action: 'delete', uid }
 // Admin-only. Door staff logins are email + password accounts with the
 // 'staff' role: they can sign in to Jazba Scan (/scan) and check people in,
-// nothing else (firestore.rules → isDoorCheckIn). Suspending one is an
-// ordinary profile change the portal makes itself.
+// nothing else, and only for the events in doorStaff/<uid>.events
+// (firestore.rules → isDoorStaffFor). Suspending one, or changing its
+// events, is an ordinary change the portal makes itself.
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const UID_RE = /^[A-Za-z0-9]{1,128}$/;
+const EVENT_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+
+/** The events a new login may check: valid ids only, at most 50. */
+function eventsFrom(v: unknown): string[] {
+  if (v === undefined || v === null) return [];
+  if (!Array.isArray(v)) throw new HttpError('Events must be a list.');
+  const ids = [...new Set(v.filter((x): x is string => typeof x === 'string' && EVENT_ID_RE.test(x)))];
+  if (ids.length > 50) throw new HttpError('Choose at most 50 events.');
+  return ids;
+}
 
 function passwordFrom(v: unknown): string {
   const p = typeof v === 'string' ? v : '';
@@ -47,10 +58,13 @@ export default async function handler(req: any, res: any) {
       const email = String(body.email || '').trim().toLowerCase();
       if (!name) throw new HttpError('Enter the staff member’s name.');
       if (!EMAIL_RE.test(email) || email.length > 128) throw new HttpError('Enter a valid email address.');
+      const events = eventsFrom(body.events);
       const uid = await createAuthUser(sa, email, passwordFrom(body.password), name);
+      const now = new Date().toISOString();
       try {
         await createDocuments(sa, [
-          { path: `users/${uid}`, data: { uid, email, name, role: 'staff', status: 'active', createdAt: new Date().toISOString() } },
+          { path: `users/${uid}`, data: { uid, email, name, role: 'staff', status: 'active', createdAt: now } },
+          { path: `doorStaff/${uid}`, data: { uid, events, updatedAt: now, updatedBy: admin.email } },
         ]);
       } catch (err) {
         // No half-made logins: without its profile the account can't scan.
@@ -59,7 +73,7 @@ export default async function handler(req: any, res: any) {
         throw new HttpError('Could not save the new login. Try again.', 502);
       }
       console.log(`Door staff login ${email} created by ${admin.email}.`);
-      res.status(200).json({ ok: true, uid, email, name });
+      res.status(200).json({ ok: true, uid, email, name, events });
       return;
     }
 
@@ -78,6 +92,7 @@ export default async function handler(req: any, res: any) {
       await requireStaff(sa, uid);
       await deleteAuthUser(sa, uid);
       await deleteDocument(sa, `users/${uid}`);
+      await deleteDocument(sa, `doorStaff/${uid}`);
       console.log(`Door staff ${uid}: login deleted by ${admin.email}.`);
       res.status(200).json({ ok: true });
       return;

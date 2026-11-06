@@ -2,7 +2,8 @@
 // create, re-password and delete door staff logins. A door staff login can
 // only sign in to Jazba Scan and check people in (firestore.rules).
 
-import { auth } from '../firebase';
+import { collection, doc, getDocs, setDoc } from 'firebase/firestore';
+import { accountEmail, auth, db } from '../firebase';
 
 async function call(body: Record<string, unknown>): Promise<any> {
   const idToken = await auth.currentUser?.getIdToken();
@@ -22,8 +23,34 @@ async function call(body: Record<string, unknown>): Promise<any> {
   return data;
 }
 
-export async function createDoorStaff(name: string, email: string, password: string): Promise<{ uid: string; email: string; name: string }> {
-  return call({ action: 'create', name, email, password });
+export async function createDoorStaff(
+  name: string,
+  email: string,
+  password: string,
+  events: string[],
+): Promise<{ uid: string; email: string; name: string; events: string[] }> {
+  return call({ action: 'create', name, email, password, events });
+}
+
+/** Every door staff login's events, by uid (doorStaff/<uid>.events). */
+export async function getDoorStaffEvents(): Promise<Map<string, string[]>> {
+  const snap = await getDocs(collection(db, 'doorStaff'));
+  const m = new Map<string, string[]>();
+  snap.forEach((d) => {
+    const list = d.data().events;
+    m.set(d.id, Array.isArray(list) ? list.filter((e: unknown): e is string => typeof e === 'string') : []);
+  });
+  return m;
+}
+
+/** Admin: the events this login may check tickets for (replaces the list). */
+export async function setDoorStaffEvents(uid: string, events: string[]): Promise<void> {
+  await setDoc(doc(db, 'doorStaff', uid), {
+    uid,
+    events: [...new Set(events)].slice(0, 50),
+    updatedAt: new Date().toISOString(),
+    updatedBy: accountEmail(auth.currentUser) || '',
+  });
 }
 
 export async function setDoorStaffPassword(uid: string, password: string): Promise<void> {

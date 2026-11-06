@@ -28,12 +28,12 @@ import { getEventTimestamp, passPeople, peoplePerPass, ticketSeat, tierDisplayNa
 import { money } from '../components/admin/ui';
 import brandMark from '../../assets/images/Favicon.png';
 import { QrCamera } from './QrCamera';
-import { CheckInConflict, checkInPeople, checkInWithoutPasses, cleanCode, lookupCode, watchEventCheckIns, type EventCheckIns, type OrderLookup } from './checkIn';
+import { CheckInConflict, checkInPeople, checkInWithoutPasses, cleanCode, lookupCode, watchEventCheckIns, watchStaffEvents, type EventCheckIns, type OrderLookup } from './checkIn';
 import { feedback, isSoundOn, setSoundOn, unlockAudio, useInstallPrompt, useScannerKeyboard, type Feedback } from './feedback';
 
 const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
 /** Shown on screen, so door staff can tell the phone runs the latest app. */
-const SCAN_VERSION = 'Version 3 · door staff';
+const SCAN_VERSION = 'Version 4 · staff events';
 const SAFE_TOP = { paddingTop: 'env(safe-area-inset-top)' } as const;
 const SAFE_BOTTOM = { paddingBottom: 'max(14px, env(safe-area-inset-bottom))' } as const;
 
@@ -317,7 +317,7 @@ async function buildView(
   const empty: ScanView = {
     code,
     verdict: 'not-found',
-    reason: `No Jazba ticket matches “${code}”. Do not admit.`,
+    reason: staff ? `No ticket for your events matches “${code}”. Do not admit.` : `No Jazba ticket matches “${code}”. Do not admit.`,
     booking: null,
     passes: [],
     open: [],
@@ -513,6 +513,36 @@ function Scanner({ user, role }: { user: User; role: ScanRole }) {
   const eventMap = useMemo(() => new Map(events.map((e) => [e.id, e])), [events]);
   const selected = eventId ? eventMap.get(eventId) || null : null;
 
+  /** Door staff: the events an admin gave this login (null while loading). */
+  const [staffEvents, setStaffEvents] = useState<string[] | null>(isStaff ? null : []);
+  useEffect(() => {
+    if (!isStaff) return;
+    return watchStaffEvents(user.uid, setStaffEvents);
+  }, [isStaff, user.uid]);
+
+  // Door staff always check one of their own events: the only one, or the
+  // one they choose. An event taken away from them mid-shift is dropped.
+  useEffect(() => {
+    if (!isStaff || !staffEvents) return;
+    if (eventId && staffEvents.includes(eventId)) return;
+    const next = staffEvents.length === 1 ? staffEvents[0] : '';
+    if (next !== eventId) {
+      setEventId(next);
+      save('jazba-scan-event', next);
+    }
+  }, [isStaff, staffEvents, eventId]);
+
+  /** Events this phone may pick: all for an admin, the login's own for door staff. */
+  const pickable = useMemo(
+    () =>
+      isStaff
+        ? (staffEvents || []).map((id) => eventMap.get(id) || ({ id, title: 'Event (details loading…)' } as unknown as EventItem))
+        : events,
+    [isStaff, staffEvents, eventMap, events],
+  );
+  /** Door staff can scan once one of their events is chosen. */
+  const ready = !isStaff || (!!staffEvents && !!eventId && staffEvents.includes(eventId));
+
   useEffect(() => {
     setStats(null);
     if (!eventId) return;
@@ -520,8 +550,8 @@ function Scanner({ user, role }: { user: User; role: ScanRole }) {
   }, [eventId, selected]);
 
   // The camera calls back with whatever it sees; read the latest state here.
-  const latest = useRef({ eventMap, eventId });
-  latest.current = { eventMap, eventId };
+  const latest = useRef({ eventMap, eventId, staffEvents });
+  latest.current = { eventMap, eventId, staffEvents };
 
   const pushRecent = (r: Omit<RecentScan, 'key' | 'at'>) =>
     setRecent((list) => [{ ...r, key: `${Date.now()}-${Math.random()}`, at: Date.now() }, ...list].slice(0, 25));
@@ -550,7 +580,8 @@ function Scanner({ user, role }: { user: User; role: ScanRole }) {
     setLooking(code);
     let v: ScanView;
     try {
-      const found = await lookupCode(code);
+      // Door staff only search their own events (the database allows no more).
+      const found = await lookupCode(code, isStaff ? latest.current.staffEvents || [] : undefined);
       let events = await (eventsLoad.current || loadEvents());
       const ticketEvent = found?.booking?.eventId || found?.passes[0]?.eventId || '';
       // Not in the list (it failed to load, or is out of date): load it again.
@@ -567,7 +598,7 @@ function Scanner({ user, role }: { user: User; role: ScanRole }) {
 
   // A handheld scanner only reads when its trigger is pulled, so a repeat is deliberate.
   const handleTriggered = useCallback((code: string) => handleCode(code, true), [handleCode]);
-  useScannerKeyboard(handleTriggered, !view && !admitted && !pickerOpen);
+  useScannerKeyboard(handleTriggered, ready && !view && !admitted && !pickerOpen);
 
   const closeView = () => {
     setView(null);
@@ -616,7 +647,7 @@ function Scanner({ user, role }: { user: User; role: ScanRole }) {
     } catch (err) {
       if (err instanceof CheckInConflict) {
         // Someone checked it in meanwhile: show the ticket as it is now.
-        const fresh = await lookupCode(view.code)
+        const fresh = await lookupCode(view.code, isStaff ? staffEvents || [] : undefined)
           .then((found) => buildView(view.code, found, eventMap, eventId, isStaff))
           .catch(() => null);
         if (fresh) showView({ ...fresh, reason: fresh.verdict === 'used' ? fresh.reason : `${err.message} ${fresh.reason}` });
@@ -694,7 +725,9 @@ function Scanner({ user, role }: { user: User; role: ScanRole }) {
           <CalendarDays className="w-5 h-5 text-[#ffed00] shrink-0" />
           <div className="flex-1 min-w-0">
             <p className={`${overline} text-white/45`}>Checking tickets for</p>
-            <p className="font-bold truncate mt-0.5">{selected ? selected.title : eventId ? 'Loading event…' : 'All events'}</p>
+            <p className="font-bold truncate mt-0.5">
+              {selected ? selected.title : eventId ? 'Loading event…' : isStaff ? 'Choose your event' : 'All events'}
+            </p>
             {selected && <p className="text-xs text-white/55 truncate">{[eventWhen(selected, null), eventVenue(selected as any, null)].filter(Boolean).join(' · ')}</p>}
           </div>
           <ChevronDown className="w-5 h-5 text-white/50 shrink-0" />
@@ -720,6 +753,10 @@ function Scanner({ user, role }: { user: User; role: ScanRole }) {
           </div>
         )}
 
+        {!ready ? (
+          <StaffEventGate staffEvents={staffEvents} events={pickable} onChoose={chooseEvent} />
+        ) : (
+          <>
         <div className="px-4">
           <QrCamera paused={!!view || !!looking || !!admitted || pickerOpen} onCode={handleCode} />
         </div>
@@ -740,6 +777,8 @@ function Scanner({ user, role }: { user: User; role: ScanRole }) {
             Check
           </button>
         </form>
+          </>
+        )}
 
         <div className="mx-4 mt-4">
           <InstallTip />
@@ -796,7 +835,7 @@ function Scanner({ user, role }: { user: User; role: ScanRole }) {
 
       {admitted && <AdmittedScreen {...admitted} onClose={closeAdmitted} />}
 
-      {pickerOpen && <EventPicker events={events} selectedId={eventId} onChoose={chooseEvent} onClose={() => setPickerOpen(false)} />}
+      {pickerOpen && <EventPicker events={pickable} allowAll={!isStaff} selectedId={eventId} onChoose={chooseEvent} onClose={() => setPickerOpen(false)} />}
     </div>
   );
 }
@@ -1047,13 +1086,64 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
 
 // ── Event picker ──────────────────────────────────────────────────────────
 
+/** Door staff before they can scan: their events are loading, none are
+ *  given yet, or they have several and must say which one this is. */
+function StaffEventGate({ staffEvents, events, onChoose }: { staffEvents: string[] | null; events: EventItem[]; onChoose: (id: string) => void }) {
+  if (!staffEvents) {
+    return (
+      <div className="mx-4 py-16 flex flex-col items-center gap-3 text-white/70">
+        <Loader2 className="w-7 h-7 text-[#ffed00] animate-spin" />
+        <p className="text-sm">Loading your events…</p>
+      </div>
+    );
+  }
+  if (staffEvents.length === 0) {
+    return (
+      <div className="mx-4 bg-[#141414] border border-white/10 p-5">
+        <CalendarDays className="w-8 h-8 text-[#ffed00]" />
+        <p className="font-display font-extrabold text-xl mt-3">No events yet</p>
+        <p className="text-sm text-white/65 mt-2 leading-relaxed">
+          This login hasn’t been given an event to check. Ask an admin to add one in the admin portal under People → Door staff. It appears here
+          straight away.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="mx-4">
+      <p className="font-display font-extrabold text-xl">Which event are you checking?</p>
+      <p className="text-sm text-white/60 mt-1">Tickets for other events won’t be accepted.</p>
+      <div className="mt-4 space-y-2">
+        {events.map((e) => (
+          <button
+            key={e.id}
+            type="button"
+            onClick={() => onChoose(e.id)}
+            className="w-full flex items-center gap-3 bg-[#141414] border border-white/10 hover:border-[#ffed00] px-4 py-4 text-left cursor-pointer"
+          >
+            <CalendarDays className="w-5 h-5 text-[#ffed00] shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-bold truncate">{e.title}</p>
+              <p className="text-xs text-white/55 truncate">{[eventWhen(e, null), eventVenue(e as any, null)].filter(Boolean).join(' · ')}</p>
+            </div>
+            <ChevronDown className="w-5 h-5 text-white/40 -rotate-90 shrink-0" />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function EventPicker({
   events,
+  allowAll,
   selectedId,
   onChoose,
   onClose,
 }: {
   events: EventItem[];
+  /** Admins may accept tickets for any event; door staff only their own. */
+  allowAll: boolean;
   selectedId: string;
   onChoose: (id: string) => void;
   onClose: () => void;
@@ -1096,8 +1186,8 @@ function EventPicker({
           </button>
         </div>
         <div className="overflow-y-auto" style={SAFE_BOTTOM}>
-          {option('', 'All events', 'Accept tickets for any event')}
-          {events.length === 0 && (
+          {allowAll && option('', 'All events', 'Accept tickets for any event')}
+          {allowAll && events.length === 0 && (
             <p className="px-5 py-4 text-sm text-[#666] flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" /> Loading events…
             </p>
