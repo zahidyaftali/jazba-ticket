@@ -1,5 +1,5 @@
 // Vercel serverless function behind the admin and organiser portal routes.
-// Vercel's Hobby plan allows 12 functions per deployment, so these six share
+// Vercel's Hobby plan allows 12 functions per deployment, so these routes share
 // one: vercel.json rewrites /api/admin-media, /api/organizer-portal, … here
 // with ?route=<name>, and the URLs the browser uses stay the same. Each
 // route's own code lives in api/_routes/ (folders starting with _ aren't
@@ -8,6 +8,7 @@ import adminMedia from './_routes/admin-media.js';
 import adminPayments from './_routes/admin-payments.js';
 import adminSecurityRules from './_routes/admin-security-rules.js';
 import adminUsers from './_routes/admin-users.js';
+import doorStaff from './_routes/door-staff.js';
 import organizerNotify from './_routes/organizer-notify.js';
 import organizerPortal from './_routes/organizer-portal.js';
 
@@ -16,6 +17,7 @@ const ROUTES: Record<string, (req: any, res: any) => Promise<void>> = {
   'admin-payments': adminPayments,
   'admin-security-rules': adminSecurityRules,
   'admin-users': adminUsers,
+  'door-staff': doorStaff,
   'organizer-notify': organizerNotify,
   'organizer-portal': organizerPortal,
 };

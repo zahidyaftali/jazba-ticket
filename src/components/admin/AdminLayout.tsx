@@ -10,6 +10,7 @@ import {
   Building2,
   Images,
   Users,
+  ScanLine,
   Settings,
   ChevronsLeft,
   ChevronsRight,
@@ -174,7 +175,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { id: "media", label: "Media", icon: Images, to: "/admin/media" },
       ],
     },
-    { heading: "People", items: [{ id: "users", label: "Users", icon: Users, to: "/admin/users", count: data.users.length }] },
+    {
+      heading: "People",
+      items: [
+        { id: "users", label: "Users", icon: Users, to: "/admin/users", count: data.users.length },
+        { id: "door-staff", label: "Door staff", icon: ScanLine, to: "/admin/door-staff", count: data.users.filter((u) => u.role === "staff").length },
+      ],
+    },
     { heading: "Account", items: [{ id: "settings", label: "Account settings", icon: Settings, to: "/admin/settings" }] },
   ];
 

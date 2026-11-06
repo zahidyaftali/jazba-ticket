@@ -19,7 +19,8 @@ export interface UserProfile {
   name: string;
   email: string;
   phone: string;
-  role: 'admin' | 'organizer' | 'artist' | 'user';
+  /** 'staff' = door staff: Jazba Scan check-in only. */
+  role: 'admin' | 'organizer' | 'artist' | 'staff' | 'user';
   profileImage?: string;
   createdAt: string;
   status: 'active' | 'suspended';

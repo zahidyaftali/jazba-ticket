@@ -32,6 +32,7 @@ const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
   organizer: "Organiser",
   artist: "Artist",
+  staff: "Door staff",
   user: "Customer",
 };
 
@@ -239,7 +240,7 @@ export function ClientsPage() {
   );
 }
 
-type RoleTab = "all" | "admin" | "organizer" | "artist" | "user" | "suspended";
+type RoleTab = "all" | "admin" | "organizer" | "artist" | "staff" | "user" | "suspended";
 
 /** Explains missing emails — and the one-time setup that recovers them. */
 function EmailStatusBanner({
@@ -400,6 +401,7 @@ export function UsersPage() {
             { id: "admin" as RoleTab, label: "Admins", count: count("admin") },
             { id: "organizer" as RoleTab, label: "Organisers", count: count("organizer") },
             { id: "artist" as RoleTab, label: "Artists", count: count("artist") },
+            { id: "staff" as RoleTab, label: "Door staff", count: count("staff") },
             { id: "user" as RoleTab, label: "Customers", count: count("user") },
             { id: "suspended" as RoleTab, label: "Suspended", count: count("suspended") },
           ]}
@@ -496,6 +498,7 @@ export function UsersPage() {
                     <option value="user">Customer</option>
                     <option value="organizer">Organiser</option>
                     <option value="artist">Artist</option>
+                    <option value="staff">Door staff (scan only)</option>
                     <option value="admin">Admin</option>
                   </select>
                 </td>

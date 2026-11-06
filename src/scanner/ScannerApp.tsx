@@ -33,7 +33,7 @@ import { feedback, isSoundOn, setSoundOn, unlockAudio, useInstallPrompt, useScan
 
 const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
 /** Shown on screen, so door staff can tell the phone runs the latest app. */
-const SCAN_VERSION = 'Version 2 · group tickets';
+const SCAN_VERSION = 'Version 3 · door staff';
 const SAFE_TOP = { paddingTop: 'env(safe-area-inset-top)' } as const;
 const SAFE_BOTTOM = { paddingBottom: 'max(14px, env(safe-area-inset-bottom))' } as const;
 
@@ -57,9 +57,13 @@ function save(key: string, value: string) {
 
 type Stage = 'checking' | 'signed-out' | 'denied' | 'ready';
 
+/** Who may use the scanner: admins, and door staff logins (check-in only). */
+type ScanRole = 'admin' | 'staff';
+
 export default function ScannerApp() {
   const [stage, setStage] = useState<Stage>('checking');
   const [user, setUser] = useState<User | null>(null);
+  const [role, setRole] = useState<ScanRole>('admin');
 
   useEffect(
     () =>
@@ -71,7 +75,15 @@ export default function ScannerApp() {
         }
         try {
           const profile = await getUserProfile(u.uid);
-          if (isUserBootstrappedAdmin(accountEmail(u)) || profile?.role === 'admin') {
+          const active = profile?.status !== 'suspended';
+          if (isUserBootstrappedAdmin(accountEmail(u)) || (active && profile?.role === 'admin')) {
+            setRole('admin');
+            setUser(u);
+            setStage('ready');
+            return;
+          }
+          if (active && profile?.role === 'staff') {
+            setRole('staff');
             setUser(u);
             setStage('ready');
             return;
@@ -100,7 +112,7 @@ export default function ScannerApp() {
     );
   }
   if (stage !== 'ready' || !user) return <SignIn denied={stage === 'denied'} />;
-  return <Scanner user={user} />;
+  return <Scanner user={user} role={role} />;
 }
 
 function SignIn({ denied }: { denied: boolean }) {
@@ -133,12 +145,12 @@ function SignIn({ denied }: { denied: boolean }) {
       <div className="flex-1 flex flex-col justify-center px-6 py-10 max-w-sm w-full mx-auto">
         <img src={brandMark} alt="" className="w-14 h-14 object-contain" />
         <h1 className="font-display font-extrabold text-3xl leading-none mt-6">Jazba Scan</h1>
-        <p className="text-white/60 text-sm mt-2">Ticket check-in at the door. Sign in with your Jazba Tickets admin account.</p>
+        <p className="text-white/60 text-sm mt-2">Ticket check-in at the door. Sign in with your door staff login or admin account.</p>
 
         {(denied || error) && (
           <div className="mt-6 bg-[#2a1212] border-l-4 border-[#ef4444] px-3 py-3 text-sm font-bold flex gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-[#ef4444]" />
-            <span>{error || 'That account is not an admin, so it can’t check tickets in.'}</span>
+            <span>{error || 'That login can’t check tickets in. Use a door staff login from your Jazba admin, or an admin account. A suspended login can’t sign in.'}</span>
           </div>
         )}
 
@@ -223,7 +235,7 @@ function InstallTip() {
 
 // ── What a scan found ─────────────────────────────────────────────────────
 
-type Verdict = 'valid' | 'partial' | 'unpaid' | 'used' | 'cancelled' | 'wrong-event' | 'not-found' | 'error';
+type Verdict = 'valid' | 'partial' | 'unpaid' | 'needs-admin' | 'used' | 'cancelled' | 'wrong-event' | 'not-found' | 'error';
 const CAN_ADMIT: Verdict[] = ['valid', 'partial', 'unpaid'];
 
 interface ScanView {
@@ -292,8 +304,16 @@ function whenLabel(iso?: string): string {
   return `${day} at ${time}${ago ? ` (${ago})` : ''}`;
 }
 
-/** `scanningFor`: the event chosen on the scanner, or '' for any event. */
-async function buildView(code: string, found: OrderLookup | null, events: Map<string, EventItem>, scanningFor: string): Promise<ScanView> {
+/** `scanningFor`: the event chosen on the scanner, or '' for any event.
+ *  `staff`: a door staff login, which can't admit unpaid tickets, can't
+ *  create missing passes and can't read customer profiles. */
+async function buildView(
+  code: string,
+  found: OrderLookup | null,
+  events: Map<string, EventItem>,
+  scanningFor: string,
+  staff = false,
+): Promise<ScanView> {
   const empty: ScanView = {
     code,
     verdict: 'not-found',
@@ -323,7 +343,7 @@ async function buildView(code: string, found: OrderLookup | null, events: Map<st
   let email = b?.billingEmail || '';
   let phone = b?.billingPhone || '';
   const uid = b?.userId || passes[0]?.userId || '';
-  if ((!name || !email) && uid) {
+  if ((!name || !email) && uid && !staff) {
     const u = await getUserProfile(uid).catch(() => null);
     name = name || realName(u?.name);
     email = email || u?.email || '';
@@ -364,8 +384,13 @@ async function buildView(code: string, found: OrderLookup | null, events: Map<st
       ? `${all}Last check-in ${whenLabel(lastIn.scannedAt)}${lastIn.scannedBy ? ` by ${lastIn.scannedBy}` : ''}.`
       : `${all}This ticket has already been used.`;
   } else if (b && b.paymentStatus !== 'paid' && b.paymentMethod !== 'complimentary') {
-    verdict = 'unpaid';
-    reason = 'Payment isn’t confirmed for this order. Only admit once it’s paid.';
+    verdict = staff ? 'needs-admin' : 'unpaid';
+    reason = staff
+      ? 'Payment isn’t confirmed for this order. Don’t admit: send the guest to an admin.'
+      : 'Payment isn’t confirmed for this order. Only admit once it’s paid.';
+  } else if (staff && noPasses) {
+    verdict = 'needs-admin';
+    reason = 'This order has no admission passes saved, so door staff can’t check it in. Send the guest to an admin.';
   } else if (peopleIn > 0) {
     verdict = 'partial';
     reason = `${peopleIn} of ${peopleTotal} people already in${lastIn?.scannedAt ? ` (last ${whenLabel(lastIn.scannedAt)})` : ''}. ${peopleLeft} still to come in.`;
@@ -399,7 +424,7 @@ function errorView(code: string, err?: unknown): ScanView {
     code,
     verdict: 'error',
     reason: denied
-      ? 'This account isn’t allowed to check tickets. Sign out, then sign in with an admin account.'
+      ? 'This login isn’t allowed to check tickets. It may have been suspended. Ask an admin, or sign out and sign in again.'
       : navigator.onLine
         ? 'Couldn’t check this ticket. Scan it again in a moment.'
         : 'No internet connection. The scanner needs internet to check tickets.',
@@ -423,6 +448,7 @@ const TONE: Record<Verdict, { title: string; band: string; icon: React.Component
   valid: { title: 'Valid ticket', band: 'bg-[#15803d] text-white', icon: CircleCheck, sound: 'beep' },
   partial: { title: 'Valid ticket', band: 'bg-[#15803d] text-white', icon: CircleCheck, sound: 'warn' },
   unpaid: { title: 'Not paid', band: 'bg-[#f59e0b] text-black', icon: AlertTriangle, sound: 'warn' },
+  'needs-admin': { title: 'Ask an admin', band: 'bg-[#f59e0b] text-black', icon: AlertTriangle, sound: 'bad' },
   used: { title: 'Already used', band: 'bg-[#dc2626] text-white', icon: CircleX, sound: 'bad' },
   cancelled: { title: 'Cancelled', band: 'bg-[#dc2626] text-white', icon: Ban, sound: 'bad' },
   'wrong-event': { title: 'Wrong event', band: 'bg-[#dc2626] text-white', icon: CalendarDays, sound: 'bad' },
@@ -441,8 +467,10 @@ interface RecentScan {
 
 // ── Scanner ───────────────────────────────────────────────────────────────
 
-function Scanner({ user }: { user: User }) {
+function Scanner({ user, role }: { user: User; role: ScanRole }) {
+  /** Recorded on every check-in. Security rules require the login's own email. */
   const staff = accountEmail(user) || user.uid;
+  const isStaff = role === 'staff';
   const [events, setEvents] = useState<EventItem[]>([]);
   const [eventId, setEventId] = useState(() => load('jazba-scan-event'));
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -527,7 +555,7 @@ function Scanner({ user }: { user: User }) {
       const ticketEvent = found?.booking?.eventId || found?.passes[0]?.eventId || '';
       // Not in the list (it failed to load, or is out of date): load it again.
       if (ticketEvent && !events.has(ticketEvent)) events = await loadEvents();
-      v = await buildView(code, found, events, latest.current.eventId);
+      v = await buildView(code, found, events, latest.current.eventId, isStaff);
     } catch (err) {
       console.error('Ticket lookup failed:', err);
       v = errorView(code, err);
@@ -589,13 +617,18 @@ function Scanner({ user }: { user: User }) {
       if (err instanceof CheckInConflict) {
         // Someone checked it in meanwhile: show the ticket as it is now.
         const fresh = await lookupCode(view.code)
-          .then((found) => buildView(view.code, found, eventMap, eventId))
+          .then((found) => buildView(view.code, found, eventMap, eventId, isStaff))
           .catch(() => null);
         if (fresh) showView({ ...fresh, reason: fresh.verdict === 'used' ? fresh.reason : `${err.message} ${fresh.reason}` });
         else {
           feedback('bad');
           setAdmitError(err.message);
         }
+      } else if ((err as { code?: string } | undefined)?.code === 'permission-denied') {
+        // The database refused it: unpaid/cancelled meanwhile, or the login was suspended.
+        console.error('Check-in refused:', err);
+        feedback('bad');
+        setAdmitError('This check-in was refused. The order may be unpaid or cancelled, or this login was suspended. Ask an admin.');
       } else {
         console.error('Check-in failed:', err);
         feedback('bad');
@@ -642,7 +675,7 @@ function Scanner({ user }: { user: User }) {
           <div className="flex-1 min-w-0">
             <p className="font-display font-extrabold leading-none">Jazba Scan</p>
             <p className="text-[11px] text-white/50 truncate mt-1">
-              {staff} · <span className="text-[#ffed00]/80">{SCAN_VERSION}</span>
+              {staff} · {isStaff ? 'Door staff' : 'Admin'} · <span className="text-[#ffed00]/80">{SCAN_VERSION}</span>
             </p>
           </div>
           <button type="button" onClick={toggleSound} aria-label={sound ? 'Turn sound off' : 'Turn sound on'} className="w-10 h-10 flex items-center justify-center text-white/70 cursor-pointer">

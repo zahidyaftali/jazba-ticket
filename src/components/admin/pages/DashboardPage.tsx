@@ -262,6 +262,7 @@ export default function DashboardPage() {
               { role: "Administrators", count: users.filter((u) => u.role === "admin").length, color: "#000000" },
               { role: "Organisers", count: users.filter((u) => u.role === "organizer").length, color: "#333333" },
               { role: "Artists", count: users.filter((u) => u.role === "artist").length, color: "#666666" },
+              { role: "Door staff", count: users.filter((u) => u.role === "staff").length, color: "#777777" },
               { role: "Customers", count: users.filter((u) => u.role === "user").length, color: "#8a8a8a" },
             ].map((item) => {
               const pct = users.length ? (item.count / users.length) * 100 : 0;

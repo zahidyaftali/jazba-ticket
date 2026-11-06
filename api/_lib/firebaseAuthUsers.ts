@@ -139,3 +139,50 @@ export async function listAuthUsers(sa: ServiceAccount): Promise<AuthUserInfo[]>
   }
   return out;
 }
+
+// ── Door staff logins (made by an admin in the portal) ─────────────────────
+
+async function accountsCall(sa: ServiceAccount, action: '' | ':update' | ':delete', body: Record<string, unknown>): Promise<any> {
+  const token = await serviceAccountToken(sa);
+  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/projects/${encodeURIComponent(sa.project_id)}/accounts${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  const data: any = await res.json().catch(() => ({}));
+  if (res.ok) return data;
+  const code = String(data?.error?.message || '');
+  console.error(`accounts${action || ':create'} failed:`, res.status, code);
+  if (code.startsWith('EMAIL_EXISTS')) {
+    throw new HttpError(
+      'This email already has a Jazba account. Use a different email, or give that account the Door staff role on the Users page.',
+      409,
+    );
+  }
+  if (code.startsWith('INVALID_EMAIL')) throw new HttpError('That email address is not valid.', 400);
+  if (code.startsWith('WEAK_PASSWORD')) throw new HttpError('Choose a longer password (at least 8 characters).', 400);
+  if (code.startsWith('USER_NOT_FOUND')) throw new HttpError('That login no longer exists.', 404);
+  throw new HttpError('Firebase could not update the login right now. Try again in a moment.', 502);
+}
+
+/** A new email + password login. Returns its uid. */
+export async function createAuthUser(sa: ServiceAccount, email: string, password: string, name: string): Promise<string> {
+  const data = await accountsCall(sa, '', { email, password, displayName: name, emailVerified: true });
+  const uid = String(data?.localId || '');
+  if (!uid) throw new HttpError('Firebase did not return the new login.', 502);
+  return uid;
+}
+
+export async function setAuthPassword(sa: ServiceAccount, uid: string, password: string): Promise<void> {
+  await accountsCall(sa, ':update', { localId: uid, password });
+}
+
+/** Delete a login. One that is already gone counts as deleted. */
+export async function deleteAuthUser(sa: ServiceAccount, uid: string): Promise<void> {
+  try {
+    await accountsCall(sa, ':delete', { localId: uid });
+  } catch (err) {
+    if (err instanceof HttpError && err.status === 404) return;
+    throw err;
+  }
+}

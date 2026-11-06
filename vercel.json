@@ -25,7 +25,7 @@
       "destination": "/api/event-share?slug=:slug"
     },
     {
-      "source": "/api/:route(admin-media|admin-payments|admin-security-rules|admin-users|organizer-notify|organizer-portal)",
+      "source": "/api/:route(admin-media|admin-payments|admin-security-rules|admin-users|door-staff|organizer-notify|organizer-portal)",
       "destination": "/api/portal?route=:route"
     },
     { "source": "/scan", "destination": "/scan.html" },

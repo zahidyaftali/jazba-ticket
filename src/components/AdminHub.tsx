@@ -14,6 +14,7 @@ import ArtistsPage from "./admin/pages/ArtistsPage";
 import OrganizersPage from "./admin/pages/OrganizersPage";
 import MediaLibraryPage from "./admin/pages/MediaLibraryPage";
 import AccountSettingsPage from "./admin/pages/AccountSettingsPage";
+import DoorStaffPage from "./admin/pages/DoorStaffPage";
 
 /**
  * The admin portal (/admin/*): a WordPress-style dashboard with a collapsible
@@ -70,6 +71,9 @@ function AdminShell() {
       break;
     case "users":
       page = <UsersPage />;
+      break;
+    case "door-staff":
+      page = <DoorStaffPage />;
       break;
     case "settings":
       page = <AccountSettingsPage />;

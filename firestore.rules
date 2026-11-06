@@ -63,13 +63,19 @@ service cloud.firestore {
       return hasRole('artist');
     }
 
+    // Door staff: a login made by an admin for the gate. It can only look
+    // tickets up and check people in (Jazba Scan) — nothing else.
+    function isDoorStaff() {
+      return hasRole('staff');
+    }
+
     function isValidUser(data) {
       return data.keys().hasAll(['uid', 'email', 'name', 'role', 'status', 'createdAt'])
         && data.keys().size() <= 10
         && data.uid is string && data.uid.size() <= 128 && data.uid == request.auth.uid
         && data.email is string && data.email.size() <= 128
         && data.name is string && data.name.size() <= 128
-        && data.role is string && (data.role == 'admin' || data.role == 'organizer' || data.role == 'artist' || data.role == 'user')
+        && data.role is string && (data.role == 'admin' || data.role == 'organizer' || data.role == 'artist' || data.role == 'staff' || data.role == 'user')
         && data.status is string && (data.status == 'active' || data.status == 'suspended')
         && data.createdAt is string && data.createdAt.size() <= 64
         && (!data.keys().hasAny(['phone']) || (data.phone is string && data.phone.size() <= 32))
@@ -192,17 +198,50 @@ service cloud.firestore {
     // ── Orders ──────────────────────────────────────────────────────────
     // Buyers can see their own orders and passes. Only admins (and the
     // server, after a confirmed payment) can create or change them.
+    // Door staff may read orders and passes (to look a ticket up at the gate)
+    // and check people in on a pass — see isDoorCheckIn().
     match /bookings/{bookingId} {
-      allow get: if isValidId(bookingId) && isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isValidId(bookingId) && isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isDoorStaff());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isDoorStaff());
       allow create, update: if isValidId(bookingId) && isAdmin();
       allow delete: if isAdmin();
     }
 
+    // A door check-in: more people in on an active pass of a paid, not
+    // cancelled order — never fewer, never past what the pass admits, and
+    // signed with the staff member's own email. Nothing else on the pass can
+    // change. How many a pass admits is fixed at its first check-in.
+    function isDoorCheckIn() {
+      let before = existing();
+      let after = incoming();
+      let admits = before.get('people', after.get('people', 0));
+      let wasIn = before.get('peopleIn', 0);
+      let order = get(/databases/$(database)/documents/bookings/$(before.bookingId)).data;
+      return isDoorStaff()
+        && after.diff(before).affectedKeys().hasOnly(['status', 'people', 'peopleIn', 'scannedAt', 'scannedBy', 'checkIns'])
+        && before.status == 'active'
+        && admits is int && admits >= 1 && admits <= 20
+        && after.get('people', 0) == admits
+        // Before its first check-in a pass may claim more than one person
+        // only on a group package (e.g. "Standard Group").
+        && (before.keys().hasAny(['people']) || admits == 1
+            || order.get('tier', '').lower().matches('.*group.*')
+            || order.get('tierName', '').lower().matches('.*group.*'))
+        && wasIn is int
+        && after.peopleIn is int && after.peopleIn > wasIn && after.peopleIn <= admits
+        && ((after.peopleIn == admits && after.status == 'scanned') || (after.peopleIn < admits && after.status == 'active'))
+        && after.scannedBy == request.auth.token.email
+        && after.scannedAt is string && after.scannedAt.size() <= 40
+        && after.checkIns is list && after.checkIns.size() <= 100
+        && order.get('bookingStatus', 'active') != 'cancelled'
+        && (order.get('paymentStatus', '') == 'paid' || order.get('paymentMethod', '') == 'complimentary');
+    }
+
     match /tickets/{ticketId} {
-      allow get: if isValidId(ticketId) && isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create, update: if isValidId(ticketId) && isAdmin();
+      allow get: if isValidId(ticketId) && isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isDoorStaff());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin() || isDoorStaff());
+      allow create: if isValidId(ticketId) && isAdmin();
+      allow update: if isValidId(ticketId) && (isAdmin() || isDoorCheckIn());
       allow delete: if isAdmin();
     }
 

@@ -93,6 +93,16 @@ function docFrom(d: any): DocData {
   return { ...fromFirestoreFields(d.fields || {}), id: String(d.name || '').split('/').pop() || '' };
 }
 
+/** Delete one document by path. A missing one counts as deleted. */
+export async function deleteDocument(sa: ServiceAccount | null, path: string): Promise<void> {
+  const { docs, auth } = await endpoint(sa);
+  const res = await fetch(`${docs}/${path.split('/').map(encodeURIComponent).join('/')}`, { method: 'DELETE', headers: { Authorization: auth } });
+  if (!res.ok && res.status !== 404) {
+    console.error('Firestore delete failed:', res.status, path);
+    throw new HttpError('Could not update the database.', 502);
+  }
+}
+
 /** One document by path ("organizers/abc"), or null when it doesn't exist. */
 export async function getDocument(sa: ServiceAccount | null, path: string): Promise<DocData | null> {
   const { docs, auth } = await endpoint(sa);
