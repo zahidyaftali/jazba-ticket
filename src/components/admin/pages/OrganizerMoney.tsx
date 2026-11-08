@@ -151,10 +151,12 @@ export function DeleteOrganizerDialog({ org, onClose, onDeleted }: { org: Organi
 // ── Payouts & fee ──────────────────────────────────────────────────────────
 
 export function PayoutsPanel({ org, grossUsd }: { org: OrganizerProfile; grossUsd: number }) {
-  const { notify, fail, reload } = useAdmin();
+  const { notify, fail, reload, currency: shownIn } = useAdmin();
   const key = payoutKey(org);
   const [payouts, setPayouts] = useState<Payout[] | null>(null);
-  const [currency, setCurrency] = useState("PKR");
+  // Follows the currency picked at the top of the portal; can be changed here too.
+  const [currency, setCurrency] = useState<string>(shownIn);
+  useEffect(() => setCurrency(shownIn), [shownIn]);
   const [fee, setFee] = useState(String(org.feePercent ?? 0));
   const [savingFee, setSavingFee] = useState(false);
   const [form, setForm] = useState({ amount: "", currency: "PKR", paidAt: new Date().toISOString().slice(0, 10), method: METHODS[0], reference: "", note: "" });

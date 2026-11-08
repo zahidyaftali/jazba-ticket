@@ -14,6 +14,7 @@ import {
   Toolbar,
   btnOutline,
   btnPrimary,
+  convertMoney,
   downloadCsv,
   money,
   tdCls,
@@ -89,20 +90,21 @@ function addInto(into: PackageStats, from: PackageStats) {
   for (const [c, v] of Object.entries(from.revenue)) into.revenue[c] = (into.revenue[c] || 0) + v;
 }
 
-/** "PKR 120,000 + $25", or "—" when nothing is paid yet. */
-function revenueLabel(r: Record<string, number>): string {
-  const order = ["PKR", "GBP", "USD"];
-  const parts = Object.entries(r)
-    .filter(([, v]) => v > 0)
-    .sort(([a], [b]) => (order.indexOf(a) + 1 || 9) - (order.indexOf(b) + 1 || 9))
-    .map(([c, v]) => money(v, c));
-  return parts.length ? parts.join(" + ") : "—";
+/** Money paid in several currencies, added up in one (the portal's choice). */
+function revenueIn(r: Record<string, number>, currency: string): number {
+  return Object.entries(r).reduce((sum, [c, v]) => sum + convertMoney(v, c, currency), 0);
+}
+
+/** "£2,316.40", or "—" when nothing is paid yet. */
+function revenueLabel(r: Record<string, number>, currency: string): string {
+  const total = revenueIn(r, currency);
+  return total > 0 ? money(total, currency) : "—";
 }
 
 const plural = (n: number, word: string) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`;
 
 export function EventSalesPage() {
-  const { data, route, navigate, allEvents, eventById, eventInfo, tierName, passesFor, peopleOnPass } = useAdmin();
+  const { data, route, navigate, allEvents, eventById, eventInfo, tierName, passesFor, peopleOnPass, currency } = useAdmin();
   const selectedId = route.query.get("event") || "";
 
   const stats = useMemo(() => {
@@ -186,11 +188,11 @@ export function EventSalesPage() {
 
   const exportCsv = (events: EventStats[]) => {
     const rows: (string | number)[][] = [
-      ["Event", "Event date", "Package", "Orders", "Tickets", "People", "Checked in", "Paid", "Complimentary", "Unpaid", "Online", "Issued in portal", "Cancelled", "Revenue"],
+      ["Event", "Event date", "Package", "Orders", "Tickets", "People", "Checked in", "Paid", "Complimentary", "Unpaid", "Online", "Issued in portal", "Cancelled", `Revenue (${currency})`],
     ];
     for (const ev of events) {
       for (const p of [...ev.packages, ev.total]) {
-        rows.push([ev.info.title, ev.info.date, p.name, p.orders, p.tickets, p.people, p.checkedIn, p.paid, p.complimentary, p.unpaid, p.online, p.portal, p.cancelled, revenueLabel(p.revenue)]);
+        rows.push([ev.info.title, ev.info.date, p.name, p.orders, p.tickets, p.people, p.checkedIn, p.paid, p.complimentary, p.unpaid, p.online, p.portal, p.cancelled, Math.round(revenueIn(p.revenue, currency) * 100) / 100]);
       }
     }
     const name = events.length === 1 ? `jazba-${events[0].info.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-packages` : "jazba-tickets-by-event";
@@ -213,7 +215,7 @@ export function EventSalesPage() {
 // ── All events ─────────────────────────────────────────────────────────────
 
 function EventList({ stats, onExport }: { stats: EventStats[]; onExport: (events: EventStats[]) => void }) {
-  const { navigate } = useAdmin();
+  const { navigate, currency } = useAdmin();
   const upcomingCount = stats.filter((s) => s.info.upcoming).length;
   const [tab, setTab] = useState<"upcoming" | "past" | "all">(upcomingCount ? "upcoming" : "all");
   const [query, setQuery] = useState("");
@@ -291,7 +293,7 @@ function EventList({ stats, onExport }: { stats: EventStats[]; onExport: (events
                   {ev.packages.length === 0 && <span className="text-[11px] text-[#8a8a8a]">No packages</span>}
                 </div>
               </td>
-              <td className={`${tdCls} font-bold whitespace-nowrap`}>{revenueLabel(ev.total.revenue)}</td>
+              <td className={`${tdCls} font-bold whitespace-nowrap`}>{revenueLabel(ev.total.revenue, currency)}</td>
               <td className={`${tdCls} text-right`}>
                 <ChevronRight className="w-4 h-4 text-[#8a8a8a] inline" />
               </td>
@@ -314,7 +316,7 @@ function EventList({ stats, onExport }: { stats: EventStats[]; onExport: (events
 // ── One event ──────────────────────────────────────────────────────────────
 
 function EventDetail({ ev, onExport }: { ev: EventStats; onExport: () => void }) {
-  const { navigate } = useAdmin();
+  const { navigate, currency } = useAdmin();
   const t = ev.total;
   const hasGroups = ev.packages.some((p) => p.groupSize > 1 || p.people !== p.tickets);
   const ordersFor = (pkg?: string) =>
@@ -355,7 +357,7 @@ function EventDetail({ ev, onExport }: { ev: EventStats; onExport: () => void })
           sub={`${Math.max(0, t.people - t.checkedIn).toLocaleString()} still to come`}
           icon={ScanLine}
         />
-        <StatTile label="Revenue" value={<span className="text-[22px]">{revenueLabel(t.revenue)}</span>} sub={`${plural(t.paid, "paid ticket")}`} icon={Wallet} />
+        <StatTile label="Revenue" value={<span className="text-[22px]">{revenueLabel(t.revenue, currency)}</span>} sub={`${plural(t.paid, "paid ticket")}`} icon={Wallet} />
       </div>
 
       <div className="bg-white border border-[#e4e4e4]">
@@ -409,7 +411,7 @@ function EventDetail({ ev, onExport }: { ev: EventStats; onExport: () => void })
                 <td className={`${tdCls} text-right`}>{p.complimentary.toLocaleString()}</td>
                 <td className={`${tdCls} text-right ${p.unpaid ? "font-bold text-[#7a4f0e]" : ""}`}>{p.unpaid.toLocaleString()}</td>
                 <td className={`${tdCls} text-right`}>{p.orders.toLocaleString()}</td>
-                <td className={`${tdCls} font-bold whitespace-nowrap`}>{revenueLabel(p.revenue)}</td>
+                <td className={`${tdCls} font-bold whitespace-nowrap`}>{revenueLabel(p.revenue, currency)}</td>
                 <td className={`${tdCls} text-right whitespace-nowrap`}>
                   {p.orders > 0 && (
                     <button type="button" onClick={() => ordersFor(p.id)} className="text-[11px] font-bold underline cursor-pointer">
@@ -434,7 +436,7 @@ function EventDetail({ ev, onExport }: { ev: EventStats; onExport: () => void })
               <td className={`${tdCls} text-right`}>{t.complimentary.toLocaleString()}</td>
               <td className={`${tdCls} text-right`}>{t.unpaid.toLocaleString()}</td>
               <td className={`${tdCls} text-right`}>{t.orders.toLocaleString()}</td>
-              <td className={`${tdCls} whitespace-nowrap`}>{revenueLabel(t.revenue)}</td>
+              <td className={`${tdCls} whitespace-nowrap`}>{revenueLabel(t.revenue, currency)}</td>
               <td className={tdCls}></td>
             </tr>
           )}
@@ -446,8 +448,8 @@ function EventDetail({ ev, onExport }: { ev: EventStats; onExport: () => void })
             {t.cancelled > 0 && ` ${plural(t.cancelled, "ticket")} on cancelled orders ${t.cancelled === 1 ? "is" : "are"} not counted.`}
           </p>
           <p>
-            Free = complimentary tickets. Unpaid = orders still marked pending or failed. Revenue counts paid orders only, in the currency each was
-            paid in.
+            Free = complimentary tickets. Unpaid = orders still marked pending or failed. Revenue counts paid orders only, shown in {currency} at
+            the checkout&rsquo;s rates ($1 = £0.78 = PKR 280).
           </p>
         </div>
       </div>

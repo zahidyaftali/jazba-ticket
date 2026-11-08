@@ -25,7 +25,7 @@ import {
   CircleX,
 } from "lucide-react";
 import brandMark from "../../../assets/images/Favicon.png";
-import { useAdmin } from "./AdminContext";
+import { DISPLAY_CURRENCIES, useAdmin } from "./AdminContext";
 import { Avatar, overline } from "./ui";
 
 interface NavChild {
@@ -402,11 +402,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <a
                   href={`/admin/${route.section}`}
                   onClick={(e) => go(e, `/admin/${route.section}`)}
-                  className="text-[#8a8a8a] font-bold hover:text-black truncate"
+                  className="hidden sm:inline text-[#8a8a8a] font-bold hover:text-black truncate"
                 >
                   {sectionTitle}
                 </a>
-                <span className="text-[#c4c4c4]">/</span>
+                <span className="hidden sm:inline text-[#c4c4c4]">/</span>
                 <span className="font-bold text-black truncate">{subTitle}</span>
               </>
             ) : (
@@ -415,6 +415,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
 
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+            <CurrencySwitch />
             <button
               type="button"
               onClick={() => reload()}
@@ -588,6 +589,37 @@ function AccountMenu({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** GBP / USD / PKR — every amount in the portal is shown in the one picked.
+ *  Converted at the checkout's fixed rates; nothing stored changes. */
+function CurrencySwitch() {
+  const { currency, setCurrency } = useAdmin();
+  const names: Record<string, string> = { GBP: "pounds", USD: "US dollars", PKR: "Pakistani rupees" };
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Show amounts in"
+      title="Amounts are converted at the checkout's rates: $1 = £0.78 = PKR 280"
+      className="flex border border-[#d9d9d9] shrink-0"
+    >
+      {DISPLAY_CURRENCIES.map((c) => (
+        <button
+          key={c}
+          type="button"
+          role="radio"
+          aria-checked={currency === c}
+          onClick={() => setCurrency(c)}
+          title={`Show every amount in ${names[c]}`}
+          className={`h-8 px-2 sm:px-2.5 text-[11px] font-bold cursor-pointer transition-colors ${
+            currency === c ? "bg-black text-white" : "bg-white text-[#555] hover:text-black hover:bg-[#f2f2f2]"
+          }`}
+        >
+          {c}
+        </button>
+      ))}
     </div>
   );
 }

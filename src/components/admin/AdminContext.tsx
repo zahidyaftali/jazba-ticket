@@ -22,7 +22,7 @@ import { fetchCardPayments, CardPayment } from "../../services/adminPaymentsServ
 import { EventItem, getEventTimestamp, isPastEvent, passPeople, peoplePerPass, tierDisplayName, ticketSeat, withEventSlugs } from "../../types";
 import { auth, accountEmail } from "../../firebase";
 import { printWhenReady, type TicketPrintData } from "../TicketPrintSheet";
-import { money } from "./ui";
+import { convertMoney, money } from "./ui";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -80,6 +80,21 @@ export interface Client {
   lastOrderAt: string;
 }
 
+/** Currencies the portal can show amounts in, in the order of the switch. */
+export const DISPLAY_CURRENCIES = ["GBP", "USD", "PKR"] as const;
+export type DisplayCurrency = (typeof DISPLAY_CURRENCIES)[number];
+const CURRENCY_KEY = "jz-admin-currency";
+
+function readDisplayCurrency(): DisplayCurrency {
+  try {
+    const saved = localStorage.getItem(CURRENCY_KEY);
+    if ((DISPLAY_CURRENCIES as readonly string[]).includes(saved || "")) return saved as DisplayCurrency;
+  } catch {
+    /* storage unavailable — use the default */
+  }
+  return "GBP";
+}
+
 export interface AdminData {
   users: UserProfile[];
   bookings: Booking[];
@@ -131,9 +146,23 @@ interface AdminCtx {
   /** A pass's door check-in in people (a group pass admits several). */
   peopleOnPass: (p: TicketPass) => { total: number; inside: number; left: number };
   tierName: (b: Booking) => string;
+  /** What an order paid, in the currency chosen at the top of the portal. */
   amountLabel: (b: Booking) => string;
+  /** What an order paid, in the currency it was paid in (for tickets sent to customers). */
+  paidLabel: (b: Booking) => string;
+  /** What an order paid as a number, in the chosen currency. */
+  bookingValue: (b: Booking) => number;
+
+  /** The currency every amount in the portal is shown in. */
+  currency: DisplayCurrency;
+  setCurrency: (c: DisplayCurrency) => void;
+  /** An amount in `from` (default USD) → the chosen currency, as a number. */
+  conv: (amount: number, from?: string) => number;
+  /** An amount in `from` (default USD) → the chosen currency, formatted. */
+  fmt: (amount: number, from?: string) => string;
   clients: Client[];
-  analytics: { totalRevenue: number; totalTicketsSold: number; paidOrders: number };
+  /** totalRevenue is USD; revenue is the same total in the chosen currency. */
+  analytics: { totalRevenue: number; revenue: number; totalTicketsSold: number; paidOrders: number };
 
   admin: { uid: string; name: string; email: string; photo: string };
   onLogout: () => void;
@@ -223,6 +252,7 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [openBookingId, setOpenBookingId] = useState<string | null>(null);
   const [printData, setPrintData] = useState<TicketPrintData | null>(null);
+  const [currency, setCurrencyState] = useState<DisplayCurrency>(readDisplayCurrency);
   const [authUsers, setAuthUsers] = useState<Map<string, AuthUserInfo>>(new Map());
   const [authStatus, setAuthStatus] = useState<AdminCtx["authStatus"]>("loading");
   const [authError, setAuthError] = useState("");
@@ -498,11 +528,35 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
     [eventMap],
   );
 
-  const amountLabel = useCallback((b: Booking) => {
+  // ---- money: every amount is shown in the currency picked at the top
+  const setCurrency = useCallback((c: DisplayCurrency) => {
+    setCurrencyState(c);
+    try {
+      localStorage.setItem(CURRENCY_KEY, c);
+    } catch {
+      /* storage unavailable — choice lasts until the page is closed */
+    }
+  }, []);
+  const conv = useCallback((amount: number, from = "USD") => convertMoney(amount, from, currency), [currency]);
+  const fmt = useCallback((amount: number, from = "USD") => money(convertMoney(amount, from, currency), currency), [currency]);
+
+  const paidLabel = useCallback((b: Booking) => {
     if (b.paymentMethod === "complimentary") return "Complimentary";
     if (b.currency && b.currency !== "USD" && typeof b.amountLocal === "number") return money(b.amountLocal, b.currency);
     return money(Number(b.amount ?? b.pricePaid) || 0);
   }, []);
+  // The price in the currency it was agreed in is exact; `amount` (USD) is rounded.
+  const bookingValue = useCallback(
+    (b: Booking) =>
+      b.currency && typeof b.amountLocal === "number"
+        ? convertMoney(b.amountLocal, b.currency, currency)
+        : convertMoney(Number(b.amount ?? b.pricePaid) || 0, "USD", currency),
+    [currency],
+  );
+  const amountLabel = useCallback(
+    (b: Booking) => (b.paymentMethod === "complimentary" ? "Complimentary" : money(bookingValue(b), currency)),
+    [bookingValue, currency],
+  );
 
   const ticketDataFor = useCallback(
     (b: Booking): TicketPrintData => {
@@ -587,18 +641,20 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
 
   const analytics = useMemo(() => {
     let totalRevenue = 0;
+    let revenue = 0;
     let totalTicketsSold = 0;
     let paidOrders = 0;
     for (const b of data.bookings) {
       if (b.paymentStatus === "paid") {
         paidOrders++;
         totalRevenue += Number(b.amount ?? b.pricePaid) || 0;
+        revenue += bookingValue(b);
         totalTicketsSold += Number(b.quantity) || 1;
       }
     }
     if (totalTicketsSold === 0) totalTicketsSold = data.tickets.length;
-    return { totalRevenue, totalTicketsSold, paidOrders };
-  }, [data.bookings, data.tickets]);
+    return { totalRevenue, revenue, totalTicketsSold, paidOrders };
+  }, [data.bookings, data.tickets, bookingValue]);
 
   const me = auth.currentUser;
   const myProfile = me ? userMap.get(me.uid) : undefined;
@@ -635,6 +691,12 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
     peopleOnPass,
     tierName,
     amountLabel,
+    paidLabel,
+    bookingValue,
+    currency,
+    setCurrency,
+    conv,
+    fmt,
     clients,
     analytics,
     admin,

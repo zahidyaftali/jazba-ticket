@@ -48,6 +48,17 @@ export function toUsd(amount: number, currency: string): number {
   return (Number(amount) || 0) / (RATES[currency] ?? 1);
 }
 
+/** An amount in one currency → another, at the same fixed rates. */
+export function convertMoney(amount: number, from: string, to: string): number {
+  const v = Number(amount) || 0;
+  return from === to ? v : fromUsd(toUsd(v, from), to);
+}
+
+/** "£", "$" or "PKR " — the prefix money() puts before a number. */
+export function currencySymbol(currency: string): string {
+  return SYMBOLS[currency] ?? `${currency} `;
+}
+
 /** Compact axis/tile number: 1,284 / 12.9K / 4.2M. */
 export function compact(n: number): string {
   const v = Math.abs(n);

@@ -39,7 +39,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 /** Side panel with one person's details and every order they hold. */
 function PersonDrawer({ client, onClose }: { client: Client | null; onClose: () => void }) {
-  const { eventInfo, tierName, amountLabel, openBooking, navigate } = useAdmin();
+  const { eventInfo, tierName, amountLabel, openBooking, navigate, fmt } = useAdmin();
   if (!client) return null;
   const orders = [...client.orders].sort(byNewest);
   return (
@@ -81,7 +81,7 @@ function PersonDrawer({ client, onClose }: { client: Client | null; onClose: () 
         {[
           { k: "Orders", v: client.orders.length },
           { k: "Tickets", v: client.tickets },
-          { k: "Spent", v: money(client.spentUsd) },
+          { k: "Spent", v: fmt(client.spentUsd) },
         ].map((s) => (
           <div key={s.k} className="bg-[#f7f7f7] p-3">
             <span className={`${overline} text-[#8a8a8a] block`}>{s.k}</span>
@@ -127,7 +127,7 @@ function PersonDrawer({ client, onClose }: { client: Client | null; onClose: () 
 
 /** Clients — everyone who holds tickets, plus registered members. */
 export function ClientsPage() {
-  const { clients, navigate } = useAdmin();
+  const { clients, navigate, fmt, conv, currency } = useAdmin();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<"buyers" | "guests" | "all">("buyers");
   const [open, setOpen] = useState<Client | null>(null);
@@ -140,8 +140,8 @@ export function ClientsPage() {
 
   const exportCsv = () =>
     downloadCsv(`jazba-clients-${new Date().toISOString().slice(0, 10)}.csv`, [
-      ["Name", "Email", "Phone", "Account", "Orders", "Tickets", "Spent (USD)", "Last order"],
-      ...filtered.map((c) => [c.name, c.email, c.phone, c.registered ? "Member" : "Guest", c.orders.length, c.tickets, c.spentUsd.toFixed(2), c.lastOrderAt ? fmtDate(c.lastOrderAt) : ""]),
+      ["Name", "Email", "Phone", "Account", "Orders", "Tickets", `Spent (${currency})`, "Last order"],
+      ...filtered.map((c) => [c.name, c.email, c.phone, c.registered ? "Member" : "Guest", c.orders.length, c.tickets, conv(c.spentUsd).toFixed(2), c.lastOrderAt ? fmtDate(c.lastOrderAt) : ""]),
     ]);
 
   return (
@@ -210,7 +210,7 @@ export function ClientsPage() {
               </td>
               <td className={`${tdCls} font-bold`}>{c.orders.length}</td>
               <td className={`${tdCls} font-bold`}>{c.tickets}</td>
-              <td className={`${tdCls} font-bold whitespace-nowrap`}>{money(c.spentUsd)}</td>
+              <td className={`${tdCls} font-bold whitespace-nowrap`}>{fmt(c.spentUsd)}</td>
               <td className={`${tdCls} whitespace-nowrap text-[#666]`}>{c.lastOrderAt ? fmtDate(c.lastOrderAt) : "—"}</td>
               <td className={`${tdCls} text-right`}>
                 <div className="flex justify-end">
@@ -311,7 +311,7 @@ function EmailStatusBanner({
 
 /** Users — registered accounts, roles and access. */
 export function UsersPage() {
-  const { data, clients, userEmail, signInMethodsFor, authUserFor, authStatus, authError, admin, notify, fail, reload } = useAdmin();
+  const { data, clients, userEmail, signInMethodsFor, authUserFor, authStatus, authError, admin, notify, fail, reload, fmt, conv, currency } = useAdmin();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<RoleTab>("all");
   const [open, setOpen] = useState<Client | null>(null);
@@ -374,11 +374,11 @@ export function UsersPage() {
 
   const exportCsv = () =>
     downloadCsv(`jazba-users-${new Date().toISOString().slice(0, 10)}.csv`, [
-      ["Name", "Email", "Sign-in", "Phone", "City", "Role", "Status", "Joined", "Last sign-in", "Orders", "Spent (USD)", "User ID"],
+      ["Name", "Email", "Sign-in", "Phone", "City", "Role", "Status", "Joined", "Last sign-in", "Orders", `Spent (${currency})`, "User ID"],
       ...filtered.map((u) => {
         const s = statsByUid.get(u.uid);
         const login = authUserFor(u.uid);
-        return [u.name, userEmail(u).email, signInMethodsFor(u).join(" / "), u.phone, u.city, ROLE_LABELS[u.role] || u.role, u.status || "active", fmtDate(u.createdAt), login?.lastLoginAt ? fmtDate(login.lastLoginAt) : "", s?.orders.length || 0, (s?.spentUsd || 0).toFixed(2), u.uid];
+        return [u.name, userEmail(u).email, signInMethodsFor(u).join(" / "), u.phone, u.city, ROLE_LABELS[u.role] || u.role, u.status || "active", fmtDate(u.createdAt), login?.lastLoginAt ? fmtDate(login.lastLoginAt) : "", s?.orders.length || 0, conv(s?.spentUsd || 0).toFixed(2), u.uid];
       }),
     ]);
 
@@ -488,7 +488,7 @@ export function UsersPage() {
                 </td>
                 <td className={`${tdCls} whitespace-nowrap`}>
                   <span className="font-bold">{stats?.orders.length || 0}</span>
-                  {stats && stats.spentUsd > 0 && <span className="block text-[11px] text-[#8a8a8a]">{money(stats.spentUsd)}</span>}
+                  {stats && stats.spentUsd > 0 && <span className="block text-[11px] text-[#8a8a8a]">{fmt(stats.spentUsd)}</span>}
                 </td>
                 <td className={tdCls}>
                   <select

@@ -93,7 +93,7 @@ export default function ArtistsPage() {
 type ArtistTab = "all" | "featured" | "available" | "unavailable";
 
 function ArtistsList() {
-  const { data, navigate, notify, fail, reload } = useAdmin();
+  const { data, navigate, notify, fail, reload, fmt } = useAdmin();
   const artists = data.artists;
   const [tab, setTab] = useState<ArtistTab>("all");
   const [query, setQuery] = useState("");
@@ -435,7 +435,7 @@ Type DELETE to confirm.`);
                 <td className={tdCls}>{CATEGORY_LABELS[artist.category || "music"] || artist.category}</td>
                 <td className={`${tdCls} whitespace-nowrap`}>{artist.location || "—"}</td>
                 <td className={`${tdCls} whitespace-nowrap`}>
-                  <span className="font-bold">{money(artist.hourlyRate || 0)}</span>
+                  <span className="font-bold">{fmt(artist.hourlyRate || 0)}</span>
                   <span className="text-[11px] text-[#8a8a8a]">/event</span>
                 </td>
                 <td className={`${tdCls} whitespace-nowrap`}>
@@ -547,7 +547,7 @@ Type DELETE to confirm.`);
                   )}
                   <div className="mt-auto pt-3 flex items-center justify-between border-t border-[#f2f2f2]">
                     <span className="text-sm font-bold">
-                      {money(artist.hourlyRate || 0)}
+                      {fmt(artist.hourlyRate || 0)}
                       <span className="text-[11px] text-[#8a8a8a] font-medium">/event</span>
                     </span>
                     <div className="flex">{actions(artist)}</div>

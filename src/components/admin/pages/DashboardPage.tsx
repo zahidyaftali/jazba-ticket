@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import {
-  DollarSign,
+  Wallet,
   Ticket,
   ShoppingBag,
   CalendarDays,
@@ -21,6 +21,7 @@ import {
   btnOutline,
   btnPrimary,
   compact,
+  currencySymbol,
   fmtDate,
   money,
   overline,
@@ -30,7 +31,7 @@ import {
 const DAY = 86_400_000;
 
 export default function DashboardPage() {
-  const { data, analytics, allEvents, eventInfo, customerFor, tierName, amountLabel, navigate, openBooking, admin, notify, fail, reload, peopleOnPass } =
+  const { data, analytics, allEvents, eventInfo, customerFor, tierName, amountLabel, navigate, openBooking, admin, notify, fail, reload, peopleOnPass, currency } =
     useAdmin();
   const { users, bookings, payments, tickets, artists } = data;
   const doorCount = tickets.reduce(
@@ -107,9 +108,9 @@ export default function DashboardPage() {
           <StatTile
             dark
             label="Total revenue"
-            value={<span className="text-[40px] sm:text-[48px]">{money(analytics.totalRevenue)}</span>}
-            sub={`USD equivalent · ${analytics.paidOrders} paid order${analytics.paidOrders === 1 ? "" : "s"}`}
-            icon={DollarSign}
+            value={<span className={currency === "PKR" ? "text-[32px] sm:text-[38px]" : "text-[40px] sm:text-[48px]"}>{money(analytics.revenue, currency)}</span>}
+            sub={`In ${currency} · ${analytics.paidOrders} paid order${analytics.paidOrders === 1 ? "" : "s"}`}
+            icon={Wallet}
             onClick={() => navigate("/admin/orders")}
           />
         </div>
@@ -293,7 +294,7 @@ export default function DashboardPage() {
             {[
               {
                 k: "Average order value",
-                v: `${money(analytics.paidOrders ? analytics.totalRevenue / analytics.paidOrders : 0)} per order`,
+                v: `${money(analytics.paidOrders ? analytics.revenue / analytics.paidOrders : 0, currency)} per order`,
               },
               { k: "Paid bookings", v: bookings.filter((b) => b.paymentStatus === "paid").length },
               { k: "Pending bookings", v: pendingCount },
@@ -316,7 +317,7 @@ export default function DashboardPage() {
 
 /** Paid revenue per day over the last 30 days — single series, black columns. */
 function SalesChart() {
-  const { data } = useAdmin();
+  const { data, bookingValue, currency } = useAdmin();
   const [hover, setHover] = useState<number | null>(null);
   const [asTable, setAsTable] = useState(false);
 
@@ -331,12 +332,12 @@ function SalesChart() {
       if (isNaN(t) || t < start) continue;
       const idx = Math.floor((t - start) / DAY);
       if (idx < 0 || idx >= 30) continue;
-      rows[idx].revenue += Number(b.amount ?? b.pricePaid) || 0;
+      rows[idx].revenue += bookingValue(b);
       rows[idx].orders += 1;
       rows[idx].tickets += Number(b.quantity) || 1;
     }
     return rows;
-  }, [data.bookings]);
+  }, [data.bookings, bookingValue]);
 
   const total = days.reduce((s, d) => s + d.revenue, 0);
   const totalTickets = days.reduce((s, d) => s + d.tickets, 0);
@@ -355,7 +356,7 @@ function SalesChart() {
   return (
     <Panel
       title="Sales — last 30 days"
-      sub={`${money(total)} from ${totalTickets} ticket${totalTickets === 1 ? "" : "s"} · paid orders, USD equivalent`}
+      sub={`${money(total, currency)} from ${totalTickets} ticket${totalTickets === 1 ? "" : "s"} · paid orders, in ${currency}`}
       action={
         <div className="flex border border-[#e4e4e4] shrink-0">
           {(["Chart", "Table"] as const).map((v) => (
@@ -390,7 +391,7 @@ function SalesChart() {
                   <td className="py-2">{fmtDate(new Date(d.t).toISOString())}</td>
                   <td className="py-2 text-right">{d.orders}</td>
                   <td className="py-2 text-right">{d.tickets}</td>
-                  <td className="py-2 text-right font-bold">{money(d.revenue)}</td>
+                  <td className="py-2 text-right font-bold">{money(d.revenue, currency)}</td>
                 </tr>
               ))}
             </tbody>
@@ -400,9 +401,9 @@ function SalesChart() {
         <div className="relative">
           <div className="flex gap-3">
             {/* Y axis */}
-            <div className="flex flex-col justify-between h-[220px] text-[10px] text-[#8a8a8a] font-bold tabular-nums text-right w-10 shrink-0 -mt-1.5 pb-0">
+            <div className="flex flex-col justify-between h-[220px] text-[10px] text-[#8a8a8a] font-bold tabular-nums text-right min-w-10 whitespace-nowrap shrink-0 -mt-1.5 pb-0">
               {ticks.map((t) => (
-                <span key={t}>{t === 0 ? "0" : `$${compact(t)}`}</span>
+                <span key={t}>{t === 0 ? "0" : `${currencySymbol(currency)}${compact(t)}`}</span>
               ))}
             </div>
             <div className="relative flex-1 min-w-0">
@@ -452,7 +453,7 @@ function SalesChart() {
                   }}
                 >
                   <p className="text-[10px] font-bold text-white/60">{fmtDate(new Date(active.t).toISOString())}</p>
-                  <p className="text-sm font-bold">{money(active.revenue)}</p>
+                  <p className="text-sm font-bold">{money(active.revenue, currency)}</p>
                   <p className="text-[10px] text-white/70">
                     {active.orders} order{active.orders === 1 ? "" : "s"} · {active.tickets} ticket{active.tickets === 1 ? "" : "s"}
                   </p>

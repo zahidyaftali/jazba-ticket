@@ -299,7 +299,7 @@ export function OrganizersList({ initialTab = "all" }: { initialTab?: Tab }) {
 // ── Detail ─────────────────────────────────────────────────────────────────
 
 export function OrganizerDetail({ organizerId }: { organizerId: string }) {
-  const { data, loading, navigate, notify, fail, reload, openBooking, eventInfo } = useAdmin();
+  const { data, loading, navigate, notify, fail, reload, openBooking, eventInfo, fmt, amountLabel, currency } = useAdmin();
   const { act, busy } = useOrganizerActions();
   const org = data.organizers.find((o) => o.id === organizerId);
   const [followers, setFollowers] = useState<FollowRow[] | null>(null);
@@ -454,7 +454,7 @@ export function OrganizerDetail({ organizerId }: { organizerId: string }) {
       )}
 
       <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
-        <StatTile dark label="Ticket sales" icon={Wallet} value={money(revenue)} sub="Paid orders, in USD" />
+        <StatTile dark label="Ticket sales" icon={Wallet} value={fmt(revenue)} sub={`Paid orders, in ${currency}`} />
         <StatTile label="Tickets sold" icon={Ticket} value={sold.toLocaleString()} />
         <StatTile label="Orders" icon={ShoppingBag} value={paid.length.toLocaleString()} />
         <StatTile label="Events" icon={PlusCircle} value={events.length} sub={`${events.filter((e) => e.status === "published").length} on sale · ${events.filter((e) => e.status === "pending").length} in review`} />
@@ -578,7 +578,7 @@ export function OrganizerDetail({ organizerId }: { organizerId: string }) {
                   <span className="font-bold">{s.sold}</span>
                   {evt.capacity ? <span className="text-[11px] text-[#8a8a8a]"> / {evt.capacity}</span> : null}
                 </td>
-                <td className={`${tdCls} font-bold whitespace-nowrap`}>{money(s.revenue)}</td>
+                <td className={`${tdCls} font-bold whitespace-nowrap`}>{fmt(s.revenue)}</td>
                 <td className={`${tdCls} text-right`}>
                   <div className="flex items-center justify-end">
                     {eventBusy === evt.id ? (
@@ -634,7 +634,7 @@ export function OrganizerDetail({ organizerId }: { organizerId: string }) {
                         {b.quantity} × {b.tierName || b.ticketType} · {eventInfo(b.eventId, b).title} · {fmtDateTime(b.createdAt)}
                       </span>
                     </span>
-                    <span className="font-bold shrink-0">{money(Number(b.amount ?? b.pricePaid) || 0)}</span>
+                    <span className="font-bold shrink-0">{amountLabel(b)}</span>
                   </button>
                 </li>
               ))}

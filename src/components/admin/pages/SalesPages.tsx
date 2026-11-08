@@ -34,7 +34,7 @@ import {
 
 /** Orders — the bookings ledger with payment / order status management. */
 export function OrdersPage() {
-  const { data, analytics, eventInfo, customerFor, tierName, amountLabel, openBooking, notify, fail, reload } = useAdmin();
+  const { data, analytics, eventInfo, customerFor, tierName, amountLabel, paidLabel, bookingValue, currency, fmt, openBooking, notify, fail, reload } = useAdmin();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | "paid" | "pending" | "failed">("all");
   const [source, setSource] = useState<"all" | "online" | "admin">("all");
@@ -69,7 +69,7 @@ export function OrdersPage() {
 
   const exportCsv = () =>
     downloadCsv(`jazba-orders-${new Date().toISOString().slice(0, 10)}.csv`, [
-      ["Order", "Date", "Customer", "Email", "Phone", "Event", "Package", "Quantity", "Amount", "Amount (USD)", "Payment method", "Region", "Transaction ID", "Payment status", "Order status", "Source"],
+      ["Order", "Date", "Customer", "Email", "Phone", "Event", "Package", "Quantity", "Amount paid", `Amount (${currency})`, "Payment method", "Region", "Transaction ID", "Payment status", "Order status", "Source"],
       ...filtered.map(({ b, info, c }) => [
         b.orderId || b.bookingNumber || b.id,
         fmtDateTime(b.createdAt),
@@ -79,8 +79,8 @@ export function OrdersPage() {
         info.title,
         tierName(b),
         b.quantity || 1,
-        amountLabel(b),
-        Number(b.amount ?? b.pricePaid) || 0,
+        paidLabel(b),
+        Math.round(bookingValue(b) * 100) / 100,
         paymentMethodLabel(b.paymentMethod),
         b.paymentRegion || "",
         b.stripeTransactionId || "",
@@ -90,9 +90,7 @@ export function OrdersPage() {
       ]),
     ]);
 
-  const pendingValue = data.bookings
-    .filter((b) => b.paymentStatus === "pending")
-    .reduce((s, b) => s + (Number(b.amount ?? b.pricePaid) || 0), 0);
+  const pendingValue = data.bookings.filter((b) => b.paymentStatus === "pending").reduce((s, b) => s + bookingValue(b), 0);
 
   return (
     <div>
@@ -107,12 +105,12 @@ export function OrdersPage() {
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-        <StatTile dark label="Paid revenue" value={money(analytics.totalRevenue)} sub="USD equivalent" />
+        <StatTile dark label="Paid revenue" value={money(analytics.revenue, currency)} sub={`All orders, shown in ${currency}`} />
         <StatTile label="Paid orders" value={analytics.paidOrders} sub={`of ${data.bookings.length} orders`} />
-        <StatTile label="Awaiting payment" value={money(pendingValue)} sub={`${count("pending")} pending order${count("pending") === 1 ? "" : "s"}`} />
+        <StatTile label="Awaiting payment" value={money(pendingValue, currency)} sub={`${count("pending")} pending order${count("pending") === 1 ? "" : "s"}`} />
         <StatTile
           label="Average order"
-          value={money(analytics.paidOrders ? analytics.totalRevenue / analytics.paidOrders : 0)}
+          value={money(analytics.paidOrders ? analytics.revenue / analytics.paidOrders : 0, currency)}
           sub="Per paid order"
         />
       </div>
@@ -266,7 +264,7 @@ const paymentStatusLabel = (s: string) => PAYMENT_STATUS[s]?.label || s;
 /** Payments — every card payment straight from Stripe, plus any payment
  *  records saved in the database. */
 export function PaymentsPage() {
-  const { data, bookingById, userById, customerFor, userEmail, eventInfo, openBooking, cardPayments, cardPaymentsStatus, cardPaymentsError, fail } =
+  const { data, bookingById, userById, customerFor, userEmail, eventInfo, openBooking, cardPayments, cardPaymentsStatus, cardPaymentsError, fail, currency, conv, fmt } =
     useAdmin();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | PaymentRow["status"]>("all");
@@ -411,7 +409,7 @@ export function PaymentsPage() {
 
   const exportCsv = () =>
     downloadCsv(`jazba-payments-${new Date().toISOString().slice(0, 10)}.csv`, [
-      ["Date", "Order", "Details", "Customer", "Email", "Provider", "Transaction ID", "Currency", "Amount", "Status", "Note"],
+      ["Date", "Order", "Details", "Customer", "Email", "Provider", "Transaction ID", "Currency", "Amount", `Amount (${currency})`, "Status", "Note"],
       ...filtered.map((r) => [
         fmtDateTime(r.createdAt),
         r.orderId,
@@ -422,6 +420,7 @@ export function PaymentsPage() {
         r.transactionId,
         r.currency,
         r.amount,
+        Math.round(conv(r.amount, r.currency) * 100) / 100,
         r.status,
         r.note,
       ]),
@@ -545,7 +544,10 @@ export function PaymentsPage() {
                   r.transactionId || "—"
                 )}
               </td>
-              <td className={`${tdCls} font-bold whitespace-nowrap`}>{money(r.amount, r.currency)}</td>
+              <td className={`${tdCls} font-bold whitespace-nowrap`}>
+                {fmt(r.amount, r.currency)}
+                {r.currency !== currency && <span className="block text-[11px] font-medium text-[#8a8a8a]">Paid {money(r.amount, r.currency)}</span>}
+              </td>
               <td className={tdCls}>
                 <StatusBadge map={PAYMENT_STATUS} value={r.status} />
                 {r.note && <span className="block text-[11px] text-[#666] mt-1 max-w-[220px]">{r.note}</span>}
@@ -581,7 +583,7 @@ export function PaymentsPage() {
         open={!!viewing}
         onClose={() => setViewKey("")}
         eyebrow="Payment details"
-        title={viewing ? `${money(viewing.amount, viewing.currency)} · ${viewing.orderId || "Payment"}` : ""}
+        title={viewing ? `${fmt(viewing.amount, viewing.currency)} · ${viewing.orderId || "Payment"}` : ""}
         sub={
           viewing && (
             <div className="flex items-center gap-3 flex-wrap">

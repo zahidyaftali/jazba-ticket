@@ -39,7 +39,7 @@ export const paymentMethodLabel = (m?: string) => (m ? METHOD_LABELS[m] || m : "
 /** Email a booking's e-ticket (PDF attached) or download that PDF. Sending
  *  also records when and where the ticket went. */
 export function useEmailTicket() {
-  const { ticketDataFor, amountLabel, reload } = useAdmin();
+  const { ticketDataFor, paidLabel, reload } = useAdmin();
   const [sending, setSending] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
@@ -58,7 +58,7 @@ export function useEmailTicket() {
       orderId: t.orderId,
       seat: t.seat,
       code: t.code,
-      amount: b.paymentMethod === "complimentary" || !(Number(b.amount) > 0) ? "" : amountLabel(b),
+      amount: b.paymentMethod === "complimentary" || !(Number(b.amount) > 0) ? "" : paidLabel(b),
       message: message.trim(),
       image: t.image,
     };
@@ -100,6 +100,8 @@ export default function BookingDrawer() {
     peopleOnPass,
     tierName,
     amountLabel,
+    paidLabel,
+    currency,
     ticketDataFor,
     printTicket,
     notify,
@@ -309,8 +311,8 @@ export default function BookingDrawer() {
         </Detail>
         <Detail label="Amount">
           {amountLabel(b)}
-          {b.currency && b.currency !== "USD" && Number(b.amount) > 0 && (
-            <span className="block text-[11px] text-[#8a8a8a] font-medium">≈ {money(Number(b.amount))} USD</span>
+          {b.paymentMethod !== "complimentary" && (b.currency || "USD") !== currency && Number(b.amount) > 0 && (
+            <span className="block text-[11px] text-[#8a8a8a] font-medium">Paid {paidLabel(b)}</span>
           )}
         </Detail>
         <Detail label="Payment method">

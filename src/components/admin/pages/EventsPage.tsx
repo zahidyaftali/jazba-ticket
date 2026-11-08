@@ -110,7 +110,7 @@ export default function EventsPage() {
 // ── List ───────────────────────────────────────────────────────────────────
 
 function EventsList() {
-  const { data, allEvents, eventInfo, navigate, notify, fail, reload, wpLoading, route } = useAdmin();
+  const { data, allEvents, eventInfo, navigate, notify, fail, reload, wpLoading, route, bookingValue, currency, fmt } = useAdmin();
   const [source, setSource] = useState<"site" | "wordpress">(route.query.get("source") === "wordpress" ? "wordpress" : "site");
   const [status, setStatus] = useState<"all" | "pending" | "published" | "draft" | "cancelled" | "completed">(
     route.sub === "review" || route.query.get("status") === "pending" ? "pending" : "all",
@@ -151,11 +151,11 @@ function EventsList() {
     for (const b of data.bookings) {
       const cur = m.get(b.eventId) || { sold: 0, revenue: 0 };
       if (b.bookingStatus !== "cancelled") cur.sold += Number(b.quantity) || 1;
-      if (b.paymentStatus === "paid") cur.revenue += Number(b.amount ?? b.pricePaid) || 0;
+      if (b.paymentStatus === "paid") cur.revenue += bookingValue(b);
       m.set(b.eventId, cur);
     }
     return m;
-  }, [data.bookings]);
+  }, [data.bookings, bookingValue]);
 
   const siteEvents = allEvents.filter((e) => e.source === "site");
   const wpEvents = allEvents.filter((e) => e.source === "wordpress");
@@ -287,7 +287,7 @@ function EventsList() {
 
   const exportCsv = () =>
     downloadCsv(`jazba-events-${new Date().toISOString().slice(0, 10)}.csv`, [
-      ["Title", "Source", "Status", "Date", "Time", "Venue", "Category", "Base price (USD)", "Tickets sold", "Revenue (USD)"],
+      ["Title", "Source", "Status", "Date", "Time", "Venue", "Category", "Base price (USD)", "Tickets sold", `Revenue (${currency})`],
       ...[...siteFiltered, ...wpFiltered].map((e) => {
         const i = eventInfo(e.id);
         const s = sales.get(e.id);
@@ -422,7 +422,7 @@ function EventsList() {
                           {evt.title}
                         </button>
                         <span className="block text-[11px] text-[#8a8a8a] capitalize">
-                          {categories.find((c) => c.id === evt.category)?.name || evt.category} · from {money(evt.price)}
+                          {categories.find((c) => c.id === evt.category)?.name || evt.category} · from {fmt(evt.price)}
                         </span>
                         {organizerOf(evt) && (
                           <button
@@ -447,7 +447,7 @@ function EventsList() {
                     <SoldLink id={evt.id} sold={s?.sold || 0} />
                     {evt.capacity ? <span className="text-[11px] text-[#8a8a8a]"> / {evt.capacity}</span> : null}
                   </td>
-                  <td className={`${tdCls} font-bold whitespace-nowrap`}>{money(s?.revenue || 0)}</td>
+                  <td className={`${tdCls} font-bold whitespace-nowrap`}>{money(s?.revenue || 0, currency)}</td>
                   <td className={tdCls}>
                     <StatusBadge map={EVENT_STATUS} value={evt.status || "draft"} />
                   </td>
@@ -558,7 +558,7 @@ function EventsList() {
                   <td className={`${tdCls} whitespace-nowrap`}>
                     <SoldLink id={evt.id} sold={s?.sold || 0} />
                   </td>
-                  <td className={`${tdCls} font-bold whitespace-nowrap`}>{money(s?.revenue || 0)}</td>
+                  <td className={`${tdCls} font-bold whitespace-nowrap`}>{money(s?.revenue || 0, currency)}</td>
                   <td className={`${tdCls} text-right`}>
                     <div className="flex items-center justify-end">
                       <IconButton title="Issue a ticket" onClick={() => navigate(`/admin/tickets/new?event=${encodeURIComponent(evt.id)}`)}>

@@ -35,7 +35,7 @@ type StatusFilter = "all" | "active" | "completed" | "cancelled";
 
 /** All tickets / Upcoming — one row per ticket order. */
 export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
-  const { data, route, navigate, eventInfo, customerFor, tierName, amountLabel, openBooking, printTicket, ticketDataFor, passesFor, peopleOnPass, notify, fail } =
+  const { data, route, navigate, eventInfo, customerFor, tierName, amountLabel, paidLabel, bookingValue, currency, openBooking, printTicket, ticketDataFor, passesFor, peopleOnPass, notify, fail } =
     useAdmin();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -164,7 +164,7 @@ export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
 
   const exportCsv = () => {
     downloadCsv(`jazba-tickets-${view}-${new Date().toISOString().slice(0, 10)}.csv`, [
-      ["Order", "Created", "Holder", "Email", "Phone", "Event", "Event date", "Package", "Quantity", "Amount", "Payment", "Status", "Source", "Emailed"],
+      ["Order", "Created", "Holder", "Email", "Phone", "Event", "Event date", "Package", "Quantity", "Amount paid", `Amount (${currency})`, "Payment", "Status", "Source", "Emailed"],
       ...filtered.map(({ b, info, c }) => [
         b.orderId || b.bookingNumber || b.id,
         fmtDateTime(b.createdAt),
@@ -175,7 +175,8 @@ export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
         info.date,
         tierName(b),
         b.quantity || 1,
-        amountLabel(b),
+        paidLabel(b),
+        Math.round(bookingValue(b) * 100) / 100,
         b.paymentStatus,
         b.bookingStatus || "active",
         b.source === "admin" ? `Portal (${b.issuedBy || "admin"})` : "Online checkout",
