@@ -52,7 +52,8 @@ import {
   SearchInput,
   StatTile,
   StatusBadge,
-  TableFooter,
+  Pagination,
+  usePaged,
   Toolbar,
   btnDark,
   btnOutline,
@@ -142,6 +143,7 @@ export function OrganizersList({ initialTab = "all" }: { initialTab?: Tab }) {
     )
     .filter((o) => inTab(o, tab))
     .filter((o) => !q || [o.companyName, o.contactName, o.location, o.email, o.phone, ...(o.specialties || [])].some((v) => (v || "").toLowerCase().includes(q)));
+  const paged = usePaged(filtered, [q, tab]);
   const tabs: { id: Tab; label: string; count: number }[] = [
     { id: "all", label: "All", count: organizers.length },
     { id: "pending", label: "Applications", count: organizers.filter((o) => inTab(o, "pending")).length },
@@ -199,7 +201,7 @@ export function OrganizersList({ initialTab = "all" }: { initialTab?: Tab }) {
             </>
           }
         >
-          {filtered.map((org) => {
+          {paged.items.map((org) => {
             const evCount = eventsOfOrganizer(org, data.events).length;
             const pending = org.status === "pending";
             return (
@@ -287,7 +289,7 @@ export function OrganizersList({ initialTab = "all" }: { initialTab?: Tab }) {
             />
           )}
         </DataTable>
-        <TableFooter shown={filtered.length} total={organizers.length} noun="organisers" />
+        <Pagination paged={paged} total={organizers.length} noun="organisers" />
       </div>
       {deleting && <DeleteOrganizerDialog org={deleting} onClose={() => setDeleting(null)} onDeleted={() => setDeleting(null)} />}
     </div>

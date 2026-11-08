@@ -24,7 +24,8 @@ import {
   PageHeader,
   SearchInput,
   Switch,
-  TableFooter,
+  Pagination,
+  usePaged,
   Toolbar,
   addRowBtnCls,
   btnDark,
@@ -139,6 +140,7 @@ function ArtistsList() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [artists, tab, category, q, sort]);
+  const paged = usePaged(filtered, [q, tab, category, sort]);
   const count = (t: ArtistTab) => artists.filter((a) => inTab(a, t)).length;
 
   const toggleSel = (id: string) =>
@@ -147,7 +149,7 @@ function ArtistsList() {
       n.has(id) ? n.delete(id) : n.add(id);
       return n;
     });
-  const allSelected = filtered.length > 0 && filtered.every((a) => a.id && selected.has(a.id));
+  const allSelected = paged.items.length > 0 && paged.items.every((a) => a.id && selected.has(a.id));
 
   const quickUpdate = async (a: ArtistProfile, update: Partial<ArtistProfile>, msg: string) => {
     if (!a.id) return;
@@ -388,7 +390,7 @@ Type DELETE to confirm.`);
                   <input
                     type="checkbox"
                     checked={allSelected}
-                    onChange={() => setSelected(allSelected ? new Set() : new Set(filtered.map((a) => a.id!).filter(Boolean)))}
+                    onChange={() => setSelected(allSelected ? new Set() : new Set(paged.items.map((a) => a.id!).filter(Boolean)))}
                     aria-label="Select all"
                   />
                 </th>
@@ -403,7 +405,7 @@ Type DELETE to confirm.`);
               </>
             }
           >
-            {filtered.map((artist) => (
+            {paged.items.map((artist) => (
               <tr key={artist.id} className={`hover:bg-[#fafafa] ${artist.id && selected.has(artist.id) ? "bg-[#fffde6]" : ""}`}>
                 <td className={tdCls}>
                   <input
@@ -506,7 +508,7 @@ Type DELETE to confirm.`);
           </div>
         ) : (
           <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
-            {filtered.map((artist) => (
+            {paged.items.map((artist) => (
               <div key={artist.id} className="border border-[#e4e4e4] hover:border-black transition-colors flex flex-col">
                 <div className="relative h-28 bg-[#111] overflow-hidden">
                   {(artist.coverImage || artist.profileImage) && (
@@ -555,7 +557,7 @@ Type DELETE to confirm.`);
             ))}
           </div>
         )}
-        <TableFooter shown={filtered.length} total={artists.length} noun="artists" />
+        <Pagination paged={paged} total={artists.length} noun="artists" />
       </div>
     </div>
   );

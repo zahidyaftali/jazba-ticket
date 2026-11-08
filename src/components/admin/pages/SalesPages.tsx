@@ -17,7 +17,7 @@ import {
   SearchInput,
   StatusBadge,
   StatTile,
-  TableFooter,
+  Pagination,
   Toolbar,
   btnOutline,
   btnPrimary,
@@ -29,6 +29,7 @@ import {
   selectCls,
   tdCls,
   thCls,
+  usePaged,
 } from "../ui";
 
 /** Orders — the bookings ledger with payment / order status management. */
@@ -53,6 +54,7 @@ export function OrdersPage() {
       .filter(Boolean)
       .some((v) => String(v).toLowerCase().includes(q));
   });
+  const paged = usePaged(filtered, [q, status, source]);
   const count = (s: typeof status) => rows.filter((r) => s === "all" || (r.b.paymentStatus || "pending") === s).length;
 
   const change = async (id: string, update: { paymentStatus?: any; bookingStatus?: any }) => {
@@ -148,7 +150,7 @@ export function OrdersPage() {
             </>
           }
         >
-          {filtered.map(({ b, info, c }) => (
+          {paged.items.map(({ b, info, c }) => (
             <tr key={b.id} className="hover:bg-[#fafafa]">
               <td className={`${tdCls} whitespace-nowrap`}>
                 <span className="font-bold tracking-wide whitespace-nowrap">{b.orderId || b.bookingNumber || b.id}</span>
@@ -218,7 +220,7 @@ export function OrdersPage() {
             <EmptyRow colSpan={8} title={rows.length ? "No orders match your filters" : "No bookings found."} />
           )}
         </DataTable>
-        <TableFooter shown={filtered.length} total={rows.length} noun="orders" />
+        <Pagination paged={paged} total={rows.length} noun="orders" />
       </div>
     </div>
   );
@@ -404,6 +406,7 @@ export function PaymentsPage() {
       .filter(Boolean)
       .some((v) => String(v).toLowerCase().includes(q));
   });
+  const paged = usePaged(filtered, [q, status]);
   const count = (s: typeof status) => rows.filter((r) => s === "all" || r.status === s).length;
 
   const exportCsv = () =>
@@ -505,7 +508,7 @@ export function PaymentsPage() {
             </>
           }
         >
-          {filtered.map((r) => (
+          {paged.items.map((r) => (
             <tr key={r.key} className="hover:bg-[#fafafa]">
               <td className={`${tdCls} whitespace-nowrap text-[#666]`}>
                 {fmtDate(r.createdAt)}
@@ -571,7 +574,7 @@ export function PaymentsPage() {
             />
           )}
         </DataTable>
-        <TableFooter shown={filtered.length} total={rows.length} noun="payments" />
+        <Pagination paged={paged} total={rows.length} noun="payments" />
       </div>
 
       <Drawer

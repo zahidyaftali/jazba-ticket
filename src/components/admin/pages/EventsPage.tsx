@@ -19,7 +19,8 @@ import {
   PageHeader,
   SearchInput,
   StatusBadge,
-  TableFooter,
+  Pagination,
+  usePaged,
   Toolbar,
   addRowBtnCls,
   btnDark,
@@ -166,6 +167,8 @@ function EventsList() {
     !q || [e.title, e.venue, e.city, e.location, e.category].some((v) => (v || "").toLowerCase().includes(q));
   const siteFiltered = sorted(siteEvents).filter((e) => (status === "all" || (e.status || "draft") === status) && matches(e));
   const wpFiltered = sorted(wpEvents).filter(matches);
+  const sitePaged = usePaged(siteFiltered, [q, status]);
+  const wpPaged = usePaged(wpFiltered, [q]);
   const count = (s: typeof status) => siteEvents.filter((e) => s === "all" || (e.status || "draft") === s).length;
 
   const toggle = (id: string) =>
@@ -174,7 +177,7 @@ function EventsList() {
       n.has(id) ? n.delete(id) : n.add(id);
       return n;
     });
-  const allSelected = siteFiltered.length > 0 && siteFiltered.every((e) => selected.has(e.id));
+  const allSelected = sitePaged.items.length > 0 && sitePaged.items.every((e) => selected.has(e.id));
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Delete this event? This action cannot be undone.")) return;
@@ -385,7 +388,7 @@ function EventsList() {
                   <input
                     type="checkbox"
                     checked={allSelected}
-                    onChange={() => setSelected(allSelected ? new Set() : new Set(siteFiltered.map((e) => e.id)))}
+                    onChange={() => setSelected(allSelected ? new Set() : new Set(sitePaged.items.map((e) => e.id)))}
                     aria-label="Select all"
                   />
                 </th>
@@ -399,7 +402,7 @@ function EventsList() {
               </>
             }
           >
-            {siteFiltered.map((evt) => {
+            {sitePaged.items.map((evt) => {
               const i = eventInfo(evt.id);
               const s = sales.get(evt.id);
               return (
@@ -441,7 +444,7 @@ function EventsList() {
                     {evt.venue}, {evt.city}
                   </td>
                   <td className={`${tdCls} whitespace-nowrap`}>
-                    <span className="font-bold">{s?.sold || 0}</span>
+                    <SoldLink id={evt.id} sold={s?.sold || 0} />
                     {evt.capacity ? <span className="text-[11px] text-[#8a8a8a]"> / {evt.capacity}</span> : null}
                   </td>
                   <td className={`${tdCls} font-bold whitespace-nowrap`}>{money(s?.revenue || 0)}</td>
@@ -497,7 +500,7 @@ function EventsList() {
               />
             )}
           </DataTable>
-          <TableFooter shown={siteFiltered.length} total={siteEvents.length} noun="events" />
+          <Pagination paged={sitePaged} total={siteEvents.length} noun="events" />
         </div>
       ) : (
         <div className="bg-white border border-[#e4e4e4]">
@@ -528,7 +531,7 @@ function EventsList() {
                 </td>
               </tr>
             )}
-            {wpFiltered.map((evt) => {
+            {wpPaged.items.map((evt) => {
               const i = eventInfo(evt.id);
               const s = sales.get(evt.id);
               const wpId = evt.id.replace(/^wp-/, "");
@@ -552,7 +555,9 @@ function EventsList() {
                       <span className="text-[11px] font-bold">{evt.ticketOptions?.length || 0} packages</span>
                     )}
                   </td>
-                  <td className={`${tdCls} font-bold`}>{s?.sold || 0}</td>
+                  <td className={`${tdCls} whitespace-nowrap`}>
+                    <SoldLink id={evt.id} sold={s?.sold || 0} />
+                  </td>
                   <td className={`${tdCls} font-bold whitespace-nowrap`}>{money(s?.revenue || 0)}</td>
                   <td className={`${tdCls} text-right`}>
                     <div className="flex items-center justify-end">
@@ -577,7 +582,7 @@ function EventsList() {
               <EmptyRow colSpan={7} title={wpEvents.length ? "No events match your search" : "No events from jazbaentertainment.com"} />
             )}
           </DataTable>
-          <TableFooter shown={wpFiltered.length} total={wpEvents.length} noun="events" />
+          <Pagination paged={wpPaged} total={wpEvents.length} noun="events" />
         </div>
       )}
     </div>
@@ -1075,5 +1080,21 @@ function EventEditor({ eventId }: { eventId?: string }) {
         </div>
       </form>
     </div>
+  );
+}
+
+/** Tickets sold — opens the event's package breakdown. */
+function SoldLink({ id, sold }: { id: string; sold: number }) {
+  const { navigate } = useAdmin();
+  if (!sold) return <span className="font-bold">0</span>;
+  return (
+    <button
+      type="button"
+      title="See tickets by package"
+      onClick={() => navigate(`/admin/tickets/by-event?event=${encodeURIComponent(id)}`)}
+      className="font-bold underline decoration-[#cfcfcf] underline-offset-2 hover:decoration-black cursor-pointer"
+    >
+      {sold}
+    </button>
   );
 }

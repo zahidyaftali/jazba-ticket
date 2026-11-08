@@ -6,6 +6,7 @@ import AdminLayout from "./admin/AdminLayout";
 import BookingDrawer from "./admin/BookingDrawer";
 import DashboardPage from "./admin/pages/DashboardPage";
 import { TicketsPage, CheckInPage } from "./admin/pages/TicketsPage";
+import { EventSalesPage } from "./admin/pages/EventSalesPage";
 import IssueTicketPage from "./admin/pages/IssueTicketPage";
 import { OrdersPage, PaymentsPage } from "./admin/pages/SalesPages";
 import { ClientsPage, UsersPage } from "./admin/pages/PeoplePages";
@@ -42,8 +43,10 @@ function AdminShell() {
           </React.Fragment>
         ) : route.sub === "check-in" ? (
           <CheckInPage />
+        ) : route.sub === "by-event" ? (
+          <EventSalesPage />
         ) : (
-          <React.Fragment key={`${route.sub}-${route.query.get("event") || ""}`}>
+          <React.Fragment key={`${route.sub}-${route.query.get("event") || ""}-${route.query.get("package") || ""}`}>
             <TicketsPage view={route.sub === "upcoming" ? "upcoming" : "all"} />
           </React.Fragment>
         );

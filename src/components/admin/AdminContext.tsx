@@ -667,6 +667,11 @@ export function signInMethod(u: UserProfile): "Google" | "Facebook" | null {
   return null;
 }
 
+/** A booking's package id ("vip", "standard-group"…), the key packages are counted by. */
+export function tierKey(b: Booking): string {
+  return b.tier || b.ticketType || "general";
+}
+
 /** Bookings newest first. */
 export function byNewest(a: Booking, b: Booking): number {
   return (b.createdAt || "").localeCompare(a.createdAt || "");

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Send, Printer, Eye, Download, Mail, ScanLine, Loader2, CircleCheck, TriangleAlert, FileDown } from "lucide-react";
 import { Booking, TicketPass, updateTicketStatus } from "../../../services/backendService";
-import { useAdmin, byNewest } from "../AdminContext";
+import { useAdmin, byNewest, tierKey } from "../AdminContext";
 import { CheckInConflict, checkInPeople } from "../../../scanner/checkIn";
 import { useEmailTicket } from "../BookingDrawer";
 import {
@@ -17,7 +17,7 @@ import {
   PAYMENT_STATUS,
   SearchInput,
   StatusBadge,
-  TableFooter,
+  Pagination,
   Toolbar,
   btnOutline,
   btnPrimary,
@@ -28,6 +28,7 @@ import {
   selectCls,
   tdCls,
   thCls,
+  usePaged,
 } from "../ui";
 
 type StatusFilter = "all" | "active" | "completed" | "cancelled";
@@ -40,6 +41,7 @@ export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [source, setSource] = useState<"all" | "online" | "admin">("all");
   const [eventFilter, setEventFilter] = useState(route.query.get("event") || "");
+  const [packageFilter, setPackageFilter] = useState(route.query.get("package") || "");
   const { send, sending, download, downloading } = useEmailTicket();
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [downloadId, setDownloadId] = useState<string | null>(null);
@@ -56,7 +58,24 @@ export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
   }, [data.bookings, eventInfo, customerFor, view]);
 
   const eventsInView = useMemo(() => {
-    const m = new Map<string, { id: string; title: string; ts: number | null; date: string; venue: string; image: string; sold: number; orders: number; checkedIn: number; passes: number; revenue: number }>();
+    const m = new Map<
+      string,
+      {
+        id: string;
+        title: string;
+        ts: number | null;
+        date: string;
+        venue: string;
+        image: string;
+        sold: number;
+        orders: number;
+        checkedIn: number;
+        passes: number;
+        revenue: number;
+        /** Tickets per package, e.g. VIP → 4. */
+        byPackage: Map<string, { name: string; n: number }>;
+      }
+    >();
     for (const r of rows) {
       const cur = m.get(r.b.eventId) || {
         id: r.b.eventId,
@@ -70,9 +89,16 @@ export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
         checkedIn: 0,
         passes: 0,
         revenue: 0,
+        byPackage: new Map(),
       };
       cur.orders += 1;
-      if (r.b.bookingStatus !== "cancelled") cur.sold += Number(r.b.quantity) || 1;
+      if (r.b.bookingStatus !== "cancelled") {
+        const qty = Number(r.b.quantity) || 1;
+        cur.sold += qty;
+        const pk = cur.byPackage.get(tierKey(r.b)) || { name: tierName(r.b), n: 0 };
+        pk.n += qty;
+        cur.byPackage.set(tierKey(r.b), pk);
+      }
       if (r.b.paymentStatus === "paid") cur.revenue += Number(r.b.amount ?? r.b.pricePaid) || 0;
       // Counted in people: a group pass admits several.
       for (const p of passesFor(r.b.id || "")) {
@@ -84,7 +110,7 @@ export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
       m.set(r.b.eventId, cur);
     }
     return [...m.values()].sort((a, b) => (a.ts ?? Infinity) - (b.ts ?? Infinity));
-  }, [rows, passesFor, peopleOnPass]);
+  }, [rows, passesFor, peopleOnPass, tierName]);
 
   const q = query.trim().toLowerCase();
   const filtered = rows.filter(({ b, info, c }) => {
@@ -92,13 +118,29 @@ export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
     if (source === "admin" && b.source !== "admin") return false;
     if (source === "online" && b.source === "admin") return false;
     if (eventFilter && b.eventId !== eventFilter) return false;
+    if (packageFilter && tierKey(b) !== packageFilter) return false;
     if (!q) return true;
     return [b.orderId, b.bookingNumber, b.id, c.name, c.email, c.phone, info.title, tierName(b)]
       .filter(Boolean)
       .some((v) => String(v).toLowerCase().includes(q));
   });
 
+  const paged = usePaged(filtered, [q, status, source, eventFilter, packageFilter]);
+  // Tickets (not orders) in the filtered list; cancelled orders don't count.
+  const ticketsShown = filtered.reduce((n, r) => n + (r.b.bookingStatus === "cancelled" ? 0 : Number(r.b.quantity) || 1), 0);
+
   const count = (s: StatusFilter) => rows.filter((r) => s === "all" || (r.b.bookingStatus || "active") === s).length;
+
+  // Packages on sale in the rows (for the chosen event, when one is picked).
+  const packages = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const r of rows) {
+      if (eventFilter && r.b.eventId !== eventFilter) continue;
+      const k = tierKey(r.b);
+      m.set(k, (m.get(k) || new Set()).add(tierName(r.b)));
+    }
+    return [...m.entries()].map(([id, names]) => ({ id, name: [...names].join(" / ") })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [rows, eventFilter, tierName]);
 
   const quickEmail = async (b: Booking, email: string) => {
     if (!email) {
@@ -204,6 +246,14 @@ export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
                       <p className="text-[10px] text-[#8a8a8a] mt-1">orders</p>
                     </div>
                   </div>
+                  {ev.byPackage.size > 0 && (
+                    <p className="text-[11px] text-[#555] mt-3 leading-snug">
+                      {[...ev.byPackage.values()]
+                        .sort((a, b) => b.n - a.n)
+                        .map((p) => `${p.name} ${p.n}`)
+                        .join(" · ")}
+                    </p>
+                  )}
                 </div>
               </button>
             );
@@ -224,11 +274,27 @@ export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
         />
         <Toolbar>
           <SearchInput value={query} onChange={setQuery} placeholder="Search order, name, email, event…" />
-          <select value={eventFilter} onChange={(e) => setEventFilter(e.target.value)} className={`${selectCls} max-w-[240px]`}>
+          <select
+            value={eventFilter}
+            onChange={(e) => {
+              setEventFilter(e.target.value);
+              setPackageFilter("");
+            }}
+            className={`${selectCls} max-w-[240px]`}
+          >
             <option value="">All events</option>
             {eventsInView.map((ev) => (
               <option key={ev.id} value={ev.id}>
                 {ev.title}
+              </option>
+            ))}
+          </select>
+          <select value={packageFilter} onChange={(e) => setPackageFilter(e.target.value)} className={`${selectCls} max-w-[200px]`}>
+            <option value="">All packages</option>
+            {packageFilter && !packages.some((p) => p.id === packageFilter) && <option value={packageFilter}>{packageFilter}</option>}
+            {packages.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
               </option>
             ))}
           </select>
@@ -237,11 +303,30 @@ export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
             <option value="online">Online checkout</option>
             <option value="admin">Issued in the portal</option>
           </select>
-          {selectedEvent && (
-            <button type="button" onClick={() => setEventFilter("")} className="text-[11px] font-bold underline cursor-pointer">
-              Clear event filter
+          {(selectedEvent || packageFilter) && (
+            <button
+              type="button"
+              onClick={() => {
+                setEventFilter("");
+                setPackageFilter("");
+              }}
+              className="text-[11px] font-bold underline cursor-pointer"
+            >
+              Clear filters
             </button>
           )}
+          {eventFilter && (
+            <button
+              type="button"
+              onClick={() => navigate(`/admin/tickets/by-event?event=${encodeURIComponent(eventFilter)}`)}
+              className="text-[11px] font-bold underline cursor-pointer"
+            >
+              Package breakdown
+            </button>
+          )}
+          <span className="ml-auto text-[11px] font-bold text-[#555] whitespace-nowrap">
+            {ticketsShown} ticket{ticketsShown === 1 ? "" : "s"} in {filtered.length} order{filtered.length === 1 ? "" : "s"}
+          </span>
         </Toolbar>
 
         <DataTable
@@ -257,7 +342,7 @@ export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
             </>
           }
         >
-          {filtered.map(({ b, info, c }) => (
+          {paged.items.map(({ b, info, c }) => (
             <tr key={b.id} className="hover:bg-[#fafafa]">
               <td className={`${tdCls} whitespace-nowrap`}>
                 <button type="button" onClick={() => openBooking(b.id!)} className="text-left cursor-pointer group">
@@ -329,7 +414,7 @@ export function TicketsPage({ view }: { view: "all" | "upcoming" }) {
             />
           )}
         </DataTable>
-        <TableFooter shown={filtered.length} total={rows.length} noun="tickets" />
+        <Pagination paged={paged} total={rows.length} noun="orders" />
       </div>
     </div>
   );
@@ -427,6 +512,7 @@ export function CheckInPage() {
     if (!q) return true;
     return [t.ticketNumber, t.bookingId, info.title, c?.name, c?.email].filter(Boolean).some((v) => String(v).toLowerCase().includes(q));
   });
+  const paged = usePaged(filtered, [q, status, eventFilter]);
   const count = (s: typeof status) => rows.filter((r) => s === "all" || r.t.status === s).length;
 
   const exportCsv = () =>
@@ -593,7 +679,7 @@ export function CheckInPage() {
             </>
           }
         >
-          {filtered.map(({ t, b, info, c }) => (
+          {paged.items.map(({ t, b, info, c }) => (
             <tr key={t.id} className="hover:bg-[#fafafa]">
               <td className={`${tdCls} whitespace-nowrap`}>
                 <span className="font-bold">{t.ticketNumber}</span>
@@ -633,7 +719,7 @@ export function CheckInPage() {
             <EmptyRow colSpan={5} title={rows.length ? "No passes match your filters" : "No tickets issued yet"} />
           )}
         </DataTable>
-        <TableFooter shown={filtered.length} total={rows.length} noun="passes" />
+        <Pagination paged={paged} total={rows.length} noun="passes" />
       </div>
     </div>
   );

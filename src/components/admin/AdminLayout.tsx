@@ -80,6 +80,7 @@ const SUB_TITLES: Record<string, string> = {
   edit: "Edit",
   upcoming: "Upcoming",
   "check-in": "Check-in",
+  "by-event": "By event",
   "tickets/new": "Issue ticket",
   "events/review": "In review",
   view: "Details",
@@ -125,6 +126,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           children: [
             { label: "All tickets", to: "/admin/tickets" },
             { label: "Upcoming", to: "/admin/tickets/upcoming" },
+            { label: "By event", to: "/admin/tickets/by-event" },
             { label: "Issue ticket", to: "/admin/tickets/new" },
             { label: "Check-in", to: "/admin/tickets/check-in" },
           ],

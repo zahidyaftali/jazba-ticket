@@ -14,7 +14,8 @@ import {
   PAYMENT_STATUS,
   SearchInput,
   StatusBadge,
-  TableFooter,
+  Pagination,
+  usePaged,
   Toolbar,
   btnOutline,
   btnPrimary,
@@ -135,6 +136,7 @@ export function ClientsPage() {
   const scoped = tab === "buyers" ? buyers : tab === "guests" ? clients.filter((c) => !c.registered) : clients;
   const q = query.trim().toLowerCase();
   const filtered = scoped.filter((c) => !q || [c.name, c.email, c.phone].some((v) => (v || "").toLowerCase().includes(q)));
+  const paged = usePaged(filtered, [q, tab]);
 
   const exportCsv = () =>
     downloadCsv(`jazba-clients-${new Date().toISOString().slice(0, 10)}.csv`, [
@@ -185,7 +187,7 @@ export function ClientsPage() {
             </>
           }
         >
-          {filtered.map((c) => (
+          {paged.items.map((c) => (
             <tr key={c.key} className="hover:bg-[#fafafa]">
               <td className={tdCls}>
                 <button type="button" onClick={() => setOpen(c)} className="flex items-center gap-3 min-w-[200px] text-left cursor-pointer group">
@@ -233,7 +235,7 @@ export function ClientsPage() {
             />
           )}
         </DataTable>
-        <TableFooter shown={filtered.length} total={scoped.length} noun="clients" />
+        <Pagination paged={paged} total={scoped.length} noun="clients" />
       </div>
       <PersonDrawer client={open} onClose={() => setOpen(null)} />
     </div>
@@ -334,6 +336,7 @@ export function UsersPage() {
     const { email } = userEmail(u);
     return [u.name, email, u.role, ROLE_LABELS[u.role], u.phone, u.city].some((v) => (v || "").toLowerCase().includes(q));
   });
+  const paged = usePaged(filtered, [q, tab]);
   const count = (t: RoleTab) => users.filter((u) => inTab(u, t)).length;
 
   const handleRoleChange = async (uid: string, newRole: string, currentStatus: string) => {
@@ -424,7 +427,7 @@ export function UsersPage() {
             </>
           }
         >
-          {filtered.map((u) => {
+          {paged.items.map((u) => {
             const { email, source } = userEmail(u);
             const methods = signInMethodsFor(u);
             const login = authUserFor(u.uid);
@@ -529,7 +532,7 @@ export function UsersPage() {
           })}
           {filtered.length === 0 && <EmptyRow colSpan={7} title="No users found." />}
         </DataTable>
-        <TableFooter shown={filtered.length} total={users.length} noun="users" />
+        <Pagination paged={paged} total={users.length} noun="users" />
       </div>
       <PersonDrawer client={open} onClose={() => setOpen(null)} />
     </div>

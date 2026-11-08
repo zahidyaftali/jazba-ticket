@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Inbox, Search, X } from "lucide-react";
 
 // ── Admin portal building blocks — flat, square, black / Sunlight-Yellow ──
@@ -469,6 +469,165 @@ export function TableFooter({ shown, total, noun }: { shown: number; total: numb
   return (
     <div className="px-4 py-3 border-t border-[#efefef] text-[11px] font-bold text-[#8a8a8a]">
       {shown === total ? `${total} ${noun}` : `Showing ${shown} of ${total} ${noun}`}
+    </div>
+  );
+}
+
+// ── Paging ─────────────────────────────────────────────────────────────────
+
+/** Rows per page; 0 means every row on one page. */
+export const PAGE_SIZES = [25, 50, 100, 0];
+const PAGE_SIZE_KEY = "jz-admin-page-size";
+
+function readPageSize(): number {
+  try {
+    const saved = localStorage.getItem(PAGE_SIZE_KEY);
+    if (saved !== null && PAGE_SIZES.includes(Number(saved))) return Number(saved);
+  } catch {
+    /* storage unavailable — use the default */
+  }
+  return 25;
+}
+
+export interface Paged<T> {
+  /** The rows on the current page. */
+  items: T[];
+  page: number;
+  pages: number;
+  size: number;
+  /** Index of the first row on this page in the full (filtered) list. */
+  start: number;
+  /** Rows after filtering, across every page. */
+  count: number;
+  setPage: (page: number) => void;
+  setSize: (size: number) => void;
+}
+
+/** Splits a list into pages. The page goes back to 1 whenever one of
+ *  `resetOn` changes (a search, filter or tab), so a new search never lands
+ *  on an empty page 4. */
+export function usePaged<L extends readonly unknown[]>(items: L, resetOn: unknown[] = []): Paged<L[number]> {
+  const key = resetOn.map((v) => String(v ?? "")).join("|");
+  const [size, setSizeState] = useState(readPageSize);
+  const [state, setState] = useState({ page: 1, key });
+  // A filter changed: forget the old page (React's "adjust state while
+  // rendering" pattern), so clearing a search doesn't jump back to page 3.
+  if (state.key !== key) setState({ page: 1, key });
+  const pages = size ? Math.max(1, Math.ceil(items.length / size)) : 1;
+  const page = Math.min(state.key === key ? state.page : 1, pages);
+  const start = size ? (page - 1) * size : 0;
+  return {
+    items: (size ? items.slice(start, start + size) : items.slice()) as L[number][],
+    page,
+    pages,
+    size,
+    start,
+    count: items.length,
+    setPage: (p) => setState({ page: Math.max(1, Math.min(pages, p)), key }),
+    setSize: (s) => {
+      setSizeState(s);
+      setState({ page: 1, key });
+      try {
+        localStorage.setItem(PAGE_SIZE_KEY, String(s));
+      } catch {
+        /* storage unavailable — preference just isn't remembered */
+      }
+    },
+  };
+}
+
+/** Page numbers to show: 1 … 4 5 6 … 20 */
+function pageList(page: number, pages: number): (number | "…")[] {
+  const keep = new Set([1, pages, page - 1, page, page + 1].filter((p) => p >= 1 && p <= pages));
+  if (page <= 3) [2, 3, 4].forEach((p) => p <= pages && keep.add(p));
+  if (page >= pages - 2) [pages - 1, pages - 2, pages - 3].forEach((p) => p >= 1 && keep.add(p));
+  const sorted = [...keep].sort((a, b) => a - b);
+  const out: (number | "…")[] = [];
+  sorted.forEach((p, i) => {
+    if (i > 0 && p - sorted[i - 1] > 1) out.push("…");
+    out.push(p);
+  });
+  return out;
+}
+
+/** Table footer with row count, rows-per-page and page buttons. `total` is
+ *  the list before filters, so "12 of 312" shows when a filter is on. */
+export function Pagination({ paged, total, noun }: { paged: Paged<unknown>; total: number; noun: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { page, pages, size, start, count, items } = paged;
+
+  const go = (p: number) => {
+    paged.setPage(p);
+    // Bring the top of the table back into view (below the sticky top bar).
+    const card = ref.current?.parentElement;
+    if (card) {
+      const top = card.getBoundingClientRect().top;
+      if (top < 64) window.scrollTo({ top: window.scrollY + top - 80 });
+    }
+  };
+
+  const range = count === 0 ? "0" : items.length === count ? `${count}` : `${start + 1}–${start + items.length} of ${count}`;
+  const label = `${items.length === count ? "" : "Showing "}${range} ${noun}${count < total ? ` (filtered from ${total})` : ""}`;
+  const pageBtn = "min-w-[30px] h-[30px] px-2 inline-flex items-center justify-center text-[11px] font-bold border cursor-pointer transition-colors";
+
+  return (
+    <div ref={ref} className="px-4 py-3 border-t border-[#efefef] flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <span className="text-[11px] font-bold text-[#8a8a8a]">{label}</span>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <label className="flex items-center gap-2 text-[11px] font-bold text-[#8a8a8a]">
+          Rows per page
+          <select
+            value={size}
+            onChange={(e) => paged.setSize(Number(e.target.value))}
+            className="bg-white border border-[#d9d9d9] px-2 py-1 text-[11px] font-bold text-black cursor-pointer outline-none focus:border-black"
+          >
+            {PAGE_SIZES.map((s) => (
+              <option key={s} value={s}>
+                {s || "All"}
+              </option>
+            ))}
+          </select>
+        </label>
+        {pages > 1 && (
+          <nav className="flex items-center gap-1" aria-label="Pages">
+            <button
+              type="button"
+              onClick={() => go(page - 1)}
+              disabled={page === 1}
+              className={`${pageBtn} bg-white border-[#d9d9d9] text-black hover:border-black disabled:opacity-35 disabled:cursor-default disabled:hover:border-[#d9d9d9]`}
+              aria-label="Previous page"
+            >
+              ‹
+            </button>
+            {pageList(page, pages).map((p, i) =>
+              p === "…" ? (
+                <span key={`gap-${i}`} className="px-1 text-[11px] font-bold text-[#8a8a8a]">
+                  …
+                </span>
+              ) : (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => go(p)}
+                  aria-current={p === page ? "page" : undefined}
+                  className={`${pageBtn} ${p === page ? "bg-black border-black text-white" : "bg-white border-[#d9d9d9] text-black hover:border-black"}`}
+                >
+                  {p}
+                </button>
+              ),
+            )}
+            <button
+              type="button"
+              onClick={() => go(page + 1)}
+              disabled={page === pages}
+              className={`${pageBtn} bg-white border-[#d9d9d9] text-black hover:border-black disabled:opacity-35 disabled:cursor-default disabled:hover:border-[#d9d9d9]`}
+              aria-label="Next page"
+            >
+              ›
+            </button>
+          </nav>
+        )}
+      </div>
     </div>
   );
 }
