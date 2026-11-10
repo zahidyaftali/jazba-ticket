@@ -107,6 +107,13 @@ function toBase64(blob: Blob): Promise<string> {
   });
 }
 
+/** An admin working inside an organiser's portal sees and adds images in
+ *  that organiser's own folder (set by the organiser portal). */
+let actingForOrganizer = '';
+export function setMediaOrganizer(uid: string): void {
+  actingForOrganizer = uid;
+}
+
 async function callMedia(payload: Record<string, unknown>): Promise<any> {
   const idToken = await auth.currentUser?.getIdToken();
   if (!idToken) throw new Error('Your admin session has expired — please sign in again.');
@@ -115,7 +122,7 @@ async function callMedia(payload: Record<string, unknown>): Promise<any> {
     res = await fetch('/api/admin-media', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken, ...payload }),
+      body: JSON.stringify({ idToken, ...payload, ...(actingForOrganizer ? { organizerId: actingForOrganizer } : {}) }),
     });
   } catch {
     throw new Error('Could not reach the server.');

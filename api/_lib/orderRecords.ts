@@ -53,6 +53,7 @@ export async function saveCardOrder(
     stripeSessionId: session.id,
     stripeTransactionId: typeof pi === 'string' ? pi : pi?.id || '',
     promoApplied: order.promoApplied,
+    promoCode: order.promoApplied ? String(m.promo || '') : '',
     billingName: order.buyerName || 'Guest',
     billingEmail: order.ticketEmail || order.buyerEmail,
     qrCode: id,

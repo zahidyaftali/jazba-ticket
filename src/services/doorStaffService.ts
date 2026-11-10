@@ -34,23 +34,37 @@ export async function createDoorStaff(
 
 /** Every door staff login's events, by uid (doorStaff/<uid>.events). */
 export async function getDoorStaffEvents(): Promise<Map<string, string[]>> {
+  return (await getDoorStaffAccess()).events;
+}
+
+/** Events per login, and which organiser made each login (logins an
+ *  organiser created in their portal carry ownerId). */
+export async function getDoorStaffAccess(): Promise<{ events: Map<string, string[]>; owners: Map<string, string> }> {
   const snap = await getDocs(collection(db, 'doorStaff'));
-  const m = new Map<string, string[]>();
+  const events = new Map<string, string[]>();
+  const owners = new Map<string, string>();
   snap.forEach((d) => {
-    const list = d.data().events;
-    m.set(d.id, Array.isArray(list) ? list.filter((e: unknown): e is string => typeof e === 'string') : []);
+    const data = d.data();
+    const list = data.events;
+    events.set(d.id, Array.isArray(list) ? list.filter((e: unknown): e is string => typeof e === 'string') : []);
+    if (typeof data.ownerId === 'string' && data.ownerId && data.ownerId !== d.id) owners.set(d.id, data.ownerId);
   });
-  return m;
+  return { events, owners };
 }
 
 /** Admin: the events this login may check tickets for (replaces the list). */
 export async function setDoorStaffEvents(uid: string, events: string[]): Promise<void> {
-  await setDoc(doc(db, 'doorStaff', uid), {
-    uid,
-    events: [...new Set(events)].slice(0, 50),
-    updatedAt: new Date().toISOString(),
-    updatedBy: accountEmail(auth.currentUser) || '',
-  });
+  // merge: keeps which organiser made the login (ownerId).
+  await setDoc(
+    doc(db, 'doorStaff', uid),
+    {
+      uid,
+      events: [...new Set(events)].slice(0, 50),
+      updatedAt: new Date().toISOString(),
+      updatedBy: accountEmail(auth.currentUser) || '',
+    },
+    { merge: true },
+  );
 }
 
 export async function setDoorStaffPassword(uid: string, password: string): Promise<void> {

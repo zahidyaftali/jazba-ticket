@@ -5,10 +5,11 @@ import { HttpError, type Account } from './adminAuth.js';
 import type { ServiceAccount } from './firebaseAuthUsers.js';
 import { getDocument, type DocData } from './firestoreAdmin.js';
 import { escapeHtml, isValidEmail, sendEmail, type MailConfig } from './sendEmail.js';
+import { announceToFollowers } from './saleNotices.js';
 
-const ADMIN_INBOX = 'info@jazbatickets.com';
+export const ADMIN_INBOX = 'info@jazbatickets.com';
 // Links in emails always point at the live site, whatever host the request used.
-const SITE = 'https://jazbatickets.com';
+export const SITE = 'https://jazbatickets.com';
 
 // One email per person/action every few minutes, per server instance.
 const recent = new Map<string, number>();
@@ -20,13 +21,13 @@ function throttled(key: string, ms = 5 * 60 * 1000): boolean {
   return false;
 }
 
-function row(label: string, value: unknown): string {
+export function row(label: string, value: unknown): string {
   const v = String(value ?? '').trim();
   if (!v) return '';
   return `<tr><td style="padding:6px 12px 6px 0;color:#666;font-size:13px;white-space:nowrap;vertical-align:top">${escapeHtml(label)}</td><td style="padding:6px 0;font-size:14px;color:#111">${escapeHtml(v).replace(/\n/g, '<br/>')}</td></tr>`;
 }
 
-function layout(title: string, body: string, cta?: { label: string; href: string }): string {
+export function layout(title: string, body: string, cta?: { label: string; href: string }, footer = ''): string {
   return `
     <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">
       <div style="background:#000;color:#ffed00;font-weight:bold;font-size:13px;letter-spacing:2px;padding:12px 16px">JAZBA TICKETS</div>
@@ -35,23 +36,39 @@ function layout(title: string, body: string, cta?: { label: string; href: string
         ${body}
         ${cta ? `<p style="margin:22px 0 4px"><a href="${cta.href}" style="background:#ffed00;color:#000;text-decoration:none;font-weight:bold;font-size:14px;padding:12px 18px;display:inline-block">${escapeHtml(cta.label)}</a></p>` : ''}
       </div>
-      <p style="margin-top:14px;font-size:11px;color:#999">Jazba Tickets · jazbatickets.com</p>
+      <p style="margin-top:14px;font-size:11px;color:#999">${footer ? `${footer}<br/>` : ''}Jazba Tickets · jazbatickets.com</p>
     </div>`;
 }
 
-const para = (text: string) => `<p style="font-size:14px;line-height:1.55;margin:0 0 12px">${escapeHtml(text).replace(/\n/g, '<br/>')}</p>`;
+export const para = (text: string) => `<p style="font-size:14px;line-height:1.55;margin:0 0 12px">${escapeHtml(text).replace(/\n/g, '<br/>')}</p>`;
 
 /** Where to email an organiser: their contact address and their account's. */
-async function organizerRecipients(sa: ServiceAccount | null, org: DocData): Promise<string> {
+export async function organizerRecipients(sa: ServiceAccount | null, org: DocData): Promise<string> {
   const account = org.userId ? await getDocument(sa, `users/${org.userId}`).catch(() => null) : null;
   const list = [org.email, account?.email].map((e) => String(e || '').trim().toLowerCase()).filter((e) => e && isValidEmail(e));
   return [...new Set(list)].join(', ');
 }
 
-function eventDateLine(ev: DocData): string {
+export function eventDateLine(ev: DocData): string {
   return [ev.fullDate || [ev.date, ev.year].filter(Boolean).join(' '), ev.startTime, [ev.venue, ev.city].filter(Boolean).join(', ')]
     .filter(Boolean)
     .join(' · ');
+}
+
+/** "Early bird $10.00 × 50, Standard $15.00" — or the older General/VIP/Elite prices. */
+function ticketTypesLine(ev: DocData): string {
+  const options: any[] = Array.isArray(ev.ticketOptions) ? ev.ticketOptions : [];
+  if (!options.length) {
+    return [ev.tierPrices?.general || ev.price, ev.tierPrices?.vip, ev.tierPrices?.elite].filter(Boolean).join(' / ');
+  }
+  return options
+    .map((o) => {
+      const parts = [`${o.name} $${Number(o.price || 0).toFixed(2)}`];
+      if (o.capacity) parts.push(`× ${o.capacity}`);
+      if (o.salesEnd) parts.push(`(sales end ${String(o.salesEnd).slice(0, 16).replace('T', ' ')} UTC)`);
+      return parts.join(' ');
+    })
+    .join('\n');
 }
 
 export type NotifyAction = 'applied' | 'event-submitted' | 'decision' | 'event-decision';
@@ -70,6 +87,8 @@ export async function sendOrganizerNotice(
     const org = await getDocument(sa, `organizers/${account.uid}`);
     if (!org || org.userId !== account.uid || org.status !== 'pending') throw new HttpError('No pending application found.', 404);
     if (throttled(`applied:${account.uid}`)) return;
+    // The applicant's note is kept privately (organizerPrivate); older profiles had it on the profile.
+    const priv = await getDocument(sa, `organizerPrivate/${account.uid}`).catch(() => null);
     const details = [
       row('Organiser', org.companyName),
       row('Contact name', org.contactName),
@@ -80,7 +99,7 @@ export async function sendOrganizerNotice(
       row('Location', org.location),
       row('Event types', (org.specialties || []).join(', ')),
       row('About', org.description),
-      row('Notes', org.applicationNote),
+      row('Notes', priv?.applicationNote || org.applicationNote),
     ].join('');
     await sendEmail(mail, {
       to: ADMIN_INBOX,
@@ -118,7 +137,7 @@ export async function sendOrganizerNotice(
       row('Event', ev.title),
       row('Organiser', org?.companyName || account.email),
       row('When & where', eventDateLine(ev)),
-      row('Prices (USD)', [ev.tierPrices?.general || ev.price, ev.tierPrices?.vip, ev.tierPrices?.elite].filter(Boolean).join(' / ')),
+      row('Ticket types (USD)', ticketTypesLine(ev)),
       row('Capacity', ev.capacity),
     ].join('');
     await sendEmail(mail, {
@@ -201,6 +220,8 @@ export async function sendOrganizerNotice(
         ),
         replyTo: ADMIN_INBOX,
       });
+      // Followers hear about it once, after the organiser's own email.
+      await announceToFollowers(sa, mail, eventId, ev, org).catch((err) => console.error('Follower announcement failed:', err?.message || err));
     } else {
       await sendEmail(mail, {
         to,

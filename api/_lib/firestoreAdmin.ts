@@ -67,6 +67,81 @@ export async function createDocuments(sa: ServiceAccount | null, writes: CreateW
   throw new HttpError('Could not save the order to the database.', 502);
 }
 
+/** Set some fields of a document, leaving the others as they are. Creates
+ *  the document unless `mustExist` (then a missing one throws 'missing'). */
+export async function patchDocument(
+  sa: ServiceAccount | null,
+  path: string,
+  fields: Record<string, unknown>,
+  opts: { mustExist?: boolean } = {},
+): Promise<void> {
+  const { docs, auth } = await endpoint(sa);
+  const params = new URLSearchParams();
+  for (const k of Object.keys(fields)) params.append('updateMask.fieldPaths', k);
+  if (opts.mustExist) params.set('currentDocument.exists', 'true');
+  const res = await fetch(`${docs}/${path.split('/').map(encodeURIComponent).join('/')}?${params.toString()}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: auth },
+    body: JSON.stringify({ fields: toFirestoreFields(fields) }),
+  });
+  if (res.ok) return;
+  const data: any = await res.json().catch(() => ({}));
+  if (opts.mustExist && (res.status === 404 || data?.error?.status === 'NOT_FOUND')) throw new HttpError('missing', 404);
+  console.error('Firestore patch failed:', res.status, path, data?.error?.message);
+  throw new HttpError('Could not update the database.', 502);
+}
+
+/** Add `by` to a number field of an existing document (atomic). A missing
+ *  document is left missing. */
+export async function incrementField(sa: ServiceAccount | null, path: string, field: string, by = 1): Promise<boolean> {
+  const { docs, auth } = await endpoint(sa);
+  const base = docs.replace(/^https?:\/\/[^/]+\/v1\//, '');
+  const res = await fetch(`${docs}:commit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: auth },
+    body: JSON.stringify({
+      writes: [
+        {
+          transform: { document: `${base}/${path}`, fieldTransforms: [{ fieldPath: field, increment: { integerValue: String(by) } }] },
+          currentDocument: { exists: true },
+        },
+      ],
+    }),
+  });
+  return res.ok;
+}
+
+/** Several writes all at once: creates (must not exist), sets (replace or
+ *  create) and deletes. */
+export async function commitWrites(
+  sa: ServiceAccount | null,
+  writes: Array<{ create?: CreateWrite; set?: CreateWrite; remove?: string }>,
+): Promise<void> {
+  if (!writes.length) return;
+  const { docs, auth } = await endpoint(sa);
+  const base = docs.replace(/^https?:\/\/[^/]+\/v1\//, '');
+  for (let i = 0; i < writes.length; i += 450) {
+    const res = await fetch(`${docs}:commit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: auth },
+      body: JSON.stringify({
+        writes: writes.slice(i, i + 450).map((w) =>
+          w.remove
+            ? { delete: `${base}/${w.remove}` }
+            : w.create
+              ? { update: { name: `${base}/${w.create.path}`, fields: toFirestoreFields(w.create.data) }, currentDocument: { exists: false } }
+              : { update: { name: `${base}/${w.set!.path}`, fields: toFirestoreFields(w.set!.data) } },
+        ),
+      }),
+    });
+    if (!res.ok) {
+      const data: any = await res.json().catch(() => ({}));
+      console.error('Firestore commit failed:', res.status, data?.error?.status, data?.error?.message);
+      throw new HttpError(data?.error?.status === 'ALREADY_EXISTS' ? 'exists' : 'Could not save to the database.', data?.error?.status === 'ALREADY_EXISTS' ? 409 : 502);
+    }
+  }
+}
+
 /** A Firestore REST value back to plain JS. */
 export function fromFirestoreValue(v: any): any {
   if (!v || typeof v !== 'object') return undefined;

@@ -30,6 +30,7 @@ import {
   inputCls,
   labelCls,
   money,
+  fmtDateTime,
   selectCls,
   tdCls,
   thCls,
@@ -1050,6 +1051,35 @@ function EventEditor({ eventId }: { eventId?: string }) {
             </Field>
           </EditorPanel>
 
+          {Array.isArray((editing as any)?.ticketOptions) && (editing as any).ticketOptions.length > 0 ? (
+          <EditorPanel title="Ticket types" sub="This event has its own ticket types, set in the organiser portal — that’s what buyers see.">
+            <ul className="divide-y divide-[#f2f2f2] border border-[#e4e4e4]">
+              {(editing as any).ticketOptions.map((o: any) => (
+                <li key={o.id} className="px-3 py-2.5 text-sm flex items-start justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="font-bold block">{o.name}</span>
+                    <span className="text-[11px] text-[#8a8a8a]">
+                      {[o.capacity ? `${o.capacity} for sale` : "", o.salesEnd ? `sales end ${fmtDateTime(o.salesEnd)}` : "", o.groupSize > 1 ? `${o.groupSize} people` : ""]
+                        .filter(Boolean)
+                        .join(" · ") || "No limit"}
+                    </span>
+                  </span>
+                  <span className="font-bold shrink-0">{money(Number(o.price) || 0)}</span>
+                </li>
+              ))}
+            </ul>
+            {(editing as any).organizerId && (
+              <a
+                href={`/organizer?as=${encodeURIComponent((editing as any).organizerId)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-bold underline"
+              >
+                Change ticket types in the organiser’s portal
+              </a>
+            )}
+          </EditorPanel>
+          ) : (
           <EditorPanel title="Ticket packages" sub="Leave VIP / Elite empty to hide that package on the event page and checkout.">
             <Field label="General price (USD)">
               <input type="number" className={inputCls} value={eventForm.price} onChange={(e) => set("price", Number(e.target.value))} />
@@ -1063,6 +1093,7 @@ function EventEditor({ eventId }: { eventId?: string }) {
               </Field>
             </div>
           </EditorPanel>
+          )}
 
           <EditorPanel title="Event highlights" sub="Shown as ticks under the description — one per line. Leave empty to hide.">
             <textarea

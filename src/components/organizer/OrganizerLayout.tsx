@@ -1,7 +1,14 @@
 import React, { useState } from "react";
 import {
+  BellRing,
   Building2,
   CalendarDays,
+  Contact,
+  Eye,
+  Images,
+  ScanLine,
+  Tag,
+  TicketPlus,
   CircleCheck,
   CircleX,
   ExternalLink,
@@ -19,18 +26,26 @@ import {
 import brandMark from "../../../assets/images/Favicon.png";
 import { Avatar, overline } from "../admin/ui";
 import { useOrg } from "./OrganizerContext";
+import { stopActing } from "./acting";
 
 const TITLES: Record<string, string> = {
   dashboard: "Dashboard",
   events: "Events",
   orders: "Orders & attendees",
+  customers: "Customers",
+  issue: "Issue tickets",
+  codes: "Discount codes",
+  waitlist: "Waitlist",
+  "door-staff": "Door staff & scanning",
+  media: "Media",
   payouts: "Payouts",
   profile: "Organiser profile",
   account: "Account",
 };
 
 export default function OrganizerLayout({ children }: { children: React.ReactNode }) {
-  const { route, navigate, org, me, user, onLogout, toasts, dismissToast, reload, reportLoading, eventsLoading, events } = useOrg();
+  const { route, navigate, org, me, user, onLogout, toasts, dismissToast, reload, reportLoading, eventsLoading, events, actingAsAdmin, report } = useOrg();
+  const waiting = (report?.waitlist || []).filter((w) => w.status !== "notified").length;
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const inReview = events.filter((e) => e.status === "pending").length;
@@ -48,6 +63,12 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
       ],
     },
     { id: "orders", label: "Orders & attendees", icon: ShoppingBag, to: "/organizer/orders" },
+    { id: "customers", label: "Customers", icon: Contact, to: "/organizer/customers" },
+    { id: "issue", label: "Issue tickets", icon: TicketPlus, to: "/organizer/issue" },
+    { id: "codes", label: "Discount codes", icon: Tag, to: "/organizer/codes" },
+    { id: "waitlist", label: "Waitlist", icon: BellRing, to: "/organizer/waitlist", count: waiting },
+    { id: "door-staff", label: "Door staff & scanning", icon: ScanLine, to: "/organizer/door-staff" },
+    { id: "media", label: "Media", icon: Images, to: "/organizer/media" },
     { id: "payouts", label: "Payouts", icon: Wallet, to: "/organizer/payouts" },
     { id: "profile", label: "Organiser profile", icon: Building2, to: "/organizer/profile" },
     { id: "account", label: "Account", icon: UserCog, to: "/organizer/account" },
@@ -159,6 +180,23 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
       )}
 
       <div className="flex-1 min-w-0 flex flex-col">
+        {actingAsAdmin && (
+          <div className="bg-[#ffed00] text-black px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs font-bold">
+            <span className="flex items-center gap-2">
+              <Eye className="w-4 h-4 shrink-0" /> You’re in {org.companyName}’s portal as an admin. Changes you make are saved to their account.
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                stopActing();
+                window.location.href = `/admin/organizers/view/${encodeURIComponent(org.id || "")}`;
+              }}
+              className="bg-black text-[#ffed00] px-3 py-1.5 cursor-pointer hover:bg-neutral-800"
+            >
+              Back to admin
+            </button>
+          </div>
+        )}
         <header className="sticky top-0 z-30 bg-white border-b border-[#e4e4e4] h-16 flex items-center gap-3 px-4 sm:px-6">
           <button
             type="button"

@@ -9,9 +9,21 @@ import OrgEventEditor from "./pages/OrgEventEditor";
 import OrgOrdersPage from "./pages/OrgOrdersPage";
 import { OrgAccountPage, OrgProfilePage } from "./pages/OrgProfilePages";
 import OrgPayoutsPage from "./pages/OrgPayoutsPage";
+import OrgCustomersPage from "./pages/OrgCustomersPage";
+import OrgIssuePage from "./pages/OrgIssuePage";
+import OrgPromoCodesPage from "./pages/OrgPromoCodesPage";
+import OrgWaitlistPage from "./pages/OrgWaitlistPage";
+import OrgDoorStaffPage from "./pages/OrgDoorStaffPage";
+import OrgMediaPage from "./pages/OrgMediaPage";
 
-/** The portal for an approved organiser. */
-export default function OrganizerApp(props: { user: User; me: UserProfile | null; org: OrganizerProfile; onLogout: () => void }) {
+/** The portal for an approved organiser (or an admin acting for one). */
+export default function OrganizerApp(props: {
+  user: User;
+  me: UserProfile | null;
+  org: OrganizerProfile;
+  onLogout: () => void;
+  actingAsAdmin?: boolean;
+}) {
   return (
     <OrganizerProvider {...props}>
       <OrganizerLayout>
@@ -42,6 +54,18 @@ function Page() {
       return <OrgEventsList />;
     case "orders":
       return <OrgOrdersPage />;
+    case "customers":
+      return <OrgCustomersPage />;
+    case "issue":
+      return <OrgIssuePage />;
+    case "codes":
+      return <OrgPromoCodesPage />;
+    case "waitlist":
+      return <OrgWaitlistPage />;
+    case "door-staff":
+      return <OrgDoorStaffPage />;
+    case "media":
+      return <OrgMediaPage />;
     case "payouts":
       return <OrgPayoutsPage />;
     case "profile":

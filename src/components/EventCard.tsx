@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { MapPin, Clock, Heart, ArrowRight } from 'lucide-react';
+import React from 'react';
+import { MapPin, Clock, Heart, ArrowRight, Ticket } from 'lucide-react';
 import { EventItem, eventFromPrice } from '../types';
 import { SaleTag } from './SaleBadge';
 import { useLocalCurrency } from '../currency';
+import { useSavedEvents } from '../savedEvents';
 
 interface EventCardProps {
   key?: string;
@@ -12,7 +13,8 @@ interface EventCardProps {
 }
 
 export default function EventCard({ event, onBook, onViewDetail }: EventCardProps) {
-  const [isLiked, setIsLiked] = useState(false);
+  const { isSaved, toggleSaved } = useSavedEvents();
+  const isLiked = isSaved(event.id);
   const { formatFrom } = useLocalCurrency();
 
   // Determine badge background colors based on parameters or static values
@@ -59,9 +61,10 @@ export default function EventCard({ event, onBook, onViewDetail }: EventCardProp
 
         {/* FAVORITE HEART WITH REAL INTERACTIVE STATE */}
         <button 
-          onClick={(e) => { e.stopPropagation(); setIsLiked(!isLiked); }}
+          onClick={(e) => { e.stopPropagation(); toggleSaved(event.id); }}
           className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-white/95 hover:bg-white flex items-center justify-center   shadow-md transition-transform duration-200 hover:scale-110 active:scale-95 cursor-pointer"
-          title="Add to wishlist"
+          title={isLiked ? 'Saved — tap to remove' : 'Save event'}
+          aria-pressed={isLiked}
           id={`btn-like-${event.id}`}
         >
           <Heart 
@@ -103,11 +106,12 @@ export default function EventCard({ event, onBook, onViewDetail }: EventCardProp
           </div>
           <button 
             onClick={(e) => { e.stopPropagation(); onBook(event); }}
-            className="flex items-center gap-1.5 bg-neutral-900 hover:bg-neutral-800 text-white px-4.5 py-2.5 rounded-full shadow-sm text-xs font-bold tracking-wide transition-all active:scale-95 cursor-pointer"
+            className="jz-cta flex items-center gap-1.5 bg-neutral-900 hover:bg-neutral-800 text-white px-4 py-2.5 rounded-full text-xs font-bold tracking-wide transition-all active:scale-95 cursor-pointer"
             id={`btn-book-${event.id}`}
           >
-            Buy Ticket
-            <ArrowRight className="w-3 h-3 text-[#E34718]" />
+            <Ticket className="w-3.5 h-3.5 text-[#ffed00] jz-cta-icon" />
+            Get tickets
+            <ArrowRight className="w-3 h-3 text-[#E34718] jz-cta-arrow" />
           </button>
         </div>
       </div>

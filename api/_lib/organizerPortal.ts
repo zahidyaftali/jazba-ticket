@@ -4,6 +4,7 @@
 // them exactly their own events' sales and attendee list, nothing else.
 import type { ServiceAccount } from './firebaseAuthUsers.js';
 import { getDocument, queryDocuments, type DocData } from './firestoreAdmin.js';
+import { buildAvailability, type EventAvailability } from './availability.js';
 
 export interface OrganizerTierStats {
   name: string;
@@ -24,7 +25,24 @@ export interface OrganizerEventStats {
   orders: number;
   passes: number;
   checkedIn: number;
+  /** Free tickets (guest list / complimentary) among ticketsSold. */
+  complimentary: number;
   tiers: OrganizerTierStats[];
+  /** Tickets left per ticket type, sales-end status — same as the checkout. */
+  availability: EventAvailability;
+  waitlist: number;
+}
+
+export interface OrganizerWaitlistEntry {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  name: string;
+  email: string;
+  tier: string;
+  createdAt: string;
+  status: string;
+  notifiedAt: string;
 }
 
 export interface OrganizerOrder {
@@ -40,13 +58,19 @@ export interface OrganizerOrder {
   amountLocal: number;
   createdAt: string;
   status: 'paid' | 'pending' | 'failed' | 'cancelled';
-  source: 'online' | 'admin';
+  source: 'online' | 'admin' | 'organizer';
+  complimentary: boolean;
+  phone: string;
+  promoCode: string;
+  emailedTo: string;
+  tier: string;
 }
 
 export interface OrganizerReport {
   organizerId: string;
   events: OrganizerEventStats[];
   orders: OrganizerOrder[];
+  waitlist: OrganizerWaitlistEntry[];
   totals: { revenueUsd: number; ticketsSold: number; orders: number; checkedIn: number; followers: number; liveEvents: number };
   generatedAt: string;
 }
@@ -65,13 +89,14 @@ function eventDate(e: DocData): string {
 export async function organizerReport(sa: ServiceAccount | null, organizerUid: string): Promise<OrganizerReport> {
   const events = await queryDocuments(sa, 'events', [{ field: 'organizerId', op: 'EQUAL', value: organizerUid }]);
   const ids = events.map((e) => e.id);
-  const [bookings, tickets, follows] = await Promise.all([
+  const [bookings, tickets, follows, waitlistDocs] = await Promise.all([
     queryDocuments(sa, 'bookings', [{ field: 'eventId', op: 'IN', value: ids }]),
     queryDocuments(sa, 'tickets', [{ field: 'eventId', op: 'IN', value: ids }]),
     queryDocuments(sa, 'follows', [
       { field: 'targetType', op: 'EQUAL', value: 'organizer' },
       { field: 'targetId', op: 'EQUAL', value: organizerUid },
     ]),
+    queryDocuments(sa, 'waitlist', [{ field: 'eventId', op: 'IN', value: ids }]).catch(() => [] as DocData[]),
   ]);
 
   // Orders saved without a billing name/email (older or admin-issued ones):
@@ -102,7 +127,12 @@ export async function organizerReport(sa: ServiceAccount | null, organizerUid: s
         amountLocal: Number(b.amountLocal) || 0,
         createdAt: String(b.createdAt || b.bookingDate || ''),
         status: orderStatus(b),
-        source: b.source === 'admin' ? ('admin' as const) : ('online' as const),
+        source: b.source === 'admin' ? ('admin' as const) : b.source === 'organizer' ? ('organizer' as const) : ('online' as const),
+        complimentary: b.paymentMethod === 'complimentary',
+        phone: String(b.billingPhone || ''),
+        promoCode: b.promoApplied ? String(b.promoCode || 'Yes') : '',
+        emailedTo: String(b.emailedTo || ''),
+        tier: String(b.tier || b.ticketType || 'general'),
       };
     })
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -117,6 +147,7 @@ export async function organizerReport(sa: ServiceAccount | null, organizerUid: s
       tiers.set(o.tierName, t);
     }
     const passes = tickets.filter((t) => t.eventId === e.id && t.status !== 'cancelled');
+    const eventBookings = bookings.filter((b) => b.eventId === e.id);
     return {
       id: e.id,
       title: String(e.title || 'Untitled event'),
@@ -130,7 +161,10 @@ export async function organizerReport(sa: ServiceAccount | null, organizerUid: s
       orders: sold.length,
       passes: passes.length,
       checkedIn: passes.filter((t) => t.status === 'scanned').length,
+      complimentary: sold.filter((o) => o.complimentary).reduce((s, o) => s + o.quantity, 0),
       tiers: [...tiers.values()],
+      availability: buildAvailability(e, eventBookings),
+      waitlist: waitlistDocs.filter((w) => w.eventId === e.id && w.status !== 'notified').length,
     };
   });
 
@@ -138,6 +172,19 @@ export async function organizerReport(sa: ServiceAccount | null, organizerUid: s
     organizerId: organizerUid,
     events: stats,
     orders: orders.slice(0, 2000),
+    waitlist: waitlistDocs
+      .map((w) => ({
+        id: w.id,
+        eventId: String(w.eventId || ''),
+        eventTitle: titleOf.get(String(w.eventId)) || '',
+        name: String(w.name || ''),
+        email: String(w.email || ''),
+        tier: String(w.tier || ''),
+        createdAt: String(w.createdAt || ''),
+        status: String(w.status || 'waiting'),
+        notifiedAt: String(w.notifiedAt || ''),
+      }))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     totals: {
       revenueUsd: stats.reduce((s, e) => s + e.revenueUsd, 0),
       ticketsSold: stats.reduce((s, e) => s + e.ticketsSold, 0),

@@ -12,10 +12,17 @@ import {
   MapPin,
   Check,
   ArrowRight,
+  Ticket,
 } from 'lucide-react';
 import { EventItem, CategoryItem, isPastEvent, eventFromPrice } from '../types';
 import { SaleTag } from './SaleBadge';
-import { useLocalCurrency } from '../currency';
+import { Region, currencySymbolFor, localAmount, useLocalCurrency } from '../currency';
+import { useSavedEvents } from '../savedEvents';
+import {
+  DATE_FILTERS, DateFilterId, dateFilterFromOffset, dateWindow, eventCities, eventInWindow, eventSortTime,
+} from '../eventDates';
+import { GlowField } from './Decor';
+import { categoryLabel } from '../data';
 
 interface EventsExplorerPageProps {
   events: EventItem[];
@@ -25,6 +32,7 @@ interface EventsExplorerPageProps {
   onBackToHome: () => void;
   initialCategory?: string;
   initialSearchTerm?: string;
+  initialCity?: string;
   initialVenue?: string;
   initialTicketClass?: string;
   initialDateOffset?: number | null;
@@ -33,18 +41,32 @@ interface EventsExplorerPageProps {
 const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
 
 const SORT_LABELS = {
-  sooner: 'Latest added',
+  date: 'Date: soonest first',
   'price-low': 'Price: low to high',
   'price-high': 'Price: high to low',
   title: 'Name: A–Z',
 } as const;
 
-const PRICE_TIERS = [
-  { id: 'all', label: 'Any price' },
-  { id: 'under-50', label: 'Under $50' },
-  { id: '50-100', label: '$50–$100' },
-  { id: 'over-100', label: '$100+' },
-] as const;
+type PriceTier = 'all' | 'low' | 'mid' | 'high';
+
+// Price bands in the buyer's own currency, on each event's lowest ticket price.
+const PRICE_BANDS: Record<Region, [number, number]> = {
+  UK: [25, 75],
+  US: [30, 100],
+  PK: [5000, 15000],
+};
+
+function priceTiers(region: Region): Array<{ id: PriceTier; label: string }> {
+  const [a, b] = PRICE_BANDS[region];
+  const sym = currencySymbolFor(region);
+  const n = (v: number) => `${sym}${v.toLocaleString()}`;
+  return [
+    { id: 'all', label: 'Any price' },
+    { id: 'low', label: `Under ${n(a)}` },
+    { id: 'mid', label: `${n(a)}–${n(b)}` },
+    { id: 'high', label: `${n(b)}+` },
+  ];
+}
 
 export default function EventsExplorerPage({
   events,
@@ -54,11 +76,12 @@ export default function EventsExplorerPage({
   onBackToHome,
   initialCategory = 'all',
   initialSearchTerm = '',
+  initialCity = '',
   initialVenue = '',
   initialTicketClass = '',
   initialDateOffset = null,
 }: EventsExplorerPageProps) {
-  const { formatFrom } = useLocalCurrency();
+  const { formatFrom, region } = useLocalCurrency();
 
   // Search
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
@@ -72,30 +95,23 @@ export default function EventsExplorerPage({
     if (initialVenue === 'club') return 'music';
     return 'all';
   });
-  const [selectedCity, setSelectedCity] = useState<string>('all');
-  const [priceTier, setPriceTier] = useState<'all' | 'under-50' | '50-100' | 'over-100'>(() => {
-    if (initialTicketClass === 'vip') return 'over-100';
-    if (initialTicketClass === 'gold') return '50-100';
-    if (initialTicketClass === 'standard' || initialTicketClass === 'early') return 'under-50';
+  const [selectedCity, setSelectedCity] = useState<string>(initialCity || 'all');
+  const [priceTier, setPriceTier] = useState<PriceTier>(() => {
+    if (initialTicketClass === 'vip') return 'high';
+    if (initialTicketClass === 'gold') return 'mid';
+    if (initialTicketClass === 'standard' || initialTicketClass === 'early') return 'low';
     return 'all';
   });
-  const [dateOffset, setDateOffset] = useState<number | null>(initialDateOffset);
+  const [dateFilter, setDateFilter] = useState<DateFilterId | null>(() => dateFilterFromOffset(initialDateOffset));
   const [showOnlyFeatured, setShowOnlyFeatured] = useState(false);
   const [isSidebarOpenMobile, setIsSidebarOpenMobile] = useState(false);
 
-  // Likes (persisted locally)
-  const [likedEventIds, setLikedEventIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('jazba_liked_events');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  // Saved events — the same list as the hearts everywhere else
+  const { savedIds: likedEventIds, toggleSaved } = useSavedEvents();
   const [showOnlyLiked, setShowOnlyLiked] = useState(false);
 
   // Sort, view, pagination
-  const [sortOption, setSortOption] = useState<keyof typeof SORT_LABELS>('sooner');
+  const [sortOption, setSortOption] = useState<keyof typeof SORT_LABELS>('date');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   // Upcoming vs. past split — an event moves to "Past" the day after it happens
   const [timeFilter, setTimeFilter] = useState<'upcoming' | 'past'>('upcoming');
@@ -105,74 +121,80 @@ export default function EventsExplorerPage({
 
   const handleToggleLike = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const updated = likedEventIds.includes(id)
-      ? likedEventIds.filter((item) => item !== id)
-      : [...likedEventIds, id];
-    setLikedEventIds(updated);
-    try {
-      localStorage.setItem('jazba_liked_events', JSON.stringify(updated));
-    } catch (err) {
-      console.warn('Could not persist likes to localStorage:', err);
-    }
+    toggleSaved(id);
   };
 
-  // Unique cities from event locations
+  // Events in the chosen tab (upcoming or past) — counts and cities follow it.
+  const tabEvents = useMemo(
+    () => events.filter((e) => (timeFilter === 'past') === isPastEvent(e)),
+    [events, timeFilter],
+  );
+
+  // Cities from the real event locations, busiest first
   const availableCities = useMemo(() => {
-    const list = new Set<string>();
-    events.forEach((e) => {
-      if (e.location.toLowerCase().includes('london')) list.add('London');
-      else if (e.location.toLowerCase().includes('hamilton')) list.add('Hamilton');
-      else {
-        const parts = e.location.split('–');
-        if (parts.length > 1) list.add(parts[1].trim());
-        else list.add('London');
-      }
-    });
-    return ['all', ...Array.from(list)];
-  }, [events]);
+    const counts = new Map<string, number>();
+    tabEvents.forEach((e) => eventCities(e).forEach((c) => counts.set(c, (counts.get(c) || 0) + 1)));
+    const list = Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([city]) => city);
+    if (selectedCity !== 'all' && !list.includes(selectedCity)) list.unshift(selectedCity);
+    return ['all', ...list];
+  }, [tabEvents, selectedCity]);
 
   // Live counts per category
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: events.length };
+    const counts: Record<string, number> = { all: tabEvents.length };
     categories.forEach((cat) => {
-      if (cat.id !== 'all') counts[cat.id] = events.filter((e) => e.category === cat.id).length;
+      if (cat.id !== 'all') counts[cat.id] = tabEvents.filter((e) => e.category === cat.id).length;
     });
     return counts;
-  }, [events, categories]);
+  }, [tabEvents, categories]);
+
+  const tiers = useMemo(() => priceTiers(region), [region]);
 
   // Filtering + sorting
   const filteredEvents = useMemo(() => {
-    let result = events.filter((e) => (timeFilter === 'past') === isPastEvent(e));
+    let result = tabEvents.slice();
 
     if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
+      const term = searchTerm.trim().toLowerCase();
       result = result.filter((e) =>
-        e.title.toLowerCase().includes(term) ||
-        e.location.toLowerCase().includes(term) ||
-        e.category.toLowerCase().includes(term)
+        [
+          e.title, e.location, e.category, e.organizerName,
+          ...(e.lineup || []).map((a) => a.name),
+          ...(e.shows || []).map((sh) => sh.name),
+        ].some((field) => (field || '').toLowerCase().includes(term))
       );
     }
     if (selectedCategory !== 'all') result = result.filter((e) => e.category === selectedCategory);
-    if (selectedCity !== 'all') result = result.filter((e) => e.location.toLowerCase().includes(selectedCity.toLowerCase()));
-    if (priceTier === 'under-50') result = result.filter((e) => e.price < 50);
-    else if (priceTier === '50-100') result = result.filter((e) => e.price >= 50 && e.price <= 100);
-    else if (priceTier === 'over-100') result = result.filter((e) => e.price > 100);
+    if (selectedCity !== 'all') result = result.filter((e) => eventCities(e).includes(selectedCity));
+    if (priceTier !== 'all') {
+      const [a, b] = PRICE_BANDS[region];
+      result = result.filter((e) => {
+        const from = eventFromPrice(e);
+        if (!(from > 0)) return false; // price not announced yet
+        const local = localAmount(from, region);
+        return priceTier === 'low' ? local < a : priceTier === 'mid' ? local >= a && local <= b : local > b;
+      });
+    }
     if (showOnlyFeatured) result = result.filter((e) => e.featured || e.type === 'top');
     if (showOnlyLiked) result = result.filter((e) => likedEventIds.includes(e.id));
-
-    if (dateOffset !== null) {
-      if (dateOffset === 0) result = result.filter((evt) => evt.date.includes('18'));
-      else if (dateOffset === 1) result = result.filter((evt) => evt.date.includes('19'));
-      else if (dateOffset === 3) result = result.filter((evt) => evt.date.includes('20') || evt.date.includes('21'));
+    if (dateFilter && timeFilter === 'upcoming') {
+      const win = dateWindow(dateFilter);
+      result = result.filter((e) => eventInWindow(e, win));
     }
 
-    if (sortOption === 'sooner') result.sort((a, b) => b.id.localeCompare(a.id));
-    else if (sortOption === 'price-low') result.sort((a, b) => a.price - b.price);
-    else if (sortOption === 'price-high') result.sort((a, b) => b.price - a.price);
+    // Price sorts put "price TBA" last.
+    const price = (e: EventItem) => eventFromPrice(e) || Number.MAX_SAFE_INTEGER;
+    if (sortOption === 'date') {
+      // Upcoming: soonest first. Past: most recent first.
+      result.sort((a, b) => (timeFilter === 'past' ? -1 : 1) * (eventSortTime(a) - eventSortTime(b)));
+    } else if (sortOption === 'price-low') result.sort((a, b) => price(a) - price(b));
+    else if (sortOption === 'price-high') result.sort((a, b) => (eventFromPrice(b) || 0) - (eventFromPrice(a) || 0));
     else if (sortOption === 'title') result.sort((a, b) => a.title.localeCompare(b.title));
 
     return result;
-  }, [events, timeFilter, searchTerm, selectedCategory, selectedCity, priceTier, showOnlyFeatured, showOnlyLiked, likedEventIds, sortOption, dateOffset]);
+  }, [tabEvents, timeFilter, searchTerm, selectedCategory, selectedCity, priceTier, region, showOnlyFeatured, showOnlyLiked, likedEventIds, sortOption, dateFilter]);
 
   const displayedEvents = useMemo(() => filteredEvents.slice(0, visibleCount), [filteredEvents, visibleCount]);
 
@@ -181,12 +203,22 @@ export default function EventsExplorerPage({
     setSelectedCategory('all');
     setSelectedCity('all');
     setPriceTier('all');
-    setDateOffset(null);
+    setDateFilter(null);
     setShowOnlyFeatured(false);
     setShowOnlyLiked(false);
-    setSortOption('sooner');
+    setSortOption('date');
     setVisibleCount(9);
   };
+
+  // Chips for the filters in use, each with its own remove button
+  const activeChips: Array<{ key: string; label: string; clear: () => void }> = [];
+  if (searchTerm.trim()) activeChips.push({ key: 'q', label: `"${searchTerm.trim()}"`, clear: () => setSearchTerm('') });
+  if (dateFilter && timeFilter === 'upcoming') activeChips.push({ key: 'date', label: DATE_FILTERS.find((d) => d.id === dateFilter)?.label || '', clear: () => setDateFilter(null) });
+  if (selectedCategory !== 'all') activeChips.push({ key: 'cat', label: categories.find((c) => c.id === selectedCategory)?.name || selectedCategory, clear: () => setSelectedCategory('all') });
+  if (selectedCity !== 'all') activeChips.push({ key: 'city', label: selectedCity, clear: () => setSelectedCity('all') });
+  if (priceTier !== 'all') activeChips.push({ key: 'price', label: tiers.find((t) => t.id === priceTier)?.label || '', clear: () => setPriceTier('all') });
+  if (showOnlyLiked) activeChips.push({ key: 'saved', label: 'Saved', clear: () => setShowOnlyLiked(false) });
+  if (showOnlyFeatured) activeChips.push({ key: 'featured', label: 'Featured', clear: () => setShowOnlyFeatured(false) });
 
   const resetPage = () => setVisibleCount(9);
 
@@ -226,6 +258,30 @@ export default function EventsExplorerPage({
           {showOnlyLiked && <Check className="w-4 h-4" />}
         </button>
       </div>
+
+      {/* When */}
+      {timeFilter === 'upcoming' && (
+      <div>
+        <span className={`${overline} text-[#666] border-b border-black pb-3 block`}>When</span>
+        <div className="border-b border-[#f2f2f2]">
+          {[{ id: null, label: 'Any date' } as const, ...DATE_FILTERS].map((d) => {
+            const active = dateFilter === d.id;
+            return (
+              <button
+                key={d.id || 'any'}
+                onClick={() => { setDateFilter(d.id); resetPage(); }}
+                className={`w-full flex items-center justify-between py-3.5 border-b border-[#f2f2f2] last:border-b-0 text-sm cursor-pointer text-left transition-colors ${
+                  active ? 'font-bold text-black' : 'text-[#666] hover:text-black'
+                }`}
+              >
+                <span>{d.label}</span>
+                {active && <Check className="w-4 h-4" />}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      )}
 
       {/* Categories */}
       <div>
@@ -277,7 +333,7 @@ export default function EventsExplorerPage({
       <div>
         <span className={`${overline} text-[#666] border-b border-black pb-3 block`}>Price</span>
         <div className="border-b border-[#f2f2f2]">
-          {PRICE_TIERS.map((tier) => {
+          {tiers.map((tier) => {
             const active = priceTier === tier.id;
             return (
               <button
@@ -318,33 +374,30 @@ export default function EventsExplorerPage({
   return (
     <div className="jz-page bg-white min-h-screen text-black pb-24" id="events-explorer-page">
 
-      {/* ── HERO — black storytelling band ────────────────────── */}
-      <section className="bg-black text-white relative overflow-hidden" id="explorer-hero">
-        <div className="absolute inset-0">
-          <img
-            src="https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?q=80&w=1600&auto=crop&fit=crop"
-            alt="Live concert crowd"
-            className="w-full h-full object-cover opacity-30"
-            referrerPolicy="no-referrer"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/30" />
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-20 sm:py-28 relative z-10">
-          <div className="inline-flex items-center gap-2 text-[11px] font-bold tracking-wide text-white/60 bg-white/5 backdrop-blur-md px-3.5 py-1.5">
-            <span onClick={onBackToHome} className="hover:text-white cursor-pointer transition-colors">Home</span>
+      {/* ── HEADER — short and light, so the shows start sooner ── */}
+      <section className="relative overflow-hidden bg-[#fbfbf7] border-b border-[#f2f2f2]" id="explorer-hero">
+        <GlowField tone="light" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 pt-8 pb-9 sm:pt-12 sm:pb-12 jz-above">
+          <nav className="flex items-center gap-2 text-xs font-bold text-[#8a8a8a]" aria-label="Breadcrumb">
+            <span onClick={onBackToHome} className="hover:text-black cursor-pointer transition-colors">Home</span>
             <span>/</span>
-            <span className="text-white">Events</span>
+            <span className="text-black">Events</span>
+          </nav>
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mt-4">
+            <div className="max-w-2xl jz-rise">
+              <h1 className="font-display font-bold text-4xl sm:text-5xl leading-[0.95] tracking-tight">What’s on</h1>
+              <p className="text-[#555] text-base mt-3 leading-relaxed">
+                {upcomingCount > 0
+                  ? `${upcomingCount} upcoming ${upcomingCount === 1 ? 'show' : 'shows'} across the UK, Pakistan and beyond. Search by artist, city or date.`
+                  : 'New shows are added every week. Have a look at past events, or check back soon.'}
+              </p>
+            </div>
+            <ul className="flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold text-[#444] jz-rise" style={{ animationDelay: '150ms' }}>
+              <li className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" /> No booking fees</li>
+              <li className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" /> Secure card payment</li>
+              <li className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" /> E-tickets straight away</li>
+            </ul>
           </div>
-
-          <h1 className="font-display font-bold text-4xl sm:text-5xl md:text-[56px] leading-[0.95] tracking-tight mt-5 max-w-3xl">
-            Every night out,<br />
-            <span className="text-[#ffed00]">one place to book it.</span>
-          </h1>
-
-          <p className="text-white/70 text-base sm:text-lg mt-6 max-w-2xl leading-relaxed">
-            Concerts, theatre, comedy, sport and festivals — real tickets at real prices, with refund protection on every order.
-          </p>
         </div>
       </section>
 
@@ -357,7 +410,7 @@ export default function EventsExplorerPage({
               type="text"
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); resetPage(); }}
-              placeholder="Search events, venues, cities…"
+              placeholder="Search events, artists, venues, cities…"
               className="w-full bg-white pl-7 pr-8 py-2.5 text-sm text-black placeholder-[#8a8a8a]"
             />
             {searchTerm && (
@@ -457,6 +510,26 @@ export default function EventsExplorerPage({
               </span>
             </div>
 
+            {activeChips.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 -mt-2 mb-6">
+                {activeChips.map((chip) => (
+                  <button
+                    key={chip.key}
+                    onClick={() => { chip.clear(); resetPage(); }}
+                    className="inline-flex items-center gap-1.5 bg-black text-white text-xs font-bold px-3 py-2 cursor-pointer hover:bg-neutral-800 transition-colors"
+                    aria-label={`Remove filter ${chip.label}`}
+                  >
+                    {chip.label} <X className="w-3.5 h-3.5" />
+                  </button>
+                ))}
+                {activeChips.length > 1 && (
+                  <button onClick={handleClearFilters} className="text-xs font-bold underline cursor-pointer px-1">
+                    Clear all
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Empty state */}
             {filteredEvents.length === 0 && (
               <div className="border border-[#e4e4e4] py-20 text-center">
@@ -507,7 +580,7 @@ export default function EventsExplorerPage({
                       {/* Copy stacked beneath */}
                       <div className="p-5 flex-1 flex flex-col">
                         <span className={`${overline} text-[#8a8a8a]`}>
-                          {evt.category} · {evt.fullDate || evt.date}
+                          {categoryLabel(evt.category)} · {evt.fullDate || evt.date}
                         </span>
                         <h3 className="font-display font-bold text-xl leading-[0.95] mt-2 line-clamp-2 group-hover:underline">
                           {evt.title}
@@ -528,10 +601,11 @@ export default function EventsExplorerPage({
                             <span className="font-display font-bold text-lg">{formatFrom(eventFromPrice(evt))}</span>
                           </div>
                           <button
-                            onClick={(e) => { e.stopPropagation(); onBook(evt); }}
-                            className="bg-black text-white px-5 py-3 text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors"
+                            onClick={(e) => { e.stopPropagation(); timeFilter === 'past' ? onViewDetail(evt) : onBook(evt); }}
+                            className={`${timeFilter === 'past' ? '' : 'jz-cta'} bg-black text-white px-5 py-3 text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors flex items-center gap-2`}
                           >
-                            Buy tickets
+                            {timeFilter !== 'past' && <Ticket className="w-4 h-4 text-[#ffed00] jz-cta-icon" />}
+                            {timeFilter === 'past' ? 'View event' : 'Get tickets'}
                           </button>
                         </div>
                       </div>
@@ -572,7 +646,7 @@ export default function EventsExplorerPage({
 
                       <div className="flex-1 min-w-0">
                         <span className={`${overline} text-[#8a8a8a]`}>
-                          {evt.category} · {evt.fullDate || evt.date} · {evt.time}
+                          {categoryLabel(evt.category)} · {evt.fullDate || evt.date} · {evt.time}
                         </span>
                         <h3 className="font-display font-bold text-xl leading-[0.95] mt-1.5 truncate group-hover:underline">
                           {evt.title}
@@ -590,10 +664,11 @@ export default function EventsExplorerPage({
                         <div className="flex items-center gap-2">
                           {likeButton(evt)}
                           <button
-                            onClick={(e) => { e.stopPropagation(); onBook(evt); }}
-                            className="bg-black text-white px-5 py-3 text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors"
+                            onClick={(e) => { e.stopPropagation(); timeFilter === 'past' ? onViewDetail(evt) : onBook(evt); }}
+                            className={`${timeFilter === 'past' ? '' : 'jz-cta'} bg-black text-white px-5 py-3 text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors flex items-center gap-2`}
                           >
-                            Buy tickets
+                            {timeFilter !== 'past' && <Ticket className="w-4 h-4 text-[#ffed00] jz-cta-icon" />}
+                            {timeFilter === 'past' ? 'View event' : 'Get tickets'}
                           </button>
                         </div>
                       </div>

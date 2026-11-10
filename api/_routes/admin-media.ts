@@ -15,7 +15,9 @@ export default async function handler(req: any, res: any) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
     const caller = await verifyAccount(typeof body.idToken === 'string' ? body.idToken : '');
     if (!caller.isAdmin && !caller.isOrganizer) throw new HttpError('Only admins and approved organisers can upload images.', 403);
-    const owner = caller.isAdmin ? undefined : caller.uid;
+    // An admin inside an organiser's portal works in that organiser's folder.
+    const actingFor = caller.isAdmin && typeof body.organizerId === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(body.organizerId) ? body.organizerId : '';
+    const owner = caller.isAdmin ? actingFor || undefined : caller.uid;
     if (!mediaConfigured(process.env)) {
       res.status(200).json({ configured: false, items: [] });
       return;

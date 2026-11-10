@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Calendar, MapPin, Clock, Ticket, Check,
   Share2, ShieldCheck, Heart, Plus, Minus, ChevronDown, ChevronUp, Image as ImageIcon, X, ArrowRight, ExternalLink,
@@ -11,10 +11,19 @@ import {
 } from '../types';
 import { SaleBanner, SaleTag } from './SaleBadge';
 import { motion, AnimatePresence } from 'motion/react';
-import { auth } from '../firebase';
-import { getOrganizerProfile, followTarget, unfollowTarget, isFollowingTarget, getFollowerCount, OrganizerProfile } from '../services/backendService';
+import type { OrganizerProfile } from '../services/backendService';
+import { resolveEventOrganizer } from '../organizerLookup';
+import { useFollow } from '../useFollow';
 import { shareOrCopy } from '../share';
 import { useLocalCurrency } from '../currency';
+import { useSavedEvents } from '../savedEvents';
+import { eventCities, eventSortTime, eventTimeZone } from '../eventDates';
+import { AddToCalendar, DirectionsLink } from './AddToCalendar';
+import WaitlistForm from './WaitlistForm';
+import { salesEndLabel, tierState, useAvailability } from '../useAvailability';
+import { checkPromoCode } from '../services/organizerToolsService';
+import { GlowField } from './Decor';
+import { categoryLabel } from '../data';
 
 interface EventDetailPageProps {
   event: EventItem;
@@ -35,7 +44,8 @@ export default function EventDetailPage({
   onSelectRelatedEvent,
   onRequireLogin,
 }: EventDetailPageProps) {
-  const [isLiked, setIsLiked] = useState(false);
+  const { isSaved, toggleSaved } = useSavedEvents();
+  const isLiked = isSaved(event.id);
   const [shareCopied, setShareCopied] = useState(false);
   const { format, formatFrom } = useLocalCurrency();
   const formatPrecise = (usd: number) => format(usd, { precise: true });
@@ -47,79 +57,29 @@ export default function EventDetailPage({
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromo, setAppliedPromo] = useState(''); // '' when none
   const [promoError, setPromoError] = useState('');
+  const [promoChecking, setPromoChecking] = useState(false);
 
   // Agenda accordion
   const [selectedAgendaId, setSelectedAgendaId] = useState<number | null>(0);
 
-  // Organizer — real profile + follow state from Firestore
+  // Organiser — their public profile (found by account or by name) and Follow
   const [organizerProfile, setOrganizerProfile] = useState<OrganizerProfile | null>(null);
-  const [isFollowingOrganizer, setIsFollowingOrganizer] = useState(false);
-  const [organizerFollowers, setOrganizerFollowers] = useState(0);
-  const [organizerFollowBusy, setOrganizerFollowBusy] = useState(false);
-
   const organizerUserId = (event as any).organizerId as string | undefined;
-  const organizerTargetId = organizerProfile?.id || organizerUserId || '';
-  // Their public page — only for a live (approved) organiser profile.
-  const organizerPageId =
-    organizerProfile?.id && (!organizerProfile.status || organizerProfile.status === 'approved') ? organizerProfile.id : '';
-
   useEffect(() => {
     let cancelled = false;
-    if (!organizerUserId) {
-      setOrganizerProfile(null);
-      return;
-    }
-    getOrganizerProfile(organizerUserId).then((profile) => {
+    setOrganizerProfile(null);
+    resolveEventOrganizer(event).then((profile) => {
       if (!cancelled) setOrganizerProfile(profile);
     });
     return () => { cancelled = true; };
-  }, [organizerUserId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!organizerTargetId) {
-      setOrganizerFollowers(0);
-      setIsFollowingOrganizer(false);
-      return;
-    }
-    getFollowerCount('organizer', organizerTargetId).then((count) => {
-      if (!cancelled) setOrganizerFollowers(count);
-    });
-    const user = auth.currentUser;
-    if (user) {
-      isFollowingTarget(user.uid, 'organizer', organizerTargetId).then((following) => {
-        if (!cancelled) setIsFollowingOrganizer(following);
-      });
-    } else {
-      setIsFollowingOrganizer(false);
-    }
-    return () => { cancelled = true; };
-  }, [organizerTargetId]);
-
-  const handleToggleFollowOrganizer = async () => {
-    const user = auth.currentUser;
-    if (!user) {
-      onRequireLogin();
-      return;
-    }
-    if (!organizerTargetId || organizerFollowBusy) return;
-    setOrganizerFollowBusy(true);
-    try {
-      if (isFollowingOrganizer) {
-        await unfollowTarget(user.uid, 'organizer', organizerTargetId);
-        setIsFollowingOrganizer(false);
-        setOrganizerFollowers((prev) => Math.max(0, prev - 1));
-      } else {
-        await followTarget(user.uid, 'organizer', organizerTargetId);
-        setIsFollowingOrganizer(true);
-        setOrganizerFollowers((prev) => prev + 1);
-      }
-    } catch (err) {
-      console.error('Error updating organizer follow state', err);
-    } finally {
-      setOrganizerFollowBusy(false);
-    }
-  };
+  }, [event.id, organizerUserId, event.organizerName]);
+  const organizerTargetId = organizerProfile?.id || '';
+  const organizerPageId = organizerTargetId;
+  const organizerFollow = useFollow('organizer', organizerTargetId, onRequireLogin);
+  const isFollowingOrganizer = organizerFollow.following;
+  const organizerFollowers = organizerFollow.count;
+  const organizerFollowBusy = organizerFollow.busy;
+  const handleToggleFollowOrganizer = organizerFollow.toggle;
 
   // Gallery zoom + FAQ accordion
   const [zoomImage, setZoomImage] = useState<string | null>(null);
@@ -138,7 +98,18 @@ export default function EventDetailPage({
   // Pricing — only the packages this event offers are shown. Totals use the
   // same maths as the checkout and the payment server.
   const availableTiers = getAvailableTiers(event);
-  const selectedTier = availableTiers.find((t) => t.tier === ticketTier) || availableTiers[0];
+  // Tickets left / sales ended per type (site events; the server re-checks).
+  const avail = useAvailability(event);
+  const stateOf = (t: (typeof availableTiers)[number]) => tierState(t, avail);
+  const openTiers = availableTiers.filter((t) => stateOf(t).open);
+  const allClosed = availableTiers.length > 0 && openTiers.length === 0;
+  const chosen = availableTiers.find((t) => t.tier === ticketTier);
+  const selectedTier = chosen && stateOf(chosen).open ? chosen : openTiers[0] || availableTiers[0];
+  const selectedState = selectedTier ? stateOf(selectedTier) : null;
+  const maxQty = Math.max(1, Math.min(10, selectedState?.left ?? 10));
+  useEffect(() => {
+    if (quantity > maxQty) setQuantity(maxQty);
+  }, [maxQty, quantity]);
   // A code can be accepted yet give no discount on the chosen package; the
   // note then names the packages it does cover.
   // A running sale and a promo code don't add up: the bigger one applies.
@@ -150,14 +121,24 @@ export default function EventDetailPage({
   const promoNote = promoPackagesNote(appliedPromo, event, selectedTier?.tier ?? '') || (codeAccepted ? discount.note : '');
   const totals = computeOrderTotals(selectedTier?.price ?? 0, quantity, discountRate);
 
-  const handleApplyPromo = (e: React.FormEvent) => {
+  const handleApplyPromo = async (e: React.FormEvent) => {
     e.preventDefault();
     const clean = promoCode.trim().toUpperCase();
+    if (!clean) return;
     if (findPromo(clean, event.id)) {
       setAppliedPromo(clean);
       setPromoError('');
+      return;
+    }
+    // An organiser's own code: the server checks it, then it works here.
+    setPromoChecking(true);
+    const check = await checkPromoCode(clean, event.id);
+    setPromoChecking(false);
+    if (check.ok === true) {
+      setAppliedPromo(clean);
+      setPromoError('');
     } else {
-      setPromoError('That code isn\'t valid.');
+      setPromoError((check as { reason: string }).reason || 'That code isn\'t valid.');
       setAppliedPromo('');
     }
   };
@@ -219,18 +200,43 @@ export default function EventDetailPage({
       }
     : null;
 
-  // Upcoming shows first, so the suggestions are things you can still book.
-  const otherEvents = allEvents.filter((evt) => evt.id !== event.id);
-  const relatedEvents = [
-    ...otherEvents.filter((evt) => !isPastEvent(evt)),
-    ...otherEvents.filter((evt) => isPastEvent(evt)),
-  ].slice(0, 3);
+  // Suggestions are shows you can still book: same organiser, city and
+  // category first, then the soonest.
+  const sameOrganizer = (evt: EventItem) =>
+    (!!organizerUserId && (evt as any).organizerId === organizerUserId) ||
+    (!!event.organizerName && evt.organizerName === event.organizerName);
+  const cities = eventCities(event);
+  const relatedEvents = allEvents
+    .filter((evt) => evt.id !== event.id && !isPastEvent(evt))
+    .map((evt) => ({
+      evt,
+      score:
+        (sameOrganizer(evt) ? 1 : 0) +
+        (eventCities(evt).some((c) => cities.includes(c)) ? 2 : 0) +
+        (eventTimeZone(evt) && eventTimeZone(evt) === eventTimeZone(event) ? 1 : 0) +
+        (evt.category === event.category ? 1 : 0),
+    }))
+    .sort((a, b) => b.score - a.score || eventSortTime(a.evt) - eventSortTime(b.evt))
+    .slice(0, 3)
+    .map((r) => r.evt);
+  const organizerUpcoming = allEvents.filter((evt) => evt.id !== event.id && !isPastEvent(evt) && sameOrganizer(evt)).length;
 
-  // Stock tags for the default packages only — events with their own ticket
-  // options (e.g. from jazbaentertainment.com) show just what the organiser wrote.
-  const tierTags: Record<string, string> = event.ticketOptions?.length
-    ? {}
-    : { general: 'Available', vip: 'Popular', elite: 'Few left' };
+  // Phones: a bar with the price and "Get tickets" until the ticket box is on screen.
+  const ticketsRef = useRef<HTMLDivElement | null>(null);
+  const [ticketsInView, setTicketsInView] = useState(false);
+  const onSale = !eventEnded && ((availableTiers.length > 0 && !allClosed) || !!event.externalTicketUrl);
+  useEffect(() => {
+    const el = ticketsRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([entry]) => setTicketsInView(entry.isIntersecting), { threshold: 0.15 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [event.id, onSale]);
+  const scrollToTickets = () => {
+    const el = ticketsRef.current;
+    if (!el) return;
+    window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 76, behavior: 'smooth' });
+  };
 
   // Tours and partner-sold events list each date/city with its prices.
   const shows = event.shows?.length ? event.shows : [];
@@ -374,9 +380,10 @@ export default function EventDetailPage({
           </button>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setIsLiked(!isLiked)}
+              onClick={() => toggleSaved(event.id)}
               className="w-10 h-10 border border-[#e4e4e4] hover:border-black flex items-center justify-center transition-colors cursor-pointer"
-              title="Save event"
+              title={isLiked ? 'Saved — tap to remove' : 'Save event'}
+              aria-pressed={isLiked}
             >
               <Heart className={`w-4 h-4 ${isLiked ? 'fill-black text-black' : 'text-black'}`} />
             </button>
@@ -397,8 +404,9 @@ export default function EventDetailPage({
       </div>
 
       {/* ── HERO — black band, full-bleed photo ───────────────── */}
-      <section className="bg-black text-white relative overflow-hidden">
-        <div className="absolute inset-0">
+      {/* Not overflow-hidden: the "Add to calendar" menu opens past the band. */}
+      <section className="bg-black text-white relative">
+        <div className="absolute inset-0 overflow-hidden">
           <img
             src={event.image}
             alt={event.title}
@@ -407,10 +415,11 @@ export default function EventDetailPage({
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/20" />
         </div>
+        <GlowField tone="dark" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-20 sm:py-28 relative z-10">
           <span className={`${overline} bg-[#ffed00] text-black px-3 py-1.5 inline-block`}>
-            {event.category}
+            {categoryLabel(event.category)}
           </span>
           <h1 className="font-display font-bold text-4xl sm:text-5xl md:text-[56px] leading-[0.95] tracking-tight mt-5 max-w-3xl">
             {event.title}
@@ -426,6 +435,13 @@ export default function EventDetailPage({
             <span className="flex items-center gap-2"><Clock className="w-4 h-4 text-[#ffed00]" />{event.time}</span>
             <span className="flex items-center gap-2"><MapPin className="w-4 h-4 text-[#ffed00]" />{event.location}</span>
           </div>
+
+          {!eventEnded && (
+            <div className="flex flex-wrap gap-3 mt-6">
+              <AddToCalendar event={event} variant="dark" />
+              <DirectionsLink event={event} variant="dark" />
+            </div>
+          )}
         </div>
       </section>
 
@@ -614,7 +630,10 @@ export default function EventDetailPage({
                         </span>
                       </h4>
                       <div className="flex items-center gap-5 mt-1.5 text-sm text-[#666]">
-                        <span>{organizerFollowers.toLocaleString()} followers</span>
+                        {organizerTargetId && organizerFollowers !== null && (
+                          <span>{organizerFollowers.toLocaleString()} follower{organizerFollowers === 1 ? '' : 's'}</span>
+                        )}
+                        {organizerUpcoming > 0 && <span>{organizerUpcoming} more upcoming</span>}
                         {organizerPageId && (
                           <Link
                             to={`/organizers/${encodeURIComponent(organizerPageId)}`}
@@ -721,7 +740,7 @@ export default function EventDetailPage({
           </div>
 
           {/* RIGHT — sticky booking rail (or "event ended" notice) */}
-          <div className="lg:col-span-5 lg:sticky lg:top-20 lg:self-start">
+          <div ref={ticketsRef} id="tickets" className="lg:col-span-5 lg:sticky lg:top-20 lg:self-start">
             {eventEnded ? (
             <div className="border border-black p-8">
               <span className={`${overline} bg-black text-white px-3 py-1.5 inline-block`}>Past event</span>
@@ -735,6 +754,19 @@ export default function EventDetailPage({
               >
                 Browse upcoming events
               </button>
+            </div>
+            ) : allClosed ? (
+            <div className="border border-black p-6 sm:p-8">
+              <span className={`${overline} bg-black text-[#ffed00] px-3 py-1.5 inline-block`}>
+                {availableTiers.every((t) => stateOf(t).ended) ? 'Sales ended' : 'Sold out'}
+              </span>
+              <h3 className="font-display font-bold text-2xl leading-[0.95] mt-4">
+                {availableTiers.every((t) => stateOf(t).ended) ? 'Ticket sales have closed' : 'This event is sold out'}
+              </h3>
+              <p className="text-sm text-[#666] leading-relaxed mt-3 mb-6">
+                Tickets are sometimes released later. Join the waitlist and you’ll be among the first to hear.
+              </p>
+              <WaitlistForm eventId={event.id} eventTitle={event.title} compact />
             </div>
             ) : availableTiers.length === 0 ? (
             <div className="border border-black p-8">
@@ -780,11 +812,18 @@ export default function EventDetailPage({
               <div className="px-6 border-b border-[#f2f2f2]">
                 {availableTiers.map((option) => {
                   const { tier, name, price, groupSize } = option;
+                  const st = stateOf(option);
+                  const label = st.ended ? 'Sales ended' : st.soldOut ? 'Sold out' : st.left !== null && st.left <= 10 ? `Only ${st.left} left` : '';
+                  const endsSoon = !st.ended && option.salesEnd ? salesEndLabel(option.salesEnd) : '';
                   return (
                   <button
                     key={tier}
-                    onClick={() => setTicketTier(tier)}
-                    className="w-full flex items-center justify-between py-4 border-b border-[#f2f2f2] last:border-b-0 cursor-pointer text-left group"
+                    onClick={() => st.open && setTicketTier(tier)}
+                    disabled={!st.open}
+                    aria-disabled={!st.open}
+                    className={`w-full flex items-center justify-between py-4 border-b border-[#f2f2f2] last:border-b-0 text-left group ${
+                      st.open ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+                    }`}
                   >
                     <div className="flex items-center gap-3.5 min-w-0">
                       <span
@@ -797,12 +836,15 @@ export default function EventDetailPage({
                       <div className="min-w-0">
                         <span className="font-bold text-sm block">{name}</span>
                         {!!groupSize && <span className="text-xs text-[#666] block">Number of people: {groupSize}</span>}
+                        {endsSoon && <span className="text-xs text-[#666] block">{endsSoon}</span>}
                       </div>
                     </div>
                     <div className="text-right shrink-0 pl-3">
                       {discount.sale && <span className="text-xs text-[#8a8a8a] line-through block">{formatPrecise(price)}</span>}
                       <span className="font-display font-bold text-base block">{formatPrecise(salePrice(event.id, option))}</span>
-                      {tierTags[tier] && <span className={`${overline} text-[#8a8a8a]`}>{tierTags[tier]}</span>}
+                      {label && (
+                        <span className={`${overline} block mt-0.5 ${st.open ? 'text-[#b45309]' : 'text-[#8a8a8a]'}`}>{label}</span>
+                      )}
                     </div>
                   </button>
                   );
@@ -824,7 +866,7 @@ export default function EventDetailPage({
                   </button>
                   <span className="font-display font-bold text-xl min-w-[24px] text-center">{quantity}</span>
                   <button
-                    disabled={quantity >= 10}
+                    disabled={quantity >= maxQty}
                     onClick={() => setQuantity((prev) => prev + 1)}
                     className="w-10 h-10 border border-black flex items-center justify-center cursor-pointer hover:bg-[#f7f7f7] disabled:opacity-30 disabled:hover:bg-white transition-colors"
                   >
@@ -847,10 +889,10 @@ export default function EventDetailPage({
                   />
                   <button
                     type="submit"
-                    disabled={codeAccepted || !promoCode}
+                    disabled={codeAccepted || !promoCode || promoChecking}
                     className="bg-black text-white text-sm font-bold px-5 cursor-pointer hover:bg-neutral-800 disabled:opacity-30 transition-colors"
                   >
-                    {codeAccepted ? 'Applied' : 'Apply'}
+                    {codeAccepted ? 'Applied' : promoChecking ? 'Checking…' : 'Apply'}
                   </button>
                 </div>
                 {promoApplied && (
@@ -883,10 +925,10 @@ export default function EventDetailPage({
 
                 <button
                   onClick={() => selectedTier && onBook(event, quantity, selectedTier.tier)}
-                  className="w-full bg-[#ffed00] text-black py-4 mt-6 font-bold text-sm cursor-pointer hover:bg-[#e6d200] transition-colors flex items-center justify-center gap-2"
+                  className="jz-cta jz-cta-pulse w-full bg-[#ffed00] text-black py-4 mt-6 font-bold text-sm cursor-pointer hover:bg-[#e6d200] transition-colors flex items-center justify-center gap-2"
                   id="btn-confirm-reserve"
                 >
-                  <Ticket className="w-4 h-4" /> Get tickets
+                  <Ticket className="w-4 h-4 jz-cta-icon" /> Get tickets <ArrowRight className="w-4 h-4 jz-cta-arrow" />
                 </button>
 
                 <p className="text-xs text-[#8a8a8a] text-center mt-4 flex items-center justify-center gap-1.5">
@@ -899,6 +941,7 @@ export default function EventDetailPage({
         </div>
 
         {/* ── RELATED EVENTS ─────────────────────────────────── */}
+        {relatedEvents.length > 0 && (
         <div className="border-t border-black mt-20 pt-14">
           <div className="flex items-end justify-between mb-10">
             <div>
@@ -929,7 +972,7 @@ export default function EventDetailPage({
                   />
                 </div>
                 <div className="pt-4">
-                  <span className={`${overline} text-[#8a8a8a]`}>{evt.category} · {evt.date}</span>
+                  <span className={`${overline} text-[#8a8a8a]`}>{categoryLabel(evt.category)} · {evt.date}</span>
                   <h4 className="font-display font-bold text-lg leading-tight mt-1.5 group-hover:underline">
                     {evt.title}
                   </h4>
@@ -946,7 +989,32 @@ export default function EventDetailPage({
             ))}
           </div>
         </div>
+        )}
       </div>
+
+      {/* ── PHONE TICKET BAR ──────────────────────────────────── */}
+      {onSale && !ticketsInView && (
+        <div
+          className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-black px-4 pt-3 flex items-center justify-between gap-4"
+          style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
+        >
+          <div className="min-w-0">
+            <span className={`${overline} text-[#666] flex items-center gap-1.5`}>
+              {availableTiers.length > 0 ? 'Tickets from' : 'Partner tickets'} <SaleTag eventId={event.id} />
+            </span>
+            <span className="font-display font-bold text-lg leading-tight block truncate">
+              {availableTiers.length > 0 ? formatFrom(eventFromPrice(event)) : externalHost || 'Book online'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={scrollToTickets}
+            className="jz-cta shrink-0 bg-[#ffed00] text-black px-6 py-3.5 font-bold text-sm cursor-pointer hover:bg-[#e6d200] transition-colors flex items-center gap-2"
+          >
+            <Ticket className="w-4 h-4 jz-cta-icon" /> Get tickets
+          </button>
+        </div>
+      )}
 
       {/* ── GALLERY ZOOM MODAL ────────────────────────────────── */}
       <AnimatePresence>

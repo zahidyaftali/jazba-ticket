@@ -1,9 +1,7 @@
 import { sendEmail, escapeHtml, type MailConfig, EMAIL_RE } from './sendEmail.js';
 import {
   PaymentError,
-  computeTotalUsd,
-  fetchEventPricing,
-  orderDiscountRate,
+  priceOrder,
   toChargeAmount,
   verifyFirebaseUser,
 } from './stripePayment.js';
@@ -79,16 +77,12 @@ export async function submitEasypaisaOrder(
   if (!idToken) throw new PaymentError('You must be signed in to buy tickets. Please log in and try again.', 401);
 
   const user = await verifyFirebaseUser(idToken);
-  const event = await fetchEventPricing(eventId, idToken);
-
-  const selected = Object.prototype.hasOwnProperty.call(event.tiers, tier) ? event.tiers[tier] : undefined;
-  if (!selected) throw new PaymentError('That ticket package is not available for this event.');
-
   // A transfer made just before a sale ends can be submitted a little after,
   // so the sale price still counts for an hour past the deadline.
-  const discount = orderDiscountRate(promoCode, eventId, tier, selected, Date.now() - SALE_GRACE_MS);
+  const { event, selected, discount, amountUsd } = await priceOrder({
+    eventId, tier, quantity, promoCode, idToken, now: Date.now() - SALE_GRACE_MS,
+  });
   const promoApplied = discount.code !== '';
-  const amountUsd = computeTotalUsd(selected.price, quantity, discount.rate);
   if (amountUsd <= 0 || amountUsd > 10000) throw new PaymentError('Invalid payment amount.');
   // Same rupee figure the checkout shows and a PKR Stripe charge would take.
   const amountPkr = toChargeAmount(amountUsd, 'PKR') / 100;

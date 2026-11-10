@@ -15,6 +15,9 @@ import {
   EASYPAISA_ACCOUNT, EASYPAISA_ACCOUNT_DISPLAY, PreparedScreenshot,
   prepareScreenshot, submitEasypaisaOrder,
 } from '../services/easypaisaService';
+import { GlowField } from './Decor';
+import { tierState, useAvailability } from '../useAvailability';
+import { checkPromoCode } from '../services/organizerToolsService';
 
 interface CheckoutPageProps {
   event: EventItem;
@@ -81,6 +84,21 @@ export default function CheckoutPage({
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromo, setAppliedPromo] = useState('');
   const [promoError, setPromoError] = useState('');
+  const [promoChecking, setPromoChecking] = useState(false);
+
+  // Tickets left per type (site events). The payment server checks again.
+  const avail = useAvailability(event);
+  const currentTier = availableTiers.find((t) => t.tier === ticketTier);
+  const currentState = currentTier ? tierState(currentTier, avail) : null;
+  const maxQty = Math.max(1, Math.min(10, currentState?.left ?? 10));
+  useEffect(() => {
+    if (ticketCount > maxQty) setTicketCount(maxQty);
+    // A type that sold out or closed while the page was open: pick another.
+    if (currentTier && currentState && !currentState.open) {
+      const next = availableTiers.find((t) => tierState(t, avail).open);
+      if (next && next.tier !== ticketTier) setTicketTier(next.tier);
+    }
+  }, [maxQty, ticketCount, currentTier, currentState, avail, availableTiers, ticketTier]);
 
   // Region is resolved from the visitor's IP — the checkout adapts automatically.
   const [paymentRegion, setPaymentRegion] = useState<Region>('US');
@@ -133,13 +151,23 @@ export default function CheckoutPage({
   // rest of the site, so card prices and checkout totals always match.
   const formatMoney = (usdAmount: number) => formatLocalMoney(usdAmount, paymentRegion, { precise: true });
 
-  const handleApplyPromo = () => {
+  const handleApplyPromo = async () => {
     const clean = promoCode.trim().toUpperCase();
+    if (!clean) return;
     if (findPromo(clean, event.id)) {
       setAppliedPromo(clean);
       setPromoError('');
+      return;
+    }
+    // An organiser's own code: checked by the server first.
+    setPromoChecking(true);
+    const check = await checkPromoCode(clean, event.id);
+    setPromoChecking(false);
+    if (check.ok === true) {
+      setAppliedPromo(clean);
+      setPromoError('');
     } else {
-      setPromoError('That code isn\'t valid.');
+      setPromoError((check as { reason: string }).reason || 'That code isn\'t valid.');
       setAppliedPromo('');
     }
   };
@@ -611,7 +639,9 @@ export default function CheckoutPage({
 
           {/* RIGHT — order summary rail */}
           <div className="lg:col-span-5 lg:sticky lg:top-20 lg:self-start">
-            <div className="border border-black">
+            <div className="relative">
+            <GlowField tone="light" className="-inset-6" />
+            <div className="border border-black jz-above bg-white/75 backdrop-blur-xl">
 
               <SaleBanner eventId={event.id} />
 
@@ -643,12 +673,15 @@ export default function CheckoutPage({
                 <span className={`${overline} text-[#666] block mb-1`}>Ticket type</span>
                 {availableTiers.map((option) => {
                   const { tier, name, price, groupSize } = option;
+                  const st = tierState(option, avail);
+                  const label = st.ended ? 'Sales ended' : st.soldOut ? 'Sold out' : st.left !== null && st.left <= 10 ? `Only ${st.left} left` : '';
                   return (
                   <button
                     key={tier}
                     type="button"
-                    onClick={() => setTicketTier(tier)}
-                    className="w-full flex items-center justify-between py-4 border-b border-[#f2f2f2] last:border-b-0 cursor-pointer text-left group"
+                    onClick={() => st.open && setTicketTier(tier)}
+                    disabled={!st.open}
+                    className={`w-full flex items-center justify-between py-4 border-b border-[#f2f2f2] last:border-b-0 text-left group ${st.open ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
                   >
                     <div className="flex items-center gap-3.5 min-w-0">
                       <span
@@ -666,6 +699,7 @@ export default function CheckoutPage({
                     <span className="text-right shrink-0 pl-3">
                       {discount.sale && <span className="text-xs text-[#8a8a8a] line-through block">{formatMoney(price)}</span>}
                       <span className="font-display font-bold text-base block">{formatMoney(salePrice(event.id, option))}</span>
+                      {label && <span className={`${overline} block mt-0.5 ${st.open ? 'text-[#b45309]' : 'text-[#8a8a8a]'}`}>{label}</span>}
                     </span>
                   </button>
                   );
@@ -688,8 +722,9 @@ export default function CheckoutPage({
                   <span className="font-display font-bold text-xl min-w-[24px] text-center">{ticketCount}</span>
                   <button
                     type="button"
-                    onClick={() => setTicketCount(Math.min(10, ticketCount + 1))}
-                    className="w-10 h-10 border border-black flex items-center justify-center cursor-pointer hover:bg-[#f7f7f7] transition-colors"
+                    onClick={() => setTicketCount(Math.min(maxQty, ticketCount + 1))}
+                    disabled={ticketCount >= maxQty}
+                    className="w-10 h-10 border border-black flex items-center justify-center cursor-pointer hover:bg-[#f7f7f7] transition-colors disabled:opacity-30"
                   >
                     <Plus className="w-4 h-4" />
                   </button>
@@ -710,9 +745,10 @@ export default function CheckoutPage({
                   <button
                     type="button"
                     onClick={handleApplyPromo}
-                    className="bg-black text-white text-sm font-bold px-5 cursor-pointer hover:bg-neutral-800 transition-colors"
+                    disabled={promoChecking || !promoCode.trim()}
+                    className="bg-black text-white text-sm font-bold px-5 cursor-pointer hover:bg-neutral-800 transition-colors disabled:opacity-40"
                   >
-                    Apply
+                    {promoChecking ? 'Checking…' : 'Apply'}
                   </button>
                 </div>
                 {discount.usesCode && (
@@ -752,9 +788,10 @@ export default function CheckoutPage({
                   type="button"
                   onClick={paymentMethod === 'card' ? handleStartStripeCheckout : handleSubmitEasypaisa}
                   disabled={epSubmitting || preparingShot}
-                  className="w-full bg-[#ffed00] text-black py-4 mt-6 font-bold text-sm cursor-pointer hover:bg-[#e6d200] transition-colors disabled:opacity-60 disabled:cursor-wait"
+                  className="jz-cta w-full bg-[#ffed00] text-black py-4 mt-6 font-bold text-sm cursor-pointer hover:bg-[#e6d200] transition-colors disabled:opacity-60 disabled:cursor-wait flex items-center justify-center gap-2"
                 >
-                  {paymentMethod === 'card' ? 'Continue to payment' : epSubmitting ? 'Submitting…' : 'Submit Easypaisa payment'}
+                  <Lock className="w-4 h-4 jz-cta-icon" />
+                  {paymentMethod === 'card' ? 'Continue to secure payment' : epSubmitting ? 'Submitting…' : 'Submit Easypaisa payment'}
                 </button>
                 {paymentMethod === 'easypaisa' && (
                   <p className="text-xs text-[#666] text-center mt-3">
@@ -766,6 +803,7 @@ export default function CheckoutPage({
                   Every order is covered by our refund guarantee. By paying you accept the terms of use.
                 </p>
               </div>
+            </div>
             </div>
           </div>
         </form>

@@ -18,7 +18,7 @@ import { updateUserRoleAndStatus, type UserProfile } from "../../../services/bac
 import {
   createDoorStaff,
   deleteDoorStaff,
-  getDoorStaffEvents,
+  getDoorStaffAccess,
   setDoorStaffEvents,
   setDoorStaffPassword,
   suggestPassword,
@@ -70,13 +70,17 @@ export default function DoorStaffPage() {
   const [handover, setHandover] = useState<Handover | null>(null);
   /** Each login's events (null while loading). */
   const [assigned, setAssigned] = useState<Map<string, string[]> | null>(null);
+  /** Logins an organiser made in their portal: login uid → organiser uid. */
+  const [owners, setOwners] = useState<Map<string, string>>(new Map());
   const [editing, setEditing] = useState<UserProfile | null>(null);
 
   const failRef = useRef(fail);
   failRef.current = fail;
   const loadAssigned = useCallback(async () => {
     try {
-      setAssigned(await getDoorStaffEvents());
+      const access = await getDoorStaffAccess();
+      setAssigned(access.events);
+      setOwners(access.owners);
     } catch (err) {
       console.error("Door staff events could not be loaded:", err);
       setAssigned(new Map());
@@ -292,8 +296,13 @@ export default function DoorStaffPage() {
                         <div className="min-w-0">
                           <p className="font-bold truncate">{u.name || "—"}</p>
                           <p className="text-[11px] text-[#8a8a8a] truncate">{u.email}</p>
-                          <span className="inline-block mt-1">
+                          <span className="inline-flex flex-wrap gap-1 mt-1">
                             <Badge tone={suspended ? "negative" : "positive"}>{suspended ? "Suspended" : "Can scan"}</Badge>
+                            {owners.get(u.uid) && (
+                              <Badge tone="info">
+                                Made by {data.organizers.find((o) => o.id === owners.get(u.uid) || o.userId === owners.get(u.uid))?.companyName || "an organiser"}
+                              </Badge>
+                            )}
                           </span>
                         </div>
                       </div>

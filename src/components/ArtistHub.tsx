@@ -7,7 +7,7 @@ import {
   getArtistProfile,
   createArtistProfile,
   updateArtistProfile,
-  getEvents,
+  getPublishedEvents,
   getFollowerCount,
   ArtistProfile
 } from '../services/backendService';
@@ -46,7 +46,7 @@ export default function ArtistHub() {
 
       const [artistData, allEvents] = await Promise.all([
         getArtistProfile(user.uid),
-        getEvents()
+        getPublishedEvents()
       ]);
       
       setEvents(allEvents);

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect, useMemo } from "react";
 import {
   User,
   Ticket,
@@ -20,6 +20,7 @@ import {
   Phone,
   ArrowRight,
   Share2,
+  Download,
 } from "lucide-react";
 import { EventItem, isPastEvent, tierDisplayName, ticketSeat, eventFromPrice } from "../types";
 import { motion, AnimatePresence } from "motion/react";
@@ -35,12 +36,20 @@ import {
   createUserProfile,
   updateUserProfile,
   getBookings,
+  getNotifications,
+  SystemNotification,
 } from "../services/backendService";
 import ArtistHub from "./ArtistHub";
 import TicketPrintSheet, { QrCode, TicketPrintData, printWhenReady } from "./TicketPrintSheet";
 import brandMark from "../../assets/images/Favicon.png";
 import { shareOrCopy } from "../share";
 import { useLocalCurrency } from "../currency";
+import { useSavedEvents } from "../savedEvents";
+import { eventCities, eventSortTime } from "../eventDates";
+import { AddToCalendar, DirectionsLink } from "./AddToCalendar";
+import { downloadMyTicket } from "../services/organizerToolsService";
+import { GlowField } from './Decor';
+import { categoryLabel } from "../data";
 
 const PLACEHOLDER_EVENT: EventItem = {
   id: "unknown",
@@ -76,6 +85,20 @@ interface PersonalBooking {
   seat: string;
   barCode: string;
   pricePaid: number;
+  /** What was paid, in the currency it was paid in, e.g. "PKR 8,500". */
+  paidLabel: string;
+}
+
+/** The amount as charged: local currency when the order recorded it, else USD. */
+function paidLabelFor(item: any, usd: number): string {
+  const cur = String(item?.currency || "").toUpperCase();
+  const local = Number(item?.amountLocal);
+  if (cur && local > 0) {
+    if (cur === "PKR") return `PKR ${Math.round(local).toLocaleString()}`;
+    const sym = cur === "GBP" ? "£" : cur === "USD" ? "$" : `${cur} `;
+    return `${sym}${local.toFixed(2)}`;
+  }
+  return `$${(Number(usd) || 0).toFixed(2)}`;
 }
 
 type TabId =
@@ -115,7 +138,7 @@ export default function UserDashboardPage({
       ? (initialTab as TabId)
       : "overview",
   );
-  const { formatFrom } = useLocalCurrency();
+  const { formatFrom, format } = useLocalCurrency();
 
   // Follow header-dropdown deep links while already on the dashboard
   useEffect(() => {
@@ -157,13 +180,40 @@ export default function UserDashboardPage({
   // Ticket selected for download / print (rendered as a print-only sheet)
   const [printPass, setPrintPass] = useState<PersonalBooking | null>(null);
 
-  const [watchlist, setWatchlist] = useState<EventItem[]>([]);
+  // Saved events (the heart button): upcoming first, soonest first.
+  const { savedIds, removeSaved } = useSavedEvents();
+  const watchlist = useMemo(() => {
+    const list = savedIds
+      .map((id) => allEvents.find((e) => e.id === id))
+      .filter((e): e is EventItem => !!e);
+    const upcoming = list.filter((e) => !isPastEvent(e)).sort((a, b) => eventSortTime(a) - eventSortTime(b));
+    return [...upcoming, ...list.filter((e) => isPastEvent(e))];
+  }, [savedIds, allEvents]);
   const [userBookings, setUserBookings] = useState<PersonalBooking[]>([]);
+  const [notifications, setNotifications] = useState<SystemNotification[]>([]);
+  const [ticketView, setTicketView] = useState<"upcoming" | "past">("upcoming");
+
+  // The event a booking is for. Bookings remember the event's title, date and
+  // venue, so a ticket still shows the right show if the event is gone.
+  const eventForBooking = (item: any): EventItem => {
+    const found = allEvents.find((e) => e.id === item.eventId);
+    if (found) return found;
+    if (!item.eventTitle) return PLACEHOLDER_EVENT;
+    return {
+      ...PLACEHOLDER_EVENT,
+      id: String(item.eventId || "unknown"),
+      title: item.eventTitle,
+      date: item.eventDate || "TBA",
+      fullDate: item.eventDate || undefined,
+      time: item.eventTime || "TBA",
+      location: item.eventVenue || "TBA",
+      image: item.eventImage || PLACEHOLDER_EVENT.image,
+    };
+  };
 
   // â”€â”€ DATA LOADING (unchanged behaviour) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
-    setWatchlist(allEvents.filter((e) => !isPastEvent(e)).slice(0, 3));
 
     const loadUserData = async () => {
       const user = auth.currentUser;
@@ -200,6 +250,16 @@ export default function UserDashboardPage({
         console.error("Failed to load user profile:", err);
       }
 
+      // Order confirmations and other account messages, newest first
+      getNotifications(user.uid).then((list) => {
+        setNotifications(
+          list
+            .slice()
+            .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+            .slice(0, 5),
+        );
+      });
+
       // 2. Bookings for this user (the API scopes results by session), with localStorage fallback
       try {
         const bookingRows = await getBookings(user.uid);
@@ -207,9 +267,7 @@ export default function UserDashboardPage({
         const loaded: PersonalBooking[] = [];
         bookingRows.forEach((item: any) => {
           const evt =
-            allEvents.find((e) => e.id === item.eventId) ||
-            allEvents[0] ||
-            PLACEHOLDER_EVENT;
+            eventForBooking(item);
           loaded.push({
             id: item.id,
             event: evt,
@@ -223,6 +281,7 @@ export default function UserDashboardPage({
             seat: ticketSeat(item),
             barCode: item.barCode || item.qrCode || "937284918231",
             pricePaid: item.pricePaid || item.amount || evt.price,
+            paidLabel: paidLabelFor(item, item.pricePaid || item.amount || evt.price),
           });
         });
 
@@ -237,9 +296,7 @@ export default function UserDashboardPage({
               if (Array.isArray(parsed) && parsed.length > 0) {
                 formattedLocal = parsed.map((item: any, index: number) => {
                   const evt =
-                    allEvents.find((e) => e.id === item.eventId) ||
-                    allEvents[0] ||
-                    PLACEHOLDER_EVENT;
+                    eventForBooking(item);
                   return {
                     id: `bk-local-${index}`,
                     event: evt,
@@ -254,6 +311,7 @@ export default function UserDashboardPage({
                         100000000000 + Math.random() * 900000000000,
                       ).toString(),
                     pricePaid: item.pricePaid || evt.price,
+                    paidLabel: paidLabelFor(item, item.pricePaid || evt.price),
                   };
                 });
               }
@@ -365,8 +423,21 @@ export default function UserDashboardPage({
     }
   };
 
-  const handleRemoveFromWatchlist = (eventId: string) => {
-    setWatchlist((prev) => prev.filter((item) => item.id !== eventId));
+  const handleRemoveFromWatchlist = (eventId: string) => removeSaved(eventId);
+
+  // The same PDF ticket that's emailed; if it can't be fetched (offline,
+  // older order), fall back to printing the ticket sheet.
+  const [downloading, setDownloading] = useState("");
+  const handleDownload = async (pass: PersonalBooking) => {
+    setDownloading(pass.orderId);
+    try {
+      await downloadMyTicket(pass.orderId);
+    } catch (err) {
+      console.warn("PDF download failed, printing instead:", err);
+      handlePrintTicket(pass);
+    } finally {
+      setDownloading("");
+    }
   };
 
   // ── TICKET DOWNLOAD / PRINT — prints only the ticket sheet ──────
@@ -446,7 +517,35 @@ export default function UserDashboardPage({
     (sum, item) => sum + item.pricePaid,
     0,
   );
-  const nextBooking = userBookings[0];
+  // Tickets for shows still to come (soonest first) and for past shows.
+  const upcomingPasses = useMemo(
+    () => userBookings.filter((b) => !isPastEvent(b.event)).sort((a, b) => eventSortTime(a.event) - eventSortTime(b.event)),
+    [userBookings],
+  );
+  const pastPasses = useMemo(
+    () => userBookings.filter((b) => isPastEvent(b.event)).sort((a, b) => eventSortTime(b.event) - eventSortTime(a.event)),
+    [userBookings],
+  );
+  const shownPasses = ticketView === "upcoming" ? upcomingPasses : pastPasses;
+  const nextBooking = upcomingPasses[0];
+
+  // "Picked for you": upcoming shows not yet booked, in the categories and
+  // cities of what this person booked or saved, soonest first.
+  const pickedForYou = useMemo(() => {
+    const booked = new Set(userBookings.map((b) => b.event.id));
+    const liked = [...userBookings.map((b) => b.event), ...watchlist];
+    const cats = new Set(liked.map((e) => e.category));
+    const cities = new Set(liked.flatMap((e) => eventCities(e)));
+    return allEvents
+      .filter((e) => !isPastEvent(e) && !booked.has(e.id))
+      .map((e) => ({
+        e,
+        score: (cats.has(e.category) ? 1 : 0) + (eventCities(e).some((c) => cities.has(c)) ? 2 : 0),
+      }))
+      .sort((a, b) => b.score - a.score || eventSortTime(a.e) - eventSortTime(b.e))
+      .slice(0, 4)
+      .map((r) => r.e);
+  }, [allEvents, userBookings, watchlist]);
 
   const navItems: {
     id: TabId;
@@ -465,7 +564,7 @@ export default function UserDashboardPage({
     },
     {
       id: "watchlist",
-      label: "Watchlist",
+      label: "Saved",
       icon: Heart,
       count: watchlist.length,
       show: true,
@@ -507,8 +606,9 @@ export default function UserDashboardPage({
       id="user-dashboard-wrapper"
     >
       {/* â”€â”€ HEADER — black band â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <section className="bg-black text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-14">
+      <section className="bg-black text-white relative overflow-hidden">
+        <GlowField tone="dark" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-14 jz-above">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
             <div className="flex items-center gap-6">
               <div className="w-20 h-20 rounded-full bg-[#ffed00] text-black flex items-center justify-center shrink-0 overflow-hidden">
@@ -531,7 +631,7 @@ export default function UserDashboardPage({
                   {profileName}
                 </h1>
                 <p className="text-white/60 text-sm mt-3">
-                  {profileEmail} Â· {profileCity}
+                  {profileEmail} · {profileCity}
                 </p>
               </div>
             </div>
@@ -556,8 +656,8 @@ export default function UserDashboardPage({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-6 border-t border-white/15 mt-10 pt-8">
             {[
               { label: "Tickets held", value: totalPassesCount },
-              { label: "Watchlist", value: watchlist.length },
-              { label: "Total spent", value: `$${totalAmountSpent}` },
+              { label: "Saved", value: watchlist.length },
+              { label: "Total spent", value: format(totalAmountSpent) },
               { label: "Member status", value: "Active" },
             ].map((s) => (
               <div
@@ -697,31 +797,26 @@ export default function UserDashboardPage({
                     <div>
                       {sectionHead(
                         "Latest activity",
-                        "Account updates and offers, newest first.",
+                        "Your orders and account updates, newest first.",
+                      )}
+                      {notifications.length === 0 && (
+                        <p className="text-sm text-[#666] border-t border-[#f2f2f2] py-6">
+                          Nothing new yet. Order confirmations and account updates will appear here.
+                        </p>
                       )}
                       <div className="border-t border-[#f2f2f2]">
-                        {[
-                          {
-                            icon: ShieldCheck,
-                            title: "Account verified",
-                            body: "Your account is set up and ready to book.",
-                            time: "Today",
-                          },
-                          {
-                            icon: Sparkles,
-                            title: "18% off your next order",
-                            body: "Use code JAZBA18 at checkout on any event.",
-                            time: "Yesterday",
-                          },
-                          {
-                            icon: Bell,
-                            title: "Price alerts on",
-                            body: "We'll email you when watchlist shows drop in price.",
-                            time: "This week",
-                          },
-                        ].map((n) => (
+                        {notifications.map((item) => ({
+                          key: item.id || item.createdAt,
+                          icon: /order|ticket|confirm/i.test(`${item.title} ${item.message}`) ? Ticket : Bell,
+                          title: item.title,
+                          body: item.message,
+                          time: (() => {
+                            const d = new Date(item.createdAt);
+                            return isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+                          })(),
+                        })).map((n) => (
                           <div
-                            key={n.title}
+                            key={n.key}
                             className="flex items-start gap-4 py-5 border-b border-[#f2f2f2]"
                           >
                             <div className="w-10 h-10 bg-[#f7f7f7] flex items-center justify-center shrink-0">
@@ -746,6 +841,7 @@ export default function UserDashboardPage({
                     </div>
 
                     {/* Recommended */}
+                    {pickedForYou.length > 0 && (
                     <div>
                       <div className="flex items-end justify-between border-b border-black pb-4 mb-8">
                         <div>
@@ -764,7 +860,7 @@ export default function UserDashboardPage({
                         </button>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-[#f2f2f2] border border-[#f2f2f2]">
-                        {allEvents.filter((e) => !isPastEvent(e)).slice(0, 4).map((evt) => (
+                        {pickedForYou.map((evt) => (
                           <div
                             key={evt.id}
                             className="bg-white p-5 flex items-center gap-4"
@@ -777,7 +873,7 @@ export default function UserDashboardPage({
                             />
                             <div className="min-w-0 flex-1">
                               <span className={`${overline} text-[#8a8a8a]`}>
-                                {evt.category}
+                                {categoryLabel(evt.category)}
                               </span>
                               <h4 className="font-bold text-sm truncate mt-1">
                                 {evt.title}
@@ -797,6 +893,7 @@ export default function UserDashboardPage({
                         ))}
                       </div>
                     </div>
+                    )}
                   </div>
                 )}
 
@@ -808,9 +905,35 @@ export default function UserDashboardPage({
                       "Show the QR code at the entrance — on screen or printed.",
                     )}
 
+                    {userBookings.length > 0 && (
+                      <div className="flex border border-black w-fit mb-8">
+                        {([
+                          { id: "upcoming", label: `Upcoming (${upcomingPasses.length})` },
+                          { id: "past", label: `Past (${pastPasses.length})` },
+                        ] as const).map((t) => (
+                          <button
+                            key={t.id}
+                            onClick={() => setTicketView(t.id)}
+                            className={`px-5 py-2.5 text-sm font-bold cursor-pointer transition-colors ${
+                              ticketView === t.id ? "bg-black text-[#ffed00]" : "bg-white text-black hover:bg-[#f7f7f7]"
+                            }`}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     {userBookings.length > 0 ? (
+                      shownPasses.length === 0 ? (
+                      <div className="border border-[#e4e4e4] py-12 text-center text-sm text-[#666]">
+                        {ticketView === "upcoming"
+                          ? "No upcoming tickets. Tickets for shows that have happened are under Past."
+                          : "No past tickets yet."}
+                      </div>
+                      ) : (
                       <div className="space-y-8">
-                        {userBookings.map((pass) => (
+                        {shownPasses.map((pass) => (
                           <div
                             key={pass.id}
                             className="border-2 border-black flex flex-col md:flex-row"
@@ -837,7 +960,7 @@ export default function UserDashboardPage({
 
                               <div className="p-6">
                                 <span className={`${overline} text-[#8a8a8a]`}>
-                                  {pass.event.category} · Order {pass.orderId}
+                                  {categoryLabel(pass.event.category)} · Order {pass.orderId}
                                 </span>
                                 <h4 className="font-display font-bold text-2xl leading-[0.95] mt-2 truncate">
                                   {pass.event.title}
@@ -917,11 +1040,18 @@ export default function UserDashboardPage({
 
                                 <div className="flex flex-wrap gap-3 mt-6">
                                   <button
-                                    onClick={() => handlePrintTicket(pass)}
-                                    className="flex items-center gap-2 bg-black text-white px-5 py-2.5 text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors"
+                                    onClick={() => handleDownload(pass)}
+                                    disabled={downloading === pass.orderId}
+                                    className="jz-cta flex items-center gap-2 bg-black text-white px-5 py-2.5 text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors disabled:opacity-60"
                                   >
-                                    <Printer className="w-4 h-4" /> Download /
-                                    Print ticket
+                                    <Download className="w-4 h-4 jz-cta-icon text-[#ffed00]" />
+                                    {downloading === pass.orderId ? "Preparing…" : "Download PDF"}
+                                  </button>
+                                  <button
+                                    onClick={() => handlePrintTicket(pass)}
+                                    className="flex items-center gap-2 bg-white text-black border border-black px-5 py-2.5 text-sm font-bold cursor-pointer hover:bg-[#f7f7f7] transition-colors"
+                                  >
+                                    <Printer className="w-4 h-4" /> Print
                                   </button>
                                   <button
                                     onClick={async () => {
@@ -938,6 +1068,12 @@ export default function UserDashboardPage({
                                   >
                                     <Share2 className="w-4 h-4" /> Share
                                   </button>
+                                  {!isPastEvent(pass.event) && pass.event.id !== "unknown" && (
+                                    <>
+                                      <AddToCalendar event={pass.event} extras={{ orderId: pass.orderId }} />
+                                      <DirectionsLink event={pass.event} />
+                                    </>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -967,6 +1103,7 @@ export default function UserDashboardPage({
                           </div>
                         ))}
                       </div>
+                      )
                     ) : (
                       <div className="border border-[#e4e4e4] py-16 text-center">
                         <Compass className="w-8 h-8 mx-auto" />
@@ -985,8 +1122,8 @@ export default function UserDashboardPage({
                 {activeTab === "watchlist" && (
                   <div>
                     {sectionHead(
-                      "Watchlist",
-                      "Shows you're keeping an eye on. Book before they sell out.",
+                      "Saved events",
+                      "Events you saved with the heart button, on this device. Book before they sell out.",
                     )}
 
                     {watchlist.length > 0 ? (
@@ -1004,13 +1141,13 @@ export default function UserDashboardPage({
                             />
                             <div className="min-w-0 flex-1">
                               <span className={`${overline} text-[#8a8a8a]`}>
-                                {show.category}
+                                {categoryLabel(show.category)}
                               </span>
                               <h4 className="font-bold text-base truncate mt-0.5">
                                 {show.title}
                               </h4>
                               <span className="text-sm text-[#666]">
-                                From {formatFrom(eventFromPrice(show))} · {show.date}
+                                {isPastEvent(show) ? `Ended · ${show.fullDate || show.date}` : `From ${formatFrom(eventFromPrice(show))} · ${show.fullDate || show.date}`}
                               </span>
                             </div>
                             <div className="flex gap-2 shrink-0">
@@ -1018,7 +1155,7 @@ export default function UserDashboardPage({
                                 onClick={() => onViewShowDetail(show)}
                                 className="bg-black text-white px-4 py-2 text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors"
                               >
-                                Book
+                                {isPastEvent(show) ? "View" : "Book"}
                               </button>
                               <button
                                 onClick={() =>
@@ -1106,15 +1243,15 @@ export default function UserDashboardPage({
                                   <span className="font-bold block truncate max-w-[200px]">
                                     {bk.event.title}
                                   </span>
-                                  <span className="text-xs text-[#8a8a8a] capitalize">
-                                    {bk.tier} ticket
+                                  <span className="text-xs text-[#8a8a8a]">
+                                    {tierDisplayName(bk.tier, bk.event)}
                                   </span>
                                 </td>
                                 <td className="py-4 px-5 text-center">
                                   {bk.quantity}
                                 </td>
                                 <td className="py-4 px-5 text-right font-bold">
-                                  ${bk.pricePaid}.00
+                                  {bk.paidLabel}
                                 </td>
                                 <td className="py-4 px-5 text-center">
                                   <span className="inline-block text-xs font-bold border border-[#e4e4e4] px-2.5 py-1">

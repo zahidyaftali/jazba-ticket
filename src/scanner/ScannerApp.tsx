@@ -22,7 +22,8 @@ import {
   X,
 } from 'lucide-react';
 import { accountEmail, auth, onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from '../firebase';
-import { getEvents, getUserProfile, isUserBootstrappedAdmin, type Booking, type TicketPass } from '../services/backendService';
+import { getEvents, getPublishedEvents, getUserProfile, isUserBootstrappedAdmin, type Booking, type TicketPass } from '../services/backendService';
+import { getOrganizerEvents } from '../services/organizerService';
 import { getWordPressEvents } from '../services/wordpressEventsService';
 import { getEventTimestamp, passPeople, peoplePerPass, ticketSeat, tierDisplayName, type EventItem } from '../types';
 import { money } from '../components/admin/ui';
@@ -33,7 +34,7 @@ import { feedback, isSoundOn, setSoundOn, unlockAudio, useInstallPrompt, useScan
 
 const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
 /** Shown on screen, so door staff can tell the phone runs the latest app. */
-const SCAN_VERSION = 'Version 4 · staff events';
+const SCAN_VERSION = 'Version 5 · organisers';
 const SAFE_TOP = { paddingTop: 'env(safe-area-inset-top)' } as const;
 const SAFE_BOTTOM = { paddingBottom: 'max(14px, env(safe-area-inset-bottom))' } as const;
 
@@ -57,8 +58,23 @@ function save(key: string, value: string) {
 
 type Stage = 'checking' | 'signed-out' | 'denied' | 'ready';
 
-/** Who may use the scanner: admins, and door staff logins (check-in only). */
-type ScanRole = 'admin' | 'staff';
+/** Who may use the scanner: admins, door staff logins (check-in only) and
+ *  organisers (check-in at their own events only, same limits as staff). */
+type ScanRole = 'admin' | 'staff' | 'organizer';
+
+/** An organiser's scanner list is their own events — the server refreshes it. */
+async function refreshOrganizerScanAccess(u: User): Promise<void> {
+  try {
+    const idToken = await u.getIdToken();
+    await fetch('/api/organizer-tools', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken, action: 'scanner-access' }),
+    });
+  } catch (err) {
+    console.warn('Could not refresh the organiser event list:', err);
+  }
+}
 
 export default function ScannerApp() {
   const [stage, setStage] = useState<Stage>('checking');
@@ -84,6 +100,13 @@ export default function ScannerApp() {
           }
           if (active && profile?.role === 'staff') {
             setRole('staff');
+            setUser(u);
+            setStage('ready');
+            return;
+          }
+          if (active && profile?.role === 'organizer') {
+            await refreshOrganizerScanAccess(u);
+            setRole('organizer');
             setUser(u);
             setStage('ready');
             return;
@@ -145,12 +168,12 @@ function SignIn({ denied }: { denied: boolean }) {
       <div className="flex-1 flex flex-col justify-center px-6 py-10 max-w-sm w-full mx-auto">
         <img src={brandMark} alt="" className="w-14 h-14 object-contain" />
         <h1 className="font-display font-extrabold text-3xl leading-none mt-6">Jazba Scan</h1>
-        <p className="text-white/60 text-sm mt-2">Ticket check-in at the door. Sign in with your door staff login or admin account.</p>
+        <p className="text-white/60 text-sm mt-2">Ticket check-in at the door. Sign in with your door staff login, your organiser account or an admin account.</p>
 
         {(denied || error) && (
           <div className="mt-6 bg-[#2a1212] border-l-4 border-[#ef4444] px-3 py-3 text-sm font-bold flex gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-[#ef4444]" />
-            <span>{error || 'That login can’t check tickets in. Use a door staff login from your Jazba admin, or an admin account. A suspended login can’t sign in.'}</span>
+            <span>{error || 'That login can’t check tickets in. Use a door staff login, an approved organiser account or an admin account. A suspended login can’t sign in.'}</span>
           </div>
         )}
 
@@ -470,7 +493,8 @@ interface RecentScan {
 function Scanner({ user, role }: { user: User; role: ScanRole }) {
   /** Recorded on every check-in. Security rules require the login's own email. */
   const staff = accountEmail(user) || user.uid;
-  const isStaff = role === 'staff';
+  /** Door staff and organisers: only their own events, no unpaid admits. */
+  const isStaff = role !== 'admin';
   const [events, setEvents] = useState<EventItem[]>([]);
   const [eventId, setEventId] = useState(() => load('jazba-scan-event'));
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -496,7 +520,16 @@ function Scanner({ user, role }: { user: User; role: ScanRole }) {
    *  many people a group package admits. */
   const eventsLoad = useRef<Promise<Map<string, EventItem>> | null>(null);
   const loadEvents = useCallback(() => {
-    const p = Promise.all([getWordPressEvents(), getEvents().catch(() => [] as EventItem[])]).then(([wp, site]) => {
+    // Admins see every event; door staff and organisers the ones on sale
+    // (plus, for an organiser, their own).
+    const site =
+      role === 'admin'
+        ? getEvents().catch(() => [] as EventItem[])
+        : Promise.all([
+            getPublishedEvents().catch(() => [] as EventItem[]),
+            role === 'organizer' ? getOrganizerEvents(user.uid).catch(() => [] as EventItem[]) : Promise.resolve([] as EventItem[]),
+          ]).then(([pub, own]) => [...own, ...pub]);
+    const p = Promise.all([getWordPressEvents(), site]).then(([wp, site]) => {
       const m = new Map<string, EventItem>();
       for (const e of [...wp, ...site]) if (e?.id && !m.has(e.id)) m.set(e.id, e);
       setEvents([...m.values()]);
@@ -504,7 +537,7 @@ function Scanner({ user, role }: { user: User; role: ScanRole }) {
     });
     eventsLoad.current = p;
     return p;
-  }, []);
+  }, [role, user.uid]);
 
   useEffect(() => {
     loadEvents();
@@ -706,7 +739,7 @@ function Scanner({ user, role }: { user: User; role: ScanRole }) {
           <div className="flex-1 min-w-0">
             <p className="font-display font-extrabold leading-none">Jazba Scan</p>
             <p className="text-[11px] text-white/50 truncate mt-1">
-              {staff} · {isStaff ? 'Door staff' : 'Admin'} · <span className="text-[#ffed00]/80">{SCAN_VERSION}</span>
+              {staff} · {role === 'organizer' ? 'Organiser' : isStaff ? 'Door staff' : 'Admin'} · <span className="text-[#ffed00]/80">{SCAN_VERSION}</span>
             </p>
           </div>
           <button type="button" onClick={toggleSound} aria-label={sound ? 'Turn sound off' : 'Turn sound on'} className="w-10 h-10 flex items-center justify-center text-white/70 cursor-pointer">
@@ -754,7 +787,7 @@ function Scanner({ user, role }: { user: User; role: ScanRole }) {
         )}
 
         {!ready ? (
-          <StaffEventGate staffEvents={staffEvents} events={pickable} onChoose={chooseEvent} />
+          <StaffEventGate staffEvents={staffEvents} events={pickable} onChoose={chooseEvent} organizer={role === 'organizer'} />
         ) : (
           <>
         <div className="px-4">
@@ -1088,7 +1121,9 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
 
 /** Door staff before they can scan: their events are loading, none are
  *  given yet, or they have several and must say which one this is. */
-function StaffEventGate({ staffEvents, events, onChoose }: { staffEvents: string[] | null; events: EventItem[]; onChoose: (id: string) => void }) {
+function StaffEventGate({
+  staffEvents, events, onChoose, organizer = false,
+}: { staffEvents: string[] | null; events: EventItem[]; onChoose: (id: string) => void; organizer?: boolean }) {
   if (!staffEvents) {
     return (
       <div className="mx-4 py-16 flex flex-col items-center gap-3 text-white/70">
@@ -1103,8 +1138,9 @@ function StaffEventGate({ staffEvents, events, onChoose }: { staffEvents: string
         <CalendarDays className="w-8 h-8 text-[#ffed00]" />
         <p className="font-display font-extrabold text-xl mt-3">No events yet</p>
         <p className="text-sm text-white/65 mt-2 leading-relaxed">
-          This login hasn’t been given an event to check. Ask an admin to add one in the admin portal under People → Door staff. It appears here
-          straight away.
+          {organizer
+            ? 'You don’t have an event on sale yet. Once one of your events is live, it appears here — sign out and in again to refresh.'
+            : 'This login hasn’t been given an event to check. Ask the organiser or a Jazba admin to add one. It appears here straight away.'}
         </p>
       </div>
     );

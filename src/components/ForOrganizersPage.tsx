@@ -4,6 +4,7 @@ import {
   ArrowRight,
   BarChart3,
   BadgeCheck,
+  BellRing,
   CalendarPlus,
   Check,
   CreditCard,
@@ -12,44 +13,51 @@ import {
   QrCode,
   ScanLine,
   ShieldCheck,
-  Smartphone,
+  Tag,
   Ticket,
+  TicketPlus,
   UserPlus,
 } from 'lucide-react';
 import FaqAccordion from './FaqAccordion';
+import { Reveal, SectionHead, SoftBand, StepCard } from './Decor';
+import { GlowField } from './Decor';
 
 const overline = 'text-[10px] font-bold tracking-[0.18em] uppercase';
 
 const STEPS = [
-  { step: '01', icon: UserPlus, title: 'Create your account', body: 'Sign up free and tell us about you and the events you run. It takes about five minutes.' },
-  { step: '02', icon: BadgeCheck, title: 'Get approved', body: 'Our team checks every organiser — usually within one or two working days — and emails you when you’re in.' },
-  { step: '03', icon: CalendarPlus, title: 'Add your event', body: 'Upload your poster, set ticket prices and capacity, and submit it. We review it and put it on sale.' },
-  { step: '04', icon: BarChart3, title: 'Sell & track', body: 'Share your event link, watch sales and attendees in real time, and get paid after the show.' },
+  { icon: UserPlus, title: 'Create your account', body: 'Sign up free and tell us a little about you and the events you run. It takes about five minutes.' },
+  { icon: BadgeCheck, title: 'Get approved', body: 'We check every organiser, usually within one or two working days, and email you when you’re in.' },
+  { icon: CalendarPlus, title: 'Add your event', body: 'Upload your poster, add your ticket types and prices, and send it to us. We check it and put it on sale.' },
+  { icon: BarChart3, title: 'Sell and track', body: 'Share your link, watch orders come in, scan tickets at the door, and get paid after the show.' },
 ];
 
 const FEATURES = [
-  { icon: CreditCard, title: 'Secure checkout', body: 'Buyers pay by card through Stripe or by Easypaisa. Card details never touch your hands — or ours.' },
-  { icon: QrCode, title: 'Instant e-tickets', body: 'Every buyer gets their ticket by email straight away, with a QR code and a printable PDF.' },
-  { icon: ScanLine, title: 'Door check-in', body: 'Tickets are scanned at the door with the Jazba Scan app, and each one works only once.' },
-  { icon: BarChart3, title: 'Live sales dashboard', body: 'See revenue, tickets sold, every order and your attendee list — export it any time.' },
-  { icon: Heart, title: 'Your own page & followers', body: 'A public organiser page with your logo, story and events. Fans can follow you.' },
-  { icon: Smartphone, title: 'Works on your phone', body: 'Create events, check sales and download attendee lists from any device.' },
+  { icon: Ticket, title: 'Your own ticket types', body: 'Early bird, standard, VIP, family tickets. Each with its own price, quantity and sales end time.' },
+  { icon: CreditCard, title: 'Secure checkout', body: 'Buyers pay by card through Stripe, or by Easypaisa in Pakistan. No booking fees added on top.' },
+  { icon: ScanLine, title: 'Scan at the door', body: 'Use Jazba Scan on any phone, or give your door team their own logins. Each ticket works once.' },
+  { icon: Tag, title: 'Discount codes', body: 'Codes for early birds, sponsors or your mailing list, with limits and end dates you set.' },
+  { icon: BellRing, title: 'Waitlist when you sell out', body: 'Fans join a waitlist on your event page. Release more tickets and tell them in one click.' },
+  { icon: TicketPlus, title: 'Guest list tickets', body: 'Send complimentary or box-office tickets yourself, each with its own QR code.' },
+  { icon: BarChart3, title: 'Every sale, live', body: 'Orders, customers and tickets left per type. An email for each sale, and CSV exports any time.' },
+  { icon: Heart, title: 'Your page and followers', body: 'A public page with your logo and story. Followers hear about each new event you announce.' },
 ];
 
 const INCLUDED = [
   'Your organiser page on jazbatickets.com',
   'Unlimited events once you’re approved',
-  'General, VIP and Elite ticket types',
-  'Prices in PKR, GBP or USD — buyers see their own currency',
-  'Attendee list with names and emails, exportable to CSV',
-  'Support from the Jazba team by email',
+  'As many ticket types as you need',
+  'Prices in GBP, USD or PKR — buyers see their own currency',
+  'Customer list with names and emails, exportable to CSV',
+  'Door scanning for you and your team',
+  'Help from the Jazba team in Birmingham, by email or phone',
 ];
 
 const FAQS = [
   { q: 'Who can become an organiser?', a: 'Promoters, venues, artists, community groups and charities that run live events — concerts, qawwali nights, comedy, theatre, festivals and more. We approve every organiser to keep tickets on Jazba trustworthy.' },
   { q: 'How long does approval take?', a: 'Usually one or two working days. You’ll get an email as soon as your account is approved, and again when each event goes on sale.' },
   { q: 'Who collects the money?', a: 'Jazba Tickets collects all ticket payments securely (Stripe for cards, Easypaisa for mobile payments). After your event, we settle your earnings with you directly, as agreed when you’re approved.' },
-  { q: 'Can I edit my event after it goes live?', a: 'Yes — changes to details, images and prices go live straight away. You can also take an event off sale at any time.' },
+  { q: 'Can I edit my event after it goes live?', a: 'Yes. Changes to details, images, prices and ticket types go live straight away. You can also take an event off sale at any time.' },
+  { q: 'How does door check-in work?', a: 'Open jazbatickets.com/scan on any phone and sign in with your organiser account, or create logins for your door staff in your portal. Each QR code works once, even with several phones on the same door.' },
   { q: 'Do I need a separate account to buy tickets?', a: 'No. The same Jazba account works for buying tickets and running events.' },
 ];
 
@@ -69,6 +77,7 @@ export default function ForOrganizersPage() {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-neutral-950/85 to-neutral-950/45" />
         </div>
+        <GlowField tone="dark" />
         <div className="max-w-7xl mx-auto w-full relative z-10 text-left space-y-5">
           <div className="inline-flex items-center gap-2 text-[11px] font-bold tracking-wide text-neutral-400 bg-white/5 backdrop-blur-md px-3.5 py-1.5">
             <span onClick={() => navigate('/')} className="hover:text-white cursor-pointer transition-colors">Home</span>
@@ -93,37 +102,36 @@ export default function ForOrganizersPage() {
       </section>
 
       {/* ── HOW IT WORKS ─────────────────────────────────────── */}
-      <section className="bg-[#ffed00] text-black px-4 sm:px-6 md:px-8 py-16">
-        <div className="max-w-7xl mx-auto">
-          <span className={`${overline} text-black/60`}>How it works</span>
-          <h2 className="font-display font-bold text-3xl sm:text-4xl leading-[0.95] mt-3 max-w-xl">From sign-up to sold out in four steps.</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-black/15 border border-black/15 mt-10">
-            {STEPS.map((s) => (
-              <div key={s.step} className="bg-[#ffed00] p-7">
-                <span className="font-display font-bold text-lg">{s.step}</span>
-                <s.icon className="w-6 h-6 mt-4" />
-                <h3 className="font-display font-bold text-lg mt-4">{s.title}</h3>
-                <p className="text-sm text-black/70 leading-relaxed mt-2">{s.body}</p>
-              </div>
+      <SoftBand>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-16 sm:py-20">
+          <SectionHead eyebrow="How it works" title="From sign-up to your first sale" sub="Most organisers have their first event ready to send to us the same day." />
+          <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            {STEPS.map((s, i) => (
+              <React.Fragment key={s.title}>
+                <StepCard icon={s.icon} n={i + 1} title={s.title} delay={i * 140}>
+                  {s.body}
+                </StepCard>
+              </React.Fragment>
             ))}
-          </div>
+          </ol>
         </div>
-      </section>
+      </SoftBand>
 
       {/* ── FEATURES ─────────────────────────────────────────── */}
-      <section className="px-4 sm:px-6 md:px-8 py-20">
+      <section className="px-4 sm:px-6 md:px-8 py-16 sm:py-20">
         <div className="max-w-7xl mx-auto">
-          <span className={`${overline} text-[#666]`}>Everything you need</span>
-          <h2 className="font-display font-bold text-3xl sm:text-4xl leading-[0.95] mt-3 max-w-2xl">Built for the people who put on the show.</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-[#e4e4e4] border border-[#e4e4e4] mt-10">
-            {FEATURES.map((f) => (
-              <div key={f.title} className="bg-white p-7">
-                <span className="w-10 h-10 bg-black flex items-center justify-center">
-                  <f.icon className="w-5 h-5 text-[#ffed00]" />
-                </span>
-                <h3 className="font-display font-bold text-lg mt-5">{f.title}</h3>
-                <p className="text-sm text-[#444] leading-relaxed mt-2">{f.body}</p>
-              </div>
+          <SectionHead eyebrow="What you get" title="Everything to run the night" sub="The same tools we use for our own shows at Jazba Entertainment." />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-[#e4e4e4] border border-[#e4e4e4]">
+            {FEATURES.map((f, i) => (
+              <React.Fragment key={f.title}>
+                <Reveal delay={(i % 4) * 100} className="bg-white p-6 sm:p-7 h-full">
+                  <span className="w-10 h-10 bg-black flex items-center justify-center">
+                    <f.icon className="w-5 h-5 text-[#ffed00]" />
+                  </span>
+                  <h3 className="font-display font-bold text-lg mt-5">{f.title}</h3>
+                  <p className="text-sm text-[#444] leading-relaxed mt-2">{f.body}</p>
+                </Reveal>
+              </React.Fragment>
             ))}
           </div>
         </div>
@@ -153,17 +161,20 @@ export default function ForOrganizersPage() {
       </section>
 
       {/* ── FAQ ──────────────────────────────────────────────── */}
-      <div className="py-6">
-        <FaqAccordion faqs={FAQS.map((f, i) => ({ id: `faq-${i + 1}`, question: f.q, answer: f.a }))} />
-      </div>
+      <FaqAccordion
+        eyebrow="Organiser questions"
+        title="Before you sign up"
+        intro="What organisers usually ask us first. Anything else, just get in touch."
+        faqs={FAQS.map((f, i) => ({ id: `faq-${i + 1}`, question: f.q, answer: f.a }))}
+      />
 
       {/* ── CTA ──────────────────────────────────────────────── */}
       <section className="bg-[#ffed00] text-black px-4 sm:px-6 md:px-8 py-20">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-8">
           <div>
             <Ticket className="w-6 h-6 text-black" />
-            <h2 className="font-display font-bold text-3xl sm:text-4xl leading-[0.95] mt-5 max-w-md">Ready to put your event on sale?</h2>
-            <p className="text-black/70 text-sm mt-4 max-w-md">Create your organiser account today — it’s free to join.</p>
+            <h2 className="font-display font-bold text-3xl sm:text-4xl leading-[0.95] mt-5 max-w-md">Got an event coming up?</h2>
+            <p className="text-black/70 text-sm mt-4 max-w-md">It’s free to join. Create your account now, or email us first if you’d like to talk it through.</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <a href="/organizer/signup" className="bg-black text-white font-bold text-sm px-6 py-3.5 flex items-center gap-2 hover:bg-neutral-800 transition-colors">

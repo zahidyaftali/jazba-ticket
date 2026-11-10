@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { getAllArtists, ArtistProfile, followTarget, unfollowTarget, getFollowingIds } from '../services/backendService';
+import { getAllArtists, ArtistProfile } from '../services/backendService';
+import { useFollowingSet } from '../useFollow';
 import { auth } from '../firebase';
 import {
   Search,
@@ -102,38 +103,12 @@ export default function ArtistsPage({ onBackToHome, onViewShowDetail, onSelectAr
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showOnlyLiked, setShowOnlyLiked] = useState(false);
 
-  // Artists this user follows (Firestore)
-  const [likedArtistIds, setLikedArtistIds] = useState<string[]>([]);
-
-  useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) {
-      setLikedArtistIds([]);
-      return;
-    }
-    getFollowingIds(user.uid, 'artist').then((ids) => setLikedArtistIds(Array.from(ids)));
-  }, []);
-
-  // Follow toggle — requires auth, persists to Firestore
-  const handleToggleLike = async (id: string, e: React.MouseEvent) => {
+  // Artists this user follows — waits for sign-in to load (shared helper)
+  const followingSet = useFollowingSet('artist', onRequireLogin);
+  const likedArtistIds = useMemo(() => Array.from(followingSet.ids), [followingSet.ids]);
+  const handleToggleLike = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const user = auth.currentUser;
-    if (!user) {
-      onRequireLogin();
-      return;
-    }
-    const alreadyLiked = likedArtistIds.includes(id);
-    try {
-      if (alreadyLiked) {
-        await unfollowTarget(user.uid, 'artist', id);
-        setLikedArtistIds((prev) => prev.filter((item) => item !== id));
-      } else {
-        await followTarget(user.uid, 'artist', id);
-        setLikedArtistIds((prev) => [...prev, id]);
-      }
-    } catch (err) {
-      console.error('Error updating follow state', err);
-    }
+    void followingSet.toggle(id);
   };
 
   // Filtering

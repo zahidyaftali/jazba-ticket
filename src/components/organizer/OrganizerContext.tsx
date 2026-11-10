@@ -2,6 +2,8 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import type { User } from "../../firebase";
 import type { OrganizerProfile, UserProfile } from "../../services/backendService";
 import { fetchOrganizerReport, getOrganizerEvents, type OrganizerReport } from "../../services/organizerService";
+import { getOrganizerPrivate, type OrganizerPrivate } from "../../services/organizerToolsService";
+import { setMediaOrganizer } from "../../services/adminMediaService";
 import { MediaScopeContext, NotifyContext } from "../admin/notify";
 
 export interface OrgRoute {
@@ -19,6 +21,15 @@ interface Toast {
 
 interface OrgCtx {
   user: User;
+  /** The organiser's account id: owner of their events, codes and staff. */
+  orgUid: string;
+  /** An admin working inside this organiser's portal. */
+  actingAsAdmin: boolean;
+  /** Passed to server actions: the organiser's id when an admin acts for them, else ''. */
+  toolOrgId: string;
+  /** Private details: bank details, sale-email setting, fee (null while loading or none). */
+  priv: OrganizerPrivate | null;
+  setPriv: (p: OrganizerPrivate | null) => void;
   me: UserProfile | null;
   org: OrganizerProfile;
   setOrg: (o: OrganizerProfile) => void;
@@ -71,12 +82,14 @@ export function OrganizerProvider({
   org: initialOrg,
   onLogout,
   children,
+  actingAsAdmin = false,
 }: {
   user: User;
   me: UserProfile | null;
   org: OrganizerProfile;
   onLogout: () => void;
   children: React.ReactNode;
+  actingAsAdmin?: boolean;
 }) {
   const [me, setMe] = useState<UserProfile | null>(initialMe);
   const [org, setOrg] = useState<OrganizerProfile>(initialOrg);
@@ -95,6 +108,24 @@ export function OrganizerProvider({
     }
   });
   const toastSeq = useRef(0);
+  const orgUid = org.userId || org.id || user.uid;
+  const toolOrgId = actingAsAdmin ? orgUid : "";
+  const [priv, setPriv] = useState<OrganizerPrivate | null>(null);
+
+  // An admin inside this portal adds images to the organiser's own folder.
+  // Set while rendering (not in an effect) so it's in place before any image
+  // picker below loads the library.
+  setMediaOrganizer(actingAsAdmin ? orgUid : "");
+
+  useEffect(() => {
+    let cancelled = false;
+    getOrganizerPrivate(org.id || orgUid).then((p) => {
+      if (!cancelled) setPriv(p);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [org.id, orgUid]);
 
   const dismissToast = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), []);
   const pushToast = useCallback(
@@ -113,11 +144,11 @@ export function OrganizerProvider({
   const reload = useCallback(async () => {
     setEventsLoading(true);
     setReportLoading(true);
-    const events = getOrganizerEvents(user.uid)
+    const events = getOrganizerEvents(orgUid)
       .then(setEvents)
       .catch(() => fail("Couldn’t load your events. Please refresh the page."))
       .finally(() => setEventsLoading(false));
-    const sales = fetchOrganizerReport()
+    const sales = fetchOrganizerReport(actingAsAdmin ? orgUid : undefined)
       .then((r) => {
         setReport(r);
         setReportError("");
@@ -125,7 +156,7 @@ export function OrganizerProvider({
       .catch((err) => setReportError(err?.message || "Couldn’t load your sales."))
       .finally(() => setReportLoading(false));
     await Promise.all([events, sales]);
-  }, [user.uid, fail]);
+  }, [orgUid, actingAsAdmin, fail]);
 
   useEffect(() => {
     void reload();
@@ -161,6 +192,11 @@ export function OrganizerProvider({
 
   const value: OrgCtx = {
     user,
+    orgUid,
+    actingAsAdmin,
+    toolOrgId,
+    priv,
+    setPriv,
     me,
     org,
     setOrg,

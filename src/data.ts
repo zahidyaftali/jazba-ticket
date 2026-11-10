@@ -1,11 +1,11 @@
 import { EventItem, CategoryItem, FAQItem } from './types';
 
 export const categories: CategoryItem[] = [
-  { id: 'all', name: 'All Categories', iconType: 'music' }, // helpful addition for filtering
-  { id: 'music', name: 'Music Concerts', iconType: 'music' },
-  { id: 'theater', name: 'Theater & Arts', iconType: 'theater' },
-  { id: 'sports', name: 'Sports Events', iconType: 'sports' },
-  { id: 'festivals', name: 'Festivals & Live Shows', iconType: 'festivals' },
+  { id: 'all', name: 'All categories', iconType: 'music' },
+  { id: 'music', name: 'Music & concerts', iconType: 'music' },
+  { id: 'theater', name: 'Theatre & comedy', iconType: 'theater' },
+  { id: 'sports', name: 'Sport', iconType: 'sports' },
+  { id: 'festivals', name: 'Festivals & melas', iconType: 'festivals' },
   { id: 'conferences', name: 'Conferences', iconType: 'conferences' },
   { id: 'exhibitions', name: 'Exhibitions', iconType: 'exhibitions' },
 ];
@@ -341,27 +341,56 @@ export const events: EventItem[] = [
 export const faqs: FAQItem[] = [
   {
     id: 'faq-1',
-    question: 'How do I book an event ticket online?',
-    answer: 'Most event booking platforms allow you to browse events, select your preferred date and time, choose the number of tickets, and proceed to checkout. Payments can usually be made via credit/debit cards, digital wallets, or UPI. After payment, you\'ll receive a confirmation email or e-ticket.'
+    question: 'How do I buy tickets?',
+    answer:
+      'Open the event, choose your ticket type and how many you need, then pay by card on Stripe\'s secure page. If you\'re in Pakistan you can also pay by Easypaisa. You\'ll need a free Jazba account, so your tickets are always saved for you.',
   },
   {
     id: 'faq-2',
-    question: 'Can I cancel or reschedule my ticket after booking?',
-    answer: 'Ticket cancellation and rescheduling policies depend heavily on the event organizer. Many tickets are non-refundable, while some permit transfers or refunds up to 24-48 hours before the event starts. Please review the ticket details page or terms during booking.'
+    question: 'Where do I find my tickets?',
+    answer:
+      'We email your e-ticket, with a PDF attached, as soon as you\'ve paid. It\'s also under My tickets in your account, where you can download it again any time. Show the QR code at the door on your phone or printed.',
   },
   {
     id: 'faq-3',
-    question: 'How do I know if my ticket is confirmed?',
-    answer: 'Once your payment is successfully completed, you will receive an immediate on-screen booking confirmation with a reference ID. An email containing your digital ticket, receipt, and custom QR/barcode will be sent immediately to your registered email address.'
+    question: 'Are there any booking fees?',
+    answer:
+      'No. The price on the event page is the price you pay at checkout. You\'ll see it in pounds, dollars or rupees depending on where you are.',
   },
   {
     id: 'faq-4',
-    question: 'Are group discounts available for bulk ticket purchases?',
-    answer: 'Yes! Group discounts are available for most major concerts, theater shows, and corporate conferences. For bookings of 10 or more tickets, look for a "Group Discount" package option or contact our special support center during checkout.'
+    question: 'Can I get a refund?',
+    answer:
+      'If an event is cancelled, you get your money back in full. If you can\'t make it, you can cancel free within 24 hours of booking (when the event is at least 72 hours away), or up to 7 days before the event for a refund minus a 10% admin fee. The full details are on our refund policy page.',
   },
   {
     id: 'faq-5',
-    question: 'What should I do if I don\'t receive my ticket after booking?',
-    answer: 'First, check your Spam or Promotions folder. If you still cannot find your confirmation email, log in to your Jazba Tickets account, go to "My Passes", or use our Live Chat assistant with your transaction details to retrieve your ticket instantly.'
-  }
+    question: 'The event is sold out. Can I still go?',
+    answer:
+      'Join the waitlist on the event page. If the organiser releases more tickets, we\'ll email you straight away, and it\'s first come, first served.',
+  },
+  {
+    id: 'faq-6',
+    question: 'My ticket email hasn\'t arrived.',
+    answer:
+      'Check your spam or promotions folder first. Your tickets are also in your account under My tickets. Still nothing? Email info@jazbatickets.com with your order number and we\'ll sort it out.',
+  },
 ];
+
+
+/** A category id as people read it, e.g. "theater" → "Theatre". */
+const CATEGORY_LABELS: Record<string, string> = {
+  music: 'Music',
+  theater: 'Theatre',
+  theatre: 'Theatre',
+  comedy: 'Comedy',
+  sports: 'Sport',
+  festivals: 'Festival',
+  conferences: 'Conference',
+  exhibitions: 'Exhibition',
+};
+export function categoryLabel(id?: string): string {
+  const key = String(id || '').trim().toLowerCase();
+  if (!key) return '';
+  return CATEGORY_LABELS[key] || key.charAt(0).toUpperCase() + key.slice(1);
+}

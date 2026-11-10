@@ -373,7 +373,100 @@ button:active { transform: scale(0.985); }
 .jz-admin-slide { animation: jzSlideIn 0.24s var(--jz-ease) both; }
 .jz-admin-slide-left { animation: jzSlideInLeft 0.24s var(--jz-ease) both; }
 
+/* ---------------------------------------------------------------
+   7b. WARMTH — soft glows, glass panels, faint tickets, slow reveals
+   and a gentle shine on booking buttons. All slow (0.9s+), all quiet.
+   --------------------------------------------------------------- */
+.jz-glow { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.jz-blob {
+  position: absolute;
+  width: 46rem; height: 46rem;
+  max-width: 120vw; max-height: 120vw;
+  border-radius: 9999px;
+  will-change: transform;
+  animation: jzDrift 28s ease-in-out infinite alternate;
+}
+.jz-glow-dark .jz-blob-a { left: -14rem; top: -20rem; background: radial-gradient(closest-side, rgba(255, 237, 0, 0.30), rgba(255, 237, 0, 0) 100%); }
+.jz-glow-dark .jz-blob-b { right: -16rem; bottom: -24rem; background: radial-gradient(closest-side, rgba(255, 150, 60, 0.22), rgba(255, 150, 60, 0) 100%); animation-duration: 34s; animation-delay: -9s; }
+.jz-glow-dark .jz-blob-c { left: 38%; top: 20%; width: 34rem; height: 34rem; background: radial-gradient(closest-side, rgba(140, 110, 255, 0.14), rgba(140, 110, 255, 0) 100%); animation-duration: 40s; animation-delay: -16s; }
+.jz-glow-light .jz-blob-a { left: -12rem; top: -18rem; background: radial-gradient(closest-side, rgba(255, 237, 0, 0.42), rgba(255, 237, 0, 0) 100%); }
+.jz-glow-light .jz-blob-b { right: -14rem; bottom: -22rem; background: radial-gradient(closest-side, rgba(255, 186, 120, 0.30), rgba(255, 186, 120, 0) 100%); animation-duration: 34s; animation-delay: -9s; }
+.jz-glow-light .jz-blob-c { left: 42%; top: 10%; width: 30rem; height: 30rem; background: radial-gradient(closest-side, rgba(130, 190, 255, 0.20), rgba(130, 190, 255, 0) 100%); animation-duration: 40s; animation-delay: -16s; }
+@keyframes jzDrift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(5%, 7%, 0) scale(1.08); }
+  100% { transform: translate3d(-4%, 3%, 0) scale(0.95); }
+}
+
+/* Frosted glass panels — on light and on dark backgrounds */
+.jz-glass {
+  background: rgba(255, 255, 255, 0.66);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  backdrop-filter: blur(18px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+.jz-glass-dark {
+  background: rgba(18, 18, 18, 0.48);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  backdrop-filter: blur(18px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+/* Faint floating tickets */
+.jz-doodles { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.jz-doodle {
+  position: absolute;
+  transform: rotate(var(--jz-r, 0deg));
+  animation: jzFloat 11s ease-in-out infinite alternate;
+}
+@keyframes jzFloat {
+  from { transform: translateY(0) rotate(var(--jz-r, 0deg)); }
+  to { transform: translateY(-14px) rotate(calc(var(--jz-r, 0deg) + 4deg)); }
+}
+
+/* Slow fade-up as sections scroll into view */
+.jz-reveal { opacity: 0; transform: translateY(22px); transition: opacity 1s var(--jz-ease), transform 1.15s var(--jz-ease); }
+.jz-reveal.is-in { opacity: 1; transform: none; }
+.jz-rise { animation: jzFadeUp 1s var(--jz-ease) both; }
+
+/* Booking buttons: a slow shine every few seconds, the ticket icon
+   tilts and the arrow nudges on hover. */
+.jz-cta { position: relative; overflow: hidden; isolation: isolate; }
+.jz-cta::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.6) 50%, transparent 62%);
+  transform: translateX(-130%);
+  animation: jzSheen 5.5s ease-in-out infinite;
+}
+.bg-black.jz-cta::after, .jz-cta.bg-neutral-900::after { background: linear-gradient(105deg, transparent 38%, rgba(255, 237, 0, 0.28) 50%, transparent 62%); }
+@keyframes jzSheen {
+  0%, 64% { transform: translateX(-130%); }
+  88%, 100% { transform: translateX(130%); }
+}
+.jz-cta .jz-cta-icon { transition: transform 0.6s var(--jz-ease); }
+.jz-cta:hover .jz-cta-icon { transform: rotate(-12deg) scale(1.08); }
+.jz-cta .jz-cta-arrow { transition: transform 0.6s var(--jz-ease); }
+.jz-cta:hover .jz-cta-arrow { transform: translateX(4px); }
+/* The one main "Get tickets" button also breathes, gently */
+.jz-cta-pulse { animation: jzPulse 3.2s ease-in-out infinite; }
+@keyframes jzPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 237, 0, 0.55); }
+  60% { box-shadow: 0 0 0 10px rgba(255, 237, 0, 0); }
+}
+
+/* Above-the-glow content in decorated sections */
+.jz-above { position: relative; z-index: 1; }
+
+@media print {
+  .jz-reveal { opacity: 1 !important; transform: none !important; }
+  .jz-glow, .jz-doodles { display: none !important; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .jz-reveal { opacity: 1 !important; transform: none !important; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   div.cursor-pointer.bg-white[class*="rounded"]:hover,
   a.bg-white[class*="rounded"]:hover { transform: none; }

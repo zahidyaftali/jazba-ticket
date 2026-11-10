@@ -7,6 +7,7 @@ import {
   ExternalLink,
   Globe,
   Heart,
+  LayoutDashboard,
   Loader2,
   Mail,
   MessageSquareWarning,
@@ -26,6 +27,7 @@ import {
   eventsOfOrganizer,
   getFollowers,
   isSelfRegistered,
+  privateFieldsOf,
   removeFollower,
   reviewEvent,
   reviewOrganizer,
@@ -35,6 +37,7 @@ import {
   type OrganizerStatus,
 } from "../../../services/organizerService";
 import { eventPath } from "../../../types";
+import { getOrganizerPrivate, type OrganizerPrivate } from "../../../services/organizerToolsService";
 import { useAdmin, type AdminEvent } from "../AdminContext";
 import { DeleteOrganizerDialog, PayoutsPanel } from "./OrganizerMoney";
 import {
@@ -301,7 +304,18 @@ export function OrganizersList({ initialTab = "all" }: { initialTab?: Tab }) {
 export function OrganizerDetail({ organizerId }: { organizerId: string }) {
   const { data, loading, navigate, notify, fail, reload, openBooking, eventInfo, fmt, amountLabel, currency } = useAdmin();
   const { act, busy } = useOrganizerActions();
-  const org = data.organizers.find((o) => o.id === organizerId);
+  const publicOrg = data.organizers.find((o) => o.id === organizerId);
+  // Fee, review note and application note are kept privately (organizerPrivate).
+  const [priv, setPriv] = useState<OrganizerPrivate | null>(null);
+  useEffect(() => {
+    if (!organizerId) return;
+    getOrganizerPrivate(organizerId).then(setPriv);
+  }, [organizerId, publicOrg?.reviewedAt]);
+  const org = useMemo(() => {
+    if (!publicOrg) return undefined;
+    const p = privateFieldsOf(publicOrg, priv);
+    return { ...publicOrg, feePercent: p.feePercent, reviewNote: p.reviewNote, applicationNote: p.applicationNote };
+  }, [publicOrg, priv]);
   const [followers, setFollowers] = useState<FollowRow[] | null>(null);
   const [eventBusy, setEventBusy] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -427,6 +441,17 @@ export function OrganizerDetail({ organizerId }: { organizerId: string }) {
                   <RotateCcw className="w-4 h-4" /> Reinstate
                 </button>
               )}
+              {selfReg && (
+                <a
+                  href={`/organizer?as=${encodeURIComponent(org.id!)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={btnDark}
+                  title="See their portal exactly as they do, and make changes for them"
+                >
+                  <LayoutDashboard className="w-4 h-4" /> Open their portal
+                </a>
+              )}
               <button type="button" className={btnOutline} onClick={() => navigate(`/admin/organizers/edit/${encodeURIComponent(org.id!)}`)}>
                 <Edit3 className="w-4 h-4" /> Edit profile
               </button>
@@ -539,7 +564,30 @@ export function OrganizerDetail({ organizerId }: { organizerId: string }) {
         </div>
       </div>
 
-      <PayoutsPanel org={org} grossUsd={revenue} />
+      <PayoutsPanel org={org} grossUsd={revenue} onFeeSaved={(feePercent) => setPriv((p) => ({ ...(p || {}), feePercent }))} />
+      {priv?.payout?.accountName && (
+        <Panel title="Their payout details" sub="Entered by the organiser. Private — only you and they can see these.">
+          <dl className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+            {[
+              ["Method", { uk: "UK bank account", iban: "IBAN", pk: "Pakistan bank (IBAN)", other: "Other" }[priv.payout.method] || priv.payout.method],
+              ["Name on account", priv.payout.accountName],
+              ["Bank", priv.payout.bankName],
+              ["Sort code", priv.payout.sortCode],
+              ["Account number", priv.payout.accountNumber],
+              ["IBAN", priv.payout.iban],
+              ["BIC / SWIFT", priv.payout.bic],
+              ["Notes", priv.payout.notes],
+            ]
+              .filter(([, v]) => v)
+              .map(([k, v]) => (
+                <div key={k as string}>
+                  <dt className="text-[11px] font-bold text-[#8a8a8a]">{k}</dt>
+                  <dd className="font-bold break-words">{v}</dd>
+                </div>
+              ))}
+          </dl>
+        </Panel>
+      )}
 
       <div className="bg-white border border-[#e4e4e4]">
         <div className="px-5 py-4 border-b border-[#f2f2f2]">

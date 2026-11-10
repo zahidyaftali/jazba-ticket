@@ -17,6 +17,35 @@ import {deleteMedia, listMedia, mediaConfigured, uploadMedia} from './api/_lib/m
 import {mailConfigFromEnv, type MailConfig} from './api/_lib/sendEmail';
 import {fetchWordPressEvents, fetchWordPressSlug} from './api/_lib/wordpressEvents';
 import {SHARE_BOT_UA, renderEventSharePage} from './api/_lib/eventShare';
+import availabilityRoute from './api/_routes/availability';
+import promoCheckRoute from './api/_routes/promo-check';
+import organizerToolsRoute from './api/_routes/organizer-tools';
+import myTicketRoute from './api/_routes/my-ticket';
+
+/** Runs a Vercel-style route ((req, res) with res.status().json()) on the
+ *  dev server, so newer routes need no hand-written copy here. */
+function vercelRoute(handler: (req: any, res: any) => Promise<void>) {
+  return async (req: any, res: any) => {
+    const url = new URL(req.url || '/', 'http://localhost');
+    const body = req.method === 'POST' ? await readJsonBody(req) : {};
+    const shimReq = { method: req.method, headers: req.headers, query: Object.fromEntries(url.searchParams), body, socket: req.socket, url: req.url };
+    const shimRes: any = {
+      setHeader: (k: string, v: string) => res.setHeader(k, v),
+      status(code: number) {
+        res.statusCode = code;
+        return shimRes;
+      },
+      json(data: unknown) {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify(data));
+      },
+      send(data: unknown) {
+        res.end(data);
+      },
+    };
+    await handler(shimReq, shimRes);
+  };
+}
 
 function readJsonBody(req: any): Promise<any> {
   return new Promise((resolve) => {
@@ -37,6 +66,15 @@ function readJsonBody(req: any): Promise<any> {
 const devApi = (secrets: { stripeSecretKey: string; mail: MailConfig | null; env: Record<string, string> }): Plugin => ({
   name: 'jazba-dev-api',
   configureServer(server) {
+    // Routes written for Vercel read their settings from process.env.
+    for (const k of ['FIREBASE_SERVICE_ACCOUNT', 'ZOHO_SMTP_PASSWORD', 'ZOHO_SMTP_HOST', 'ZOHO_SMTP_USER', 'STRIPE_SECRET_KEY', 'BLOB_READ_WRITE_TOKEN']) {
+      if (secrets.env[k] && !process.env[k]) process.env[k] = secrets.env[k];
+    }
+    server.middlewares.use('/api/availability', vercelRoute(availabilityRoute));
+    server.middlewares.use('/api/promo-check', vercelRoute(promoCheckRoute));
+    server.middlewares.use('/api/organizer-tools', vercelRoute(organizerToolsRoute));
+    server.middlewares.use('/api/my-ticket', vercelRoute(myTicketRoute));
+
     // Mirrors the vercel.json rewrite: the door scanner app lives at /scan.
     server.middlewares.use((req, _res, next) => {
       const match = (req.url || '').match(/^\/scan\/?(\?.*)?$/);

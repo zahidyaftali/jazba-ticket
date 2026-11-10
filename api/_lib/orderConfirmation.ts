@@ -5,6 +5,7 @@ import { buildTicketEmail, parseTicket, ticketAttachments, type TicketFields } f
 import { retrieveCheckoutSession, wordPressEventDetails, type VerifiedCheckoutSession } from './stripePayment.js';
 import { WP_EVENT_PREFIX, fetchWordPressEvent } from './wordpressEvents.js';
 import { saveCardOrder } from './orderRecords.js';
+import { afterNewCardOrder } from './saleNotices.js';
 import type { ServiceAccount } from './firebaseAuthUsers.js';
 
 // Runs when a card buyer lands back on /checkout/success, and when Stripe
@@ -41,7 +42,11 @@ export async function confirmCheckoutSession(
   try {
     const result = await saveCardOrder(serviceAccount, session, order);
     bookingSaved = true;
-    if (result === 'created') console.log(`Order ${order.orderId}: booking saved.`);
+    if (result === 'created') {
+      console.log(`Order ${order.orderId}: booking saved.`);
+      // Once per order: the organiser's sale email and the promo code's use count.
+      await afterNewCardOrder(serviceAccount, mail, session, order);
+    }
   } catch (err: any) {
     console.error(`Order ${order.orderId}: booking NOT saved:`, err?.message || err);
   }

@@ -6,15 +6,9 @@ import {
 } from 'lucide-react';
 import { EventItem, eventPath } from '../types';
 import EventCard from './EventCard';
-import { auth } from '../firebase';
-import {
-  getOrganizerById,
-  followTarget,
-  unfollowTarget,
-  isFollowingTarget,
-  getFollowerCount,
-  OrganizerProfile,
-} from '../services/backendService';
+import { getOrganizerById, OrganizerProfile } from '../services/backendService';
+import { useFollow } from '../useFollow';
+import { GlowField } from './Decor';
 
 interface OrganizerDetailPageProps {
   allEvents: EventItem[];
@@ -47,9 +41,11 @@ export default function OrganizerDetailPage({ allEvents, onRequireLogin }: Organ
 
   const [organizer, setOrganizer] = useState<OrganizerProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followerCount, setFollowerCount] = useState(0);
-  const [followBusy, setFollowBusy] = useState(false);
+  const follow = useFollow('organizer', id || '', onRequireLogin);
+  const isFollowing = follow.following;
+  const followerCount = follow.count ?? 0;
+  const followBusy = follow.busy;
+  const handleToggleFollow = follow.toggle;
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -61,48 +57,6 @@ export default function OrganizerDetailPage({ allEvents, onRequireLogin }: Organ
       .then((org) => setOrganizer(org && (!org.status || org.status === 'approved') ? org : null))
       .finally(() => setLoading(false));
   }, [id]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!id) return;
-    getFollowerCount('organizer', id).then((count) => {
-      if (!cancelled) setFollowerCount(count);
-    });
-    const user = auth.currentUser;
-    if (user) {
-      isFollowingTarget(user.uid, 'organizer', id).then((following) => {
-        if (!cancelled) setIsFollowing(following);
-      });
-    } else {
-      setIsFollowing(false);
-    }
-    return () => { cancelled = true; };
-  }, [id]);
-
-  const handleToggleFollow = async () => {
-    const user = auth.currentUser;
-    if (!user) {
-      onRequireLogin();
-      return;
-    }
-    if (!id || followBusy) return;
-    setFollowBusy(true);
-    try {
-      if (isFollowing) {
-        await unfollowTarget(user.uid, 'organizer', id);
-        setIsFollowing(false);
-        setFollowerCount((c) => Math.max(0, c - 1));
-      } else {
-        await followTarget(user.uid, 'organizer', id);
-        setIsFollowing(true);
-        setFollowerCount((c) => c + 1);
-      }
-    } catch (err) {
-      console.error('Error updating follow state', err);
-    } finally {
-      setFollowBusy(false);
-    }
-  };
 
   const handleShare = async () => {
     try {
@@ -174,6 +128,7 @@ export default function OrganizerDetailPage({ allEvents, onRequireLogin }: Organ
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/40" />
           </div>
         )}
+        <GlowField tone="dark" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-14 sm:py-20 relative z-10">
           <button

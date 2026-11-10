@@ -150,7 +150,7 @@ export function DeleteOrganizerDialog({ org, onClose, onDeleted }: { org: Organi
 
 // ── Payouts & fee ──────────────────────────────────────────────────────────
 
-export function PayoutsPanel({ org, grossUsd }: { org: OrganizerProfile; grossUsd: number }) {
+export function PayoutsPanel({ org, grossUsd, onFeeSaved }: { org: OrganizerProfile; grossUsd: number; onFeeSaved?: (fee: number) => void }) {
   const { notify, fail, reload, currency: shownIn } = useAdmin();
   const key = payoutKey(org);
   const [payouts, setPayouts] = useState<Payout[] | null>(null);
@@ -179,6 +179,7 @@ export function PayoutsPanel({ org, grossUsd }: { org: OrganizerProfile; grossUs
     setSavingFee(true);
     try {
       await setOrganizerFee(org.id!, v);
+      onFeeSaved?.(v);
       notify(`Jazba fee set to ${v}%.`);
       await reload();
     } catch {

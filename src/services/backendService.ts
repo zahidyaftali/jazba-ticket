@@ -904,10 +904,17 @@ export async function getEvents(): Promise<EventItem[]> {
   }
 }
 
-// Public-facing pages should only ever show events the organizer/admin marked published.
+// Public-facing pages should only ever show events the organizer/admin marked
+// published. Asks the database for exactly those: drafts and events in review
+// are private to their organiser and admins (firestore.rules).
 export async function getPublishedEvents(): Promise<EventItem[]> {
-  const all = await getEvents();
-  return all.filter((e: any) => e.status === 'published');
+  try {
+    const snap = await getDocs(query(collection(db, 'events'), where('status', '==', 'published')));
+    return snap.docs.map((d) => normalizeEvent({ id: d.id, ...d.data() }));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, 'events');
+    return [];
+  }
 }
 
 export async function createEvent(event: any): Promise<any> {
@@ -1001,18 +1008,23 @@ export async function deleteUserAccount(uid: string): Promise<void> {
   }
 }
 
+/** Every organiser an admin may see; for everyone else, the approved ones
+ *  (applications in review are private — see firestore.rules). */
 export async function getAllOrganizers(): Promise<OrganizerProfile[]> {
-  const path = `organizers`;
-  try {
-    const snap = await getDocs(collection(db, 'organizers'));
+  const toList = (snap: { forEach: (cb: (d: any) => void) => void }) => {
     const list: OrganizerProfile[] = [];
-    snap.forEach((d) => {
-      list.push({ id: d.id, ...d.data() } as OrganizerProfile);
-    });
+    snap.forEach((d) => list.push({ id: d.id, ...d.data() } as OrganizerProfile));
     return list;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
-    return [];
+  };
+  try {
+    return toList(await getDocs(collection(db, 'organizers')));
+  } catch {
+    try {
+      return toList(await getDocs(query(collection(db, 'organizers'), where('status', '==', 'approved'))));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'organizers');
+      return [];
+    }
   }
 }
 

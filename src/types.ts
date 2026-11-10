@@ -54,6 +54,10 @@ export interface TicketOption {
   offerPrice?: number;
   /** Group package: people admitted on one ticket, e.g. 4. */
   groupSize?: number;
+  /** How many of this type are for sale (0 / missing = no own limit). */
+  capacity?: number;
+  /** When this type stops selling (ISO time). */
+  salesEnd?: string;
 }
 
 /** A price listed for information only (booked by enquiry or on a partner site). */
@@ -182,6 +186,14 @@ export interface AvailableTier {
   note: string;
   offerPrice?: number;
   groupSize?: number;
+  capacity?: number;
+  salesEnd?: string;
+}
+
+/** Has this ticket type stopped selling? */
+export function tierSalesEnded(t: { salesEnd?: string }, now = Date.now()): boolean {
+  const end = t.salesEnd ? Date.parse(t.salesEnd) : NaN;
+  return Number.isFinite(end) && end <= now;
 }
 
 /** The ticket packages this site's checkout sells for the event, in display
@@ -199,6 +211,8 @@ export function getAvailableTiers(event: EventItem): AvailableTier[] {
         note: o.note || '',
         ...(o.offerPrice ? { offerPrice: o.offerPrice } : {}),
         ...(o.groupSize ? { groupSize: o.groupSize } : {}),
+        ...(o.capacity ? { capacity: o.capacity } : {}),
+        ...(o.salesEnd ? { salesEnd: o.salesEnd } : {}),
       }));
   }
   const tp = event.tierPrices;
@@ -240,6 +254,18 @@ export const PROMO_CODES = new Map<string, PromoCode>([
 ]);
 
 /** The promo behind a code when it works on this event (on any package). */
+/** An organiser's own code, after the server confirmed it works on this
+ *  event (see checkPromoCode in services/organizerToolsService.ts). From then
+ *  on it behaves like the built-in codes on this page; the payment server
+ *  checks it again before charging. */
+export function registerPromo(code: string, promo: PromoCode): void {
+  const clean = code.trim().toUpperCase();
+  const existing = PROMO_CODES.get(clean);
+  if (existing && !existing.eventIds) return; // never shadow a built-in site-wide code
+  const eventIds = [...new Set([...(existing?.eventIds || []), ...(promo.eventIds || [])])];
+  PROMO_CODES.set(clean, { ...promo, eventIds });
+}
+
 export function findPromo(code: string, eventId: string): PromoCode | undefined {
   const promo = PROMO_CODES.get(code.trim().toUpperCase());
   if (!promo || (promo.eventIds && !promo.eventIds.includes(eventId))) return undefined;
@@ -419,6 +445,10 @@ export interface EventItem {
   endsOn?: string;
   /** Readable URL segment: /events/<slug>. See withEventSlugs(). */
   slug?: string;
+  /** Site events: tickets for sale in total (0 / missing = no limit). */
+  capacity?: number;
+  /** Site events made by an organiser: their account id. */
+  organizerId?: string;
 }
 
 // ---- Readable event URLs ---------------------------------------------------

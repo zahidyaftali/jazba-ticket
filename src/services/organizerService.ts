@@ -6,6 +6,7 @@
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -83,23 +84,82 @@ export async function getMyOrganizer(uid: string): Promise<OrganizerProfile | nu
   return snap.exists() ? ({ id: snap.id, ...snap.data() } as OrganizerProfile) : null;
 }
 
+/** The note an applicant writes for the Jazba team is private: it's kept in
+ *  organizerPrivate/<id>, never on the public profile. */
+async function saveApplicationNote(id: string, note: string | undefined): Promise<void> {
+  if (note === undefined) return;
+  await setDoc(doc(db, 'organizerPrivate', id), { applicationNote: note.slice(0, 3000), updatedAt: new Date().toISOString() }, { merge: true });
+}
+
 /** Send an application: the caller's own organizers/<uid>, as "pending". */
 export async function applyAsOrganizer(uid: string, details: OrganizerDetails): Promise<OrganizerProfile> {
   const now = new Date().toISOString();
-  const profile = { ...cleanDetails(details), id: uid, userId: uid, status: 'pending' as const, createdAt: now, updatedAt: now };
+  const { applicationNote, ...publicDetails } = cleanDetails(details);
+  const profile = { ...publicDetails, id: uid, userId: uid, status: 'pending' as const, createdAt: now, updatedAt: now };
   await setDoc(doc(db, 'organizers', uid), profile);
+  await saveApplicationNote(uid, applicationNote).catch((err) => console.warn('Application note not saved:', err));
   notifyOrganizerEmail('applied');
-  return profile as OrganizerProfile;
+  return { ...profile, applicationNote } as OrganizerProfile;
 }
 
 /** Edit the caller's own profile; `resubmit` sends a rejected application again. */
 export async function updateMyOrganizer(uid: string, details: Partial<OrganizerDetails>, resubmit = false): Promise<void> {
+  const { applicationNote, ...publicDetails } = cleanDetails(details);
   await updateDoc(doc(db, 'organizers', uid), {
-    ...cleanDetails(details),
+    ...publicDetails,
+    // An older profile may still carry its note publicly: it moves to private.
+    ...(applicationNote !== undefined ? { applicationNote: deleteField() } : {}),
     updatedAt: new Date().toISOString(),
     ...(resubmit ? { status: 'pending' } : {}),
   });
+  await saveApplicationNote(uid, applicationNote).catch((err) => console.warn('Application note not saved:', err));
   if (resubmit) notifyOrganizerEmail('applied');
+}
+
+/** Private fields of an organiser — the private store first, then any older
+ *  copy still on the public profile. */
+export function privateFieldsOf(
+  org: Pick<OrganizerProfile, 'feePercent' | 'reviewNote' | 'applicationNote'> | null | undefined,
+  priv: { feePercent?: number; reviewNote?: string; applicationNote?: string } | null | undefined,
+): { feePercent: number; reviewNote: string; applicationNote: string } {
+  return {
+    feePercent: Number(priv?.feePercent ?? org?.feePercent ?? 0) || 0,
+    reviewNote: String(priv?.reviewNote ?? org?.reviewNote ?? ''),
+    applicationNote: String(priv?.applicationNote ?? org?.applicationNote ?? ''),
+  };
+}
+
+/** Admin, once: move the fee, review note and application note off public
+ *  profiles into organizerPrivate (copied first, then cleared publicly), and
+ *  give old profiles without a status the 'approved' they always meant. */
+export async function migrateOrganizerPrivacy(orgs: OrganizerProfile[]): Promise<number> {
+  let moved = 0;
+  for (const org of orgs) {
+    if (!org.id) continue;
+    const pub = org as OrganizerProfile & Record<string, unknown>;
+    const keys = (['feePercent', 'reviewNote', 'applicationNote'] as const).filter((k) => pub[k] !== undefined);
+    const needsStatus = !org.status;
+    if (!keys.length && !needsStatus) continue;
+    try {
+      if (keys.length) {
+        const existing = await getDoc(doc(db, 'organizerPrivate', org.id));
+        const have = existing.exists() ? existing.data() : {};
+        const copy: Record<string, unknown> = {};
+        for (const k of keys) if (have[k] === undefined) copy[k] = pub[k];
+        if (Object.keys(copy).length) {
+          await setDoc(doc(db, 'organizerPrivate', org.id), { ...copy, updatedAt: new Date().toISOString() }, { merge: true });
+        }
+      }
+      const clear: Record<string, unknown> = {};
+      for (const k of keys) clear[k] = deleteField();
+      if (needsStatus) clear.status = 'approved';
+      await updateDoc(doc(db, 'organizers', org.id), clear);
+      moved++;
+    } catch (err) {
+      console.warn(`Organiser ${org.id}: private details not moved yet.`, err);
+    }
+  }
+  return moved;
 }
 
 // ── Events ────────────────────────────────────────────────────────────────
@@ -145,7 +205,23 @@ export interface OrganizerEventStats {
   orders: number;
   passes: number;
   checkedIn: number;
+  complimentary?: number;
   tiers: OrganizerTierStats[];
+  /** Tickets left per type and sales-end status (same as the checkout). */
+  availability?: import('./organizerToolsService').EventAvailability;
+  /** People still waiting on this event's waitlist. */
+  waitlist?: number;
+}
+export interface OrganizerWaitlistEntry {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  name: string;
+  email: string;
+  tier: string;
+  createdAt: string;
+  status: string;
+  notifiedAt: string;
 }
 export interface OrganizerOrder {
   id: string;
@@ -160,12 +236,18 @@ export interface OrganizerOrder {
   amountLocal: number;
   createdAt: string;
   status: 'paid' | 'pending' | 'failed' | 'cancelled';
-  source: 'online' | 'admin';
+  source: 'online' | 'admin' | 'organizer';
+  complimentary?: boolean;
+  phone?: string;
+  promoCode?: string;
+  emailedTo?: string;
+  tier?: string;
 }
 export interface OrganizerReport {
   organizerId: string;
   events: OrganizerEventStats[];
   orders: OrganizerOrder[];
+  waitlist?: OrganizerWaitlistEntry[];
   totals: { revenueUsd: number; ticketsSold: number; orders: number; checkedIn: number; followers: number; liveEvents: number };
   generatedAt: string;
 }
@@ -223,9 +305,14 @@ export async function reviewOrganizer(
   const batch = writeBatch(db);
   batch.update(doc(db, 'organizers', org.id), {
     status,
-    reviewNote: note.trim().slice(0, 2000),
+    reviewNote: deleteField(), // kept privately below, never on the public profile
     reviewedAt: new Date().toISOString(),
   });
+  batch.set(
+    doc(db, 'organizerPrivate', org.id),
+    { reviewNote: note.trim().slice(0, 2000), updatedAt: new Date().toISOString() },
+    { merge: true },
+  );
   if (org.userId && accountRole && accountRole !== 'admin') {
     const role = status === 'approved' ? 'organizer' : 'user';
     if (role !== accountRole) batch.update(doc(db, 'users', org.userId), { role });
@@ -385,7 +472,9 @@ export async function deletePayout(id: string): Promise<void> {
 /** Jazba's share of an organiser's ticket sales, in percent (0–100). */
 export async function setOrganizerFee(organizerId: string, feePercent: number): Promise<void> {
   const v = Math.min(100, Math.max(0, Math.round(Number(feePercent) * 100) / 100));
-  await updateDoc(doc(db, 'organizers', organizerId), { feePercent: v });
+  // Private: only the organiser and admins can see it.
+  await setDoc(doc(db, 'organizerPrivate', organizerId), { feePercent: v, updatedAt: new Date().toISOString() }, { merge: true });
+  await updateDoc(doc(db, 'organizers', organizerId), { feePercent: deleteField() }).catch(() => undefined);
 }
 
 /** Gross sales → Jazba fee → organiser's share → paid → still owed (all USD). */

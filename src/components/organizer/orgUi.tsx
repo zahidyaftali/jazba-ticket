@@ -18,9 +18,9 @@ export function CurrencyPicker() {
         onChange={(e) => setCurrency(e.target.value)}
         className="bg-white border border-[#e4e4e4] px-2 py-2 text-xs font-bold text-black cursor-pointer outline-none focus:border-black"
       >
-        <option value="PKR">PKR</option>
         <option value="GBP">GBP</option>
         <option value="USD">USD</option>
+        <option value="PKR">PKR</option>
       </select>
     </label>
   );

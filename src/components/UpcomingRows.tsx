@@ -82,9 +82,9 @@ export default function UpcomingRows({ events, onBook, onViewAll, onViewDetail }
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); onBook(item); }}
-                    className="bg-black text-white px-5 py-3 text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors flex items-center gap-2"
+                    className="jz-cta bg-black text-white px-5 py-3 text-sm font-bold cursor-pointer hover:bg-neutral-800 transition-colors flex items-center gap-2"
                   >
-                    Buy tickets <ArrowRight className="w-4 h-4" />
+                    Get tickets <ArrowRight className="w-4 h-4 jz-cta-arrow" />
                   </button>
                 </div>
               </div>

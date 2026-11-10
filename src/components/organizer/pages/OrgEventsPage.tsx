@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
+  BellRing,
   CalendarPlus,
   Copy,
   Download,
@@ -13,12 +14,15 @@ import {
   Send,
   ShoppingBag,
   Ticket,
+  TicketPlus,
   Trash2,
   Undo2,
   UserCheck,
   Wallet,
 } from "lucide-react";
 import { deleteOrganizerEvent, notifyOrganizerEmail, saveOrganizerEvent } from "../../../services/organizerService";
+import { resendOrganizerTicket } from "../../../services/organizerToolsService";
+import { EventItem, getAvailableTiers } from "../../../types";
 import {
   Badge,
   DataTable,
@@ -182,7 +186,7 @@ export function OrgEventsList() {
 }
 
 export function OrgEventDetail({ eventId }: { eventId: string }) {
-  const { events, eventsLoading, report, reportLoading, navigate, notify, fail, reload } = useOrg();
+  const { events, eventsLoading, report, reportLoading, navigate, notify, fail, reload, toolOrgId } = useOrg();
   const show = useMoney();
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
@@ -250,6 +254,15 @@ export function OrgEventDetail({ eventId }: { eventId: string }) {
     }
   };
 
+  const resend = async (orderId: string) => {
+    try {
+      const r = await resendOrganizerTicket(orderId, "", toolOrgId);
+      notify(`Ticket sent again to ${r.sentTo}.`);
+    } catch (err: any) {
+      fail(err?.message || "Couldn’t send the ticket.");
+    }
+  };
+
   const exportCsv = () =>
     downloadCsv(`${String(event.title || "event").replace(/[^\w]+/g, "-").toLowerCase()}-attendees.csv`, [
       ["Order", "Name", "Email", "Ticket", "Quantity", "Paid", "Currency", "Status", "Ordered at"],
@@ -284,6 +297,11 @@ export function OrgEventDetail({ eventId }: { eventId: string }) {
             {event.status === "pending" && (
               <button type="button" disabled={busy} className={btnOutline} onClick={() => setStatus("draft", "Moved back to drafts.")}>
                 <Undo2 className="w-4 h-4" /> Withdraw from review
+              </button>
+            )}
+            {event.status !== "draft" && event.status !== "cancelled" && (
+              <button type="button" className={btnOutline} onClick={() => navigate(`/organizer/issue?event=${encodeURIComponent(event.id)}`)}>
+                <TicketPlus className="w-4 h-4" /> Issue tickets
               </button>
             )}
             {event.status === "published" && (
@@ -323,21 +341,56 @@ export function OrgEventDetail({ eventId }: { eventId: string }) {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <Panel title="Sales by ticket type" bodyClassName="">
-          {stats?.tiers.length ? (
+        <Panel
+          title="Tickets by type"
+          sub={stats?.availability?.left != null ? `${stats.availability.left} left of ${stats.availability.capacity} in total` : "Sold, left and when sales close"}
+          bodyClassName=""
+        >
+          {getAvailableTiers(event as EventItem).length ? (
             <ul className="divide-y divide-[#f2f2f2]">
-              {stats.tiers.map((t) => (
-                <li key={t.name} className="px-5 py-3 flex items-center justify-between text-sm">
-                  <span className="font-bold">{t.name}</span>
-                  <span className="text-right">
-                    <span className="font-bold block">{show(t.revenueUsd)}</span>
-                    <span className="text-[11px] text-[#8a8a8a]">{t.sold} sold</span>
-                  </span>
-                </li>
-              ))}
+              {getAvailableTiers(event as EventItem).map((t) => {
+                const a = stats?.availability?.tiers[t.tier];
+                const revenue = stats?.tiers.find((x) => x.name === t.name)?.revenueUsd || 0;
+                const ended = a?.salesEnded;
+                const soldOut = a?.left !== null && a?.left !== undefined && a.left <= 0;
+                return (
+                  <li key={t.tier} className="px-5 py-3 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-bold min-w-0 truncate">{t.name}</span>
+                      <span className="font-bold shrink-0">{show(revenue)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 mt-1 text-[11px] text-[#8a8a8a]">
+                      <span>
+                        {a?.sold || 0} sold
+                        {a?.capacity ? ` of ${a.capacity}` : ""}
+                        {a?.left != null && !soldOut ? ` · ${a.left} left` : ""}
+                        {t.salesEnd ? ` · sales end ${fmtDateTime(t.salesEnd)}` : ""}
+                      </span>
+                      {ended ? <Badge tone="neutral">Closed</Badge> : soldOut ? <Badge tone="negative">Sold out</Badge> : <Badge tone="positive">On sale</Badge>}
+                    </div>
+                    {a?.capacity ? (
+                      <div className="h-1 bg-[#efefef] mt-2">
+                        <div className="h-full bg-black" style={{ width: `${Math.min(100, Math.round(((a.sold || 0) / a.capacity) * 100))}%` }} />
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           ) : (
-            <p className="px-5 py-8 text-sm text-[#8a8a8a]">No sales yet.</p>
+            <p className="px-5 py-8 text-sm text-[#8a8a8a]">No ticket types yet — add them in the editor.</p>
+          )}
+          {(stats?.waitlist || 0) > 0 && (
+            <button
+              type="button"
+              onClick={() => navigate("/organizer/waitlist")}
+              className="w-full flex items-center justify-between gap-3 px-5 py-3 border-t border-[#f2f2f2] bg-[#fffbd6] text-sm font-bold cursor-pointer hover:bg-[#fff6a8]"
+            >
+              <span className="flex items-center gap-2">
+                <BellRing className="w-4 h-4" /> {stats!.waitlist} on the waitlist
+              </span>
+              <span className="underline text-xs">Tell them</span>
+            </button>
           )}
         </Panel>
         <Panel title="Share your event" className="xl:col-span-2">
@@ -393,13 +446,15 @@ export function OrgEventDetail({ eventId }: { eventId: string }) {
         <Toolbar>
           <SearchInput value={q} onChange={setQ} placeholder="Search name, email, order…" />
         </Toolbar>
-        <OrdersTable orders={shown} total={orders.length} loading={reportLoading} />
+        <OrdersTable orders={shown} total={orders.length} loading={reportLoading} onResend={resend} />
       </div>
     </div>
   );
 }
 
-export function OrdersTable({ orders, total, loading, showEvent = false }: { orders: any[]; total: number; loading: boolean; showEvent?: boolean }) {
+export function OrdersTable({
+  orders, total, loading, showEvent = false, onResend,
+}: { orders: any[]; total: number; loading: boolean; showEvent?: boolean; onResend?: (orderId: string) => void }) {
   const show = useMoney();
   return (
     <>
@@ -413,6 +468,7 @@ export function OrdersTable({ orders, total, loading, showEvent = false }: { ord
             <th className={thCls}>Paid</th>
             <th className={thCls}>Status</th>
             <th className={thCls}>Date</th>
+            {onResend && <th className={thCls}></th>}
           </>
         }
       >
@@ -434,16 +490,25 @@ export function OrdersTable({ orders, total, loading, showEvent = false }: { ord
             <td className={`${tdCls} font-bold whitespace-nowrap`}>{show(o.amountUsd)}</td>
             <td className={tdCls}>
               {o.status === "paid" ? (
-                <Badge tone="positive">{o.source === "admin" ? "Issued" : "Paid"}</Badge>
+                <Badge tone="positive">{o.complimentary ? "Free" : o.source === "admin" || o.source === "organizer" ? "Issued" : "Paid"}</Badge>
               ) : (
                 <Badge tone={o.status === "cancelled" || o.status === "failed" ? "negative" : "warning"}>{o.status}</Badge>
               )}
             </td>
             <td className={`${tdCls} whitespace-nowrap text-xs`}>{fmtDateTime(o.createdAt)}</td>
+            {onResend && (
+              <td className={`${tdCls} text-right`}>
+                {o.buyerEmail && o.status !== "cancelled" && (
+                  <button type="button" className="text-[11px] font-bold underline cursor-pointer whitespace-nowrap" onClick={() => onResend(o.id)} title="Email the ticket again">
+                    Resend ticket
+                  </button>
+                )}
+              </td>
+            )}
           </tr>
         ))}
         {orders.length === 0 && (
-          <EmptyRow colSpan={showEvent ? 7 : 6} title={loading ? "Loading orders…" : total ? "No orders match" : "No orders yet"} sub={total || loading ? undefined : "Orders appear here as soon as tickets sell."} />
+          <EmptyRow colSpan={(showEvent ? 7 : 6) + (onResend ? 1 : 0)} title={loading ? "Loading orders…" : total ? "No orders match" : "No orders yet"} sub={total || loading ? undefined : "Orders appear here as soon as tickets sell."} />
         )}
       </DataTable>
       <TableFooter shown={orders.length} total={total} noun="orders" />

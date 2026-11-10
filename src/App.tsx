@@ -45,6 +45,8 @@ import OrganizersPage from './components/OrganizersPage';
 import OrganizerDetailPage from './components/OrganizerDetailPage';
 import ForOrganizersPage from './components/ForOrganizersPage';
 import { EventGridSkeleton, DetailPageSkeleton } from './components/Skeletons';
+import HowItWorks from './components/HowItWorks';
+import { Reveal, TicketDoodles } from './components/Decor';
 import { categories, faqs } from './data';
 import { EventItem, TicketTier, eventPath, getAvailableTiers, isPastEvent, withEventSlugs } from './types';
 import { getPublishedEvents, getAllArtists, syncAccountProfile } from './services/backendService';
@@ -151,6 +153,12 @@ function HomeView({ events, eventsLoaded }: { events: EventItem[]; eventsLoaded:
   const liveEvents = useMemo(() => events.filter((e) => !isPastEvent(e)), [events]);
   const topEvents = useMemo(() => liveEvents.filter((e) => e.type === 'top'), [liveEvents]);
   const nearByEvents = useMemo(() => liveEvents.filter((e) => e.type === 'near-by'), [liveEvents]);
+  // Shows on per category; empty categories aren't offered on the home page.
+  const categoryCounts = useMemo(() => {
+    const m: Record<string, number> = { all: liveEvents.length };
+    for (const e of liveEvents) m[e.category] = (m[e.category] || 0) + 1;
+    return m;
+  }, [liveEvents]);
 
   const goDetail = (evt: EventItem) => navigate(eventPath(evt));
   const goCheckout = (evt: EventItem) =>
@@ -159,12 +167,14 @@ function HomeView({ events, eventsLoaded }: { events: EventItem[]; eventsLoaded:
   return (
     <>
       <HeroSection
+        events={liveEvents}
         onSearch={() => {}}
         onSelectDateFilter={() => {}}
         onBookArtist={() => navigate('/artists')}
-        onSearchSubmit={({ query, venue, ticketClass, dateOffset }) => {
+        onSearchSubmit={({ query, venue, ticketClass, dateOffset, city }) => {
           const p = new URLSearchParams();
           if (query) p.set('q', query);
+          if (city) p.set('city', city);
           if (venue) p.set('venue', venue);
           if (ticketClass) p.set('class', ticketClass);
           if (dateOffset !== null && dateOffset !== undefined) p.set('date', String(dateOffset));
@@ -176,14 +186,19 @@ function HomeView({ events, eventsLoaded }: { events: EventItem[]; eventsLoaded:
       <CategoryCircles
         categories={categories}
         selectedCategory="all"
-        onSelectCategory={(id) => navigate(`/events?category=${id}`)}
+        counts={categoryCounts}
+        onSelectCategory={(id) => navigate(id === 'all' ? '/events' : `/events?category=${id}`)}
       />
 
+      <HowItWorks />
+
       {/* TOP EVENTS */}
-      <section className="max-w-7xl mx-auto px-4 py-16 sm:px-6 md:px-8" id="top-events">
-        <div className="flex items-end justify-between mb-10">
+      <section className="relative" id="top-events">
+      <TicketDoodles />
+      <div className="max-w-7xl mx-auto px-4 py-16 sm:px-6 md:px-8 jz-above">
+        <Reveal className="flex items-end justify-between mb-10">
           <div>
-            <span className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#666]">Trending now</span>
+            <span className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#666]">On sale now</span>
             <h2 className="text-3xl md:text-4xl font-display font-bold text-black tracking-tight leading-[0.95] mt-2">Top events</h2>
           </div>
           <button
@@ -192,23 +207,28 @@ function HomeView({ events, eventsLoaded }: { events: EventItem[]; eventsLoaded:
           >
             View all
           </button>
-        </div>
+        </Reveal>
 
         {!eventsLoaded ? (
           <EventGridSkeleton />
         ) : topEvents.length === 0 ? (
           <div className="p-12 text-center bg-neutral-50 rounded-3xl max-w-lg mx-auto">
             <Info className="w-10 h-10 text-neutral-400 mx-auto mb-3" />
-            <h4 className="font-extrabold text-[#E34718] text-lg">No events yet</h4>
-            <p className="text-xs text-neutral-500 font-bold mt-1">Check back soon — new shows go on sale every day.</p>
+            <h4 className="font-extrabold text-[#E34718] text-lg">Nothing featured just now</h4>
+            <p className="text-xs text-neutral-500 font-bold mt-1">See every upcoming show on the events page.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {topEvents.map((evt) => (
-              <EventCard key={evt.id} event={evt} onBook={goCheckout} onViewDetail={goDetail} />
+            {topEvents.map((evt, i) => (
+              <React.Fragment key={evt.id}>
+                <Reveal delay={Math.min(i, 3) * 120}>
+                  <EventCard event={evt} onBook={goCheckout} onViewDetail={goDetail} />
+                </Reveal>
+              </React.Fragment>
             ))}
           </div>
         )}
+      </div>
       </section>
 
       {!eventsLoaded ? (
@@ -284,6 +304,7 @@ function ExplorerView({ events, eventsLoaded }: { events: EventItem[]; eventsLoa
       categories={categories}
       initialCategory={params.get('category') || 'all'}
       initialSearchTerm={params.get('q') || ''}
+      initialCity={params.get('city') || ''}
       initialVenue={params.get('venue') || ''}
       initialTicketClass={params.get('class') || ''}
       initialDateOffset={dateParam !== null ? Number(dateParam) : null}
@@ -454,10 +475,7 @@ function ArtistDetailView({ events }: { events: EventItem[] }) {
       artist={artist}
       allEvents={events}
       onBack={() => navigate('/artists')}
-      onViewShowDetail={(showTitle) => {
-        const matched = events.find((e) => e.title.toLowerCase().includes(showTitle.toLowerCase()));
-        navigate(matched ? eventPath(matched) : `/events?q=${encodeURIComponent(showTitle)}`);
-      }}
+      onViewShowDetail={(evt) => navigate(eventPath(evt))}
       onBookEvent={(evt) => navigate('/checkout', { state: { event: evt, quantity: 1, tier: 'general' } })}
       onRequireLogin={() => navigate('/login')}
     />

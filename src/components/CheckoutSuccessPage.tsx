@@ -3,7 +3,9 @@ import { Check, Loader2, Printer, ShieldCheck, AlertCircle } from 'lucide-react'
 import { EventItem, tierDisplayName } from '../types';
 import { auth } from '../firebase';
 import { createBooking } from '../services/backendService';
-import TicketPrintSheet, { printWhenReady } from './TicketPrintSheet';
+import TicketPrintSheet, { QrCode, printWhenReady } from './TicketPrintSheet';
+import { AddToCalendar, DirectionsLink } from './AddToCalendar';
+import { downloadMyTicket } from '../services/organizerToolsService';
 
 interface CheckoutSuccessPageProps {
   sessionId: string;
@@ -46,6 +48,7 @@ export default function CheckoutSuccessPage({ sessionId, events, onGoToDashboard
   const [errorMsg, setErrorMsg] = useState('');
   const [session, setSession] = useState<VerifiedSession | null>(null);
   const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -231,13 +234,13 @@ export default function CheckoutSuccessPage({ sessionId, events, onGoToDashboard
                 </div>
               </div>
 
+              {/* The QR the door scanner reads — the same one as on the e-ticket */}
               <div className="flex flex-col items-center border-t border-white/15 mt-8 pt-8">
-                <div className="bg-white h-14 w-full max-w-sm px-6 py-2 flex items-center justify-center gap-[2px]">
-                  {[1, 3, 1.5, 4, 1, 2, 3.5, 1, 4, 1.5, 3, 1, 2, 4, 1.5, 1, 3, 2.5, 1, 3.5].map((w, i) => (
-                    <span key={i} className="h-full bg-black" style={{ width: `${w}px` }} />
-                  ))}
+                <div className="bg-white p-3">
+                  <QrCode value={session.orderId} size={148} />
                 </div>
                 <span className="font-bold text-xs tracking-[0.25em] mt-4">{session.orderId}</span>
+                <span className="text-xs text-white/60 mt-2">Show this at the door — on screen or printed.</span>
               </div>
             </div>
           </div>
@@ -246,13 +249,22 @@ export default function CheckoutSuccessPage({ sessionId, events, onGoToDashboard
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">
           <button
             type="button"
-            onClick={() => {
+            onClick={async () => {
               if (redirectTimer.current) clearTimeout(redirectTimer.current);
-              printWhenReady();
+              if (!session) return printWhenReady();
+              setDownloading(true);
+              try {
+                await downloadMyTicket(session.orderId);
+              } catch {
+                printWhenReady();
+              } finally {
+                setDownloading(false);
+              }
             }}
-            className="flex items-center justify-center gap-2 bg-black text-white py-4 font-bold text-sm cursor-pointer hover:bg-neutral-800 transition-colors"
+            disabled={downloading}
+            className="jz-cta flex items-center justify-center gap-2 bg-black text-white py-4 font-bold text-sm cursor-pointer hover:bg-neutral-800 transition-colors disabled:opacity-60"
           >
-            <Printer className="w-4 h-4" /> Download / Print ticket
+            <Printer className="w-4 h-4 jz-cta-icon text-[#ffed00]" /> {downloading ? 'Preparing your ticket…' : 'Download PDF ticket'}
           </button>
           <button
             type="button"
@@ -262,6 +274,17 @@ export default function CheckoutSuccessPage({ sessionId, events, onGoToDashboard
             View tickets in my profile
           </button>
         </div>
+
+        {event && session && (
+          // Using these stops the automatic move to the profile page.
+          <div
+            className="flex flex-wrap justify-center gap-3 mt-4"
+            onClickCapture={() => { if (redirectTimer.current) clearTimeout(redirectTimer.current); }}
+          >
+            <AddToCalendar event={event} extras={{ orderId: session.orderId }} />
+            <DirectionsLink event={event} />
+          </div>
+        )}
 
         {event && session && (
           <TicketPrintSheet

@@ -17,22 +17,42 @@ import {
 } from "../../firebase";
 import {
   createUserProfile,
+  getAllOrganizers,
+  getOrganizerById,
   getUserProfile,
   isUserBootstrappedAdmin,
   syncAccountProfile,
   type OrganizerProfile,
   type UserProfile,
 } from "../../services/backendService";
-import { applyAsOrganizer, getMyOrganizer, organizerStatus, updateMyOrganizer, type OrganizerDetails } from "../../services/organizerService";
+import {
+  applyAsOrganizer, getMyOrganizer, isSelfRegistered, organizerStatus, privateFieldsOf, updateMyOrganizer, type OrganizerDetails,
+} from "../../services/organizerService";
+import { getOrganizerPrivate } from "../../services/organizerToolsService";
 import brandMark from "../../../assets/images/Favicon.png";
 import { btnOutline, btnPrimary, inputCls, labelCls, overline } from "../admin/ui";
 import OrganizerApp from "./OrganizerApp";
+import { actingTarget, stopActing } from "./acting";
 import OrganizerDetailsForm, { detailsFrom, detailsProblem } from "./OrganizerDetailsForm";
 
 type Stage =
   | { kind: "checking" }
   | { kind: "signed-out" }
-  | { kind: "ready"; user: User; me: UserProfile | null; org: OrganizerProfile | null };
+  | { kind: "ready"; user: User; me: UserProfile | null; org: OrganizerProfile | null; acting?: boolean };
+
+/** The profile with its private details (fee, review note, application
+ *  note) merged in for display — they're stored separately, privately. */
+async function withPrivate(org: OrganizerProfile | null): Promise<OrganizerProfile | null> {
+  if (!org?.id) return org;
+  const priv = await getOrganizerPrivate(org.id);
+  const merged = privateFieldsOf(org, priv);
+  return {
+    ...org,
+    ...(merged.feePercent ? { feePercent: merged.feePercent } : {}),
+    ...(merged.reviewNote ? { reviewNote: merged.reviewNote } : {}),
+    ...(merged.applicationNote ? { applicationNote: merged.applicationNote } : {}),
+  };
+}
 
 /**
  * /organizer — the organiser portal. Signed out: log in or create an
@@ -44,7 +64,19 @@ export default function OrganizerPortal() {
   const [stage, setStage] = useState<Stage>({ kind: "checking" });
 
   const load = useCallback(async (user: User) => {
-    const [me, org] = await Promise.all([getUserProfile(user.uid), getMyOrganizer(user.uid).catch(() => null)]);
+    // An admin opening an organiser's portal.
+    const asId = actingTarget();
+    if (asId) {
+      const me = await getUserProfile(user.uid);
+      if (isUserBootstrappedAdmin(user.email) || (me?.role === "admin" && me?.status !== "suspended")) {
+        const org = await withPrivate(await getOrganizerById(asId));
+        setStage({ kind: "ready", user, me, org, acting: !!org });
+        return;
+      }
+      stopActing();
+    }
+    const [me, rawOrg] = await Promise.all([getUserProfile(user.uid), getMyOrganizer(user.uid).catch(() => null)]);
+    const org = await withPrivate(rawOrg);
     let profile = me;
     if (!profile) {
       // A brand-new sign-up writes its own profile a moment after the account exists.
@@ -91,12 +123,18 @@ export default function OrganizerPortal() {
   const setOrg = (o: OrganizerProfile) => setStage({ ...stage, org: o });
   const isAdmin = isUserBootstrappedAdmin(user.email) || me?.role === "admin";
 
+  // An admin inside an organiser's portal: the full portal, whatever its status.
+  if (stage.acting && org) {
+    return <OrganizerApp user={user} me={me} org={org} onLogout={logout} actingAsAdmin />;
+  }
+
   if (!org) {
     if (isAdmin) {
       return (
         <Notice icon={ShieldAlert} title="You’re signed in as an admin" onLogout={logout}>
-          <p>Organisers use this portal to run their own events. You manage every organiser from the admin portal.</p>
-          <a href="/admin/organizers" className={`${btnPrimary} mt-5`}>
+          <p>Organisers use this portal to run their own events. Open any organiser’s portal to see exactly what they see and make changes for them.</p>
+          <AdminOrganizerPicker />
+          <a href="/admin/organizers" className={`${btnOutline} mt-5`}>
             Go to the admin portal
           </a>
         </Notice>
@@ -130,6 +168,31 @@ export default function OrganizerPortal() {
 }
 
 // ── Pieces ────────────────────────────────────────────────────────────────
+
+/** Admin: open one of the self-registered organisers' portals. */
+function AdminOrganizerPicker() {
+  const [orgs, setOrgs] = useState<OrganizerProfile[] | null>(null);
+  useEffect(() => {
+    getAllOrganizers().then((list) => setOrgs(list.filter((o) => isSelfRegistered(o)).sort((a, b) => a.companyName.localeCompare(b.companyName))));
+  }, []);
+  if (!orgs) return <Loader2 className="w-5 h-5 animate-spin mt-5" />;
+  if (!orgs.length) return <p className="mt-4 text-[#8a8a8a]">No organisers have signed up yet.</p>;
+  return (
+    <ul className="mt-5 border border-[#e4e4e4] divide-y divide-[#f2f2f2] max-h-80 overflow-y-auto">
+      {orgs.map((o) => (
+        <li key={o.id}>
+          <a href={`/organizer?as=${encodeURIComponent(o.id!)}`} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-[#f7f7f7]">
+            <span className="min-w-0">
+              <span className="font-bold text-black block truncate">{o.companyName}</span>
+              <span className="text-xs text-[#8a8a8a]">{o.status || "approved"}</span>
+            </span>
+            <span className="text-xs font-bold underline shrink-0">Open portal</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 function Shell({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
   return (

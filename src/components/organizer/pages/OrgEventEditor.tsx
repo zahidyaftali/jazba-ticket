@@ -20,6 +20,41 @@ interface FaqRow {
   question: string;
   answer: string;
 }
+/** One ticket type. `id` is kept once saved (orders refer to it). */
+interface TicketRow {
+  id: string;
+  name: string;
+  price: string;
+  quantity: string;
+  salesEnd: string;
+  groupSize: string;
+  note: string;
+}
+
+const blankTicket = (name = ""): TicketRow => ({ id: "", name, price: "", quantity: "", salesEnd: "", groupSize: "", note: "" });
+
+/** "Early bird (2 people)" → "early-bird-2-people", unique among `taken`. */
+function ticketId(name: string, taken: Set<string>): string {
+  const base =
+    name
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48) || "ticket";
+  let id = base;
+  for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
+  taken.add(id);
+  return id;
+}
+
+const toLocalInput = (iso?: string) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
 
 const BLANK = {
   title: "",
@@ -35,10 +70,8 @@ const BLANK = {
   city: "",
   country: "Pakistan",
   mapUrl: "",
-  priceCurrency: "PKR",
-  general: "",
-  vip: "",
-  elite: "",
+  priceCurrency: "GBP",
+  tickets: [blankTicket("General admission")] as TicketRow[],
   capacity: "",
   lineup: [] as LineupRow[],
   faqs: [] as FaqRow[],
@@ -85,13 +118,34 @@ function formFrom(e: any): Form {
     country: e.country || "",
     mapUrl: e.venueInfo?.mapUrl || "",
     priceCurrency: cur,
-    general: priceIn(e.tierPrices?.general || e.price, cur),
-    vip: priceIn(e.tierPrices?.vip, cur),
-    elite: priceIn(e.tierPrices?.elite, cur),
+    tickets: ticketRowsFrom(e, cur),
     capacity: e.capacity ? String(e.capacity) : "",
     lineup: e.lineup || [],
     faqs: e.faqs || [],
   };
+}
+
+/** The event's ticket types as editable rows: its own list, or the older
+ *  General / VIP / Elite prices. */
+function ticketRowsFrom(e: any, cur: string): TicketRow[] {
+  if (Array.isArray(e.ticketOptions) && e.ticketOptions.length) {
+    return e.ticketOptions.map((o: any) => ({
+      id: String(o.id || ""),
+      name: String(o.name || ""),
+      price: priceIn(o.price, cur),
+      quantity: o.capacity ? String(o.capacity) : "",
+      salesEnd: toLocalInput(o.salesEnd),
+      groupSize: o.groupSize > 1 ? String(o.groupSize) : "",
+      note: String(o.note || ""),
+    }));
+  }
+  const rows: TicketRow[] = [];
+  const tp = e.tierPrices || {};
+  const general = tp.general || e.price;
+  if (general > 0) rows.push({ ...blankTicket("General admission"), id: "general", price: priceIn(general, cur) });
+  if (tp.vip > 0) rows.push({ ...blankTicket("VIP"), id: "vip", price: priceIn(tp.vip, cur) });
+  if (tp.elite > 0) rows.push({ ...blankTicket("Elite"), id: "elite", price: priceIn(tp.elite, cur) });
+  return rows.length ? rows : [blankTicket("General admission")];
 }
 
 /** What still needs filling in before an event can be sent for review. */
@@ -104,14 +158,17 @@ function missingForReview(f: Form): string[] {
   if (!f.startTime) out.push("the start time");
   if (!f.venue.trim()) out.push("the venue");
   if (!f.city.trim()) out.push("the city");
-  if (!(Number(f.general) > 0)) out.push("a ticket price");
-  if (!(Number(f.capacity) > 0)) out.push("the capacity");
+  const priced = f.tickets.filter((t) => t.name.trim() && Number(t.price) > 0);
+  if (!priced.length) out.push("at least one ticket type with a name and price");
+  if (!(Number(f.capacity) > 0) && !priced.every((t) => Number(t.quantity) > 0)) out.push("the total capacity (or a quantity for every ticket type)");
   return out;
 }
 
 export default function OrgEventEditor({ eventId }: { eventId?: string }) {
-  const { events, eventsLoading, org, user, navigate, notify, fail, reload } = useOrg();
+  const { events, eventsLoading, org, orgUid, navigate, notify, fail, reload, report } = useOrg();
   const existing = eventId ? events.find((e) => e.id === eventId) : undefined;
+  const soldByTier: Record<string, number> = {};
+  for (const [id, t] of Object.entries(report?.events.find((e) => e.id === eventId)?.availability?.tiers || {})) soldByTier[id] = t.sold;
   const [form, setForm] = useState<Form>(() => (existing ? formFrom(existing) : { ...BLANK, city: org.location?.split(",")[0] || "" }));
   const [loadedFor, setLoadedFor] = useState(existing ? eventId : "");
   const [saving, setSaving] = useState<"" | "draft" | "submit" | "save">("");
@@ -149,16 +206,39 @@ export default function OrgEventEditor({ eventId }: { eventId?: string }) {
 
   const status: string = existing?.status || "draft";
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
-  const setRow = <K extends "lineup" | "faqs">(k: K, i: number, patch: Partial<Form[K][number]>) =>
+  const setRow = <K extends "lineup" | "faqs" | "tickets">(k: K, i: number, patch: Partial<Form[K][number]>) =>
     setForm((f) => ({ ...f, [k]: (f[k] as any[]).map((r, j) => (j === i ? { ...r, ...patch } : r)) }));
-  const removeRow = (k: "lineup" | "faqs", i: number) => setForm((f) => ({ ...f, [k]: (f[k] as any[]).filter((_, j) => j !== i) }));
+  const removeRow = (k: "lineup" | "faqs" | "tickets", i: number) => setForm((f) => ({ ...f, [k]: (f[k] as any[]).filter((_, j) => j !== i) }));
+  const moveTicket = (i: number, dir: -1 | 1) =>
+    setForm((f) => {
+      const list = [...f.tickets];
+      const j = i + dir;
+      if (j < 0 || j >= list.length) return f;
+      [list[i], list[j]] = [list[j], list[i]];
+      return { ...f, tickets: list };
+    });
 
   const payload = () => {
     const [y, m, d] = form.isoDate ? form.isoDate.split("-").map(Number) : [0, 0, 0];
     const usd = (v: string) => (Number(v) > 0 ? toUsd(Number(v), form.priceCurrency) : 0);
-    const general = usd(form.general);
-    const vip = usd(form.vip);
-    const elite = usd(form.elite);
+    // Ticket types: saved ones keep their id (orders point at it).
+    const taken = new Set<string>(form.tickets.map((t) => t.id).filter(Boolean));
+    const ticketOptions = form.tickets
+      .filter((t) => t.name.trim() && Number(t.price) > 0)
+      .map((t) => {
+        const capacity = Math.max(0, Math.round(Number(t.quantity) || 0));
+        const groupSize = Math.max(0, Math.round(Number(t.groupSize) || 0));
+        return {
+          id: t.id || ticketId(t.name, taken),
+          name: t.name.trim().slice(0, 80),
+          price: usd(t.price),
+          ...(t.note.trim() ? { note: t.note.trim().slice(0, 200) } : {}),
+          ...(capacity > 0 ? { capacity } : {}),
+          ...(t.salesEnd ? { salesEnd: new Date(t.salesEnd).toISOString() } : {}),
+          ...(groupSize > 1 ? { groupSize } : {}),
+        };
+      });
+    const fromPrice = ticketOptions.length ? Math.min(...ticketOptions.map((o) => o.price)) : 0;
     return {
       title: form.title.trim().slice(0, 200),
       category: form.category,
@@ -177,12 +257,14 @@ export default function OrgEventEditor({ eventId }: { eventId?: string }) {
       country: form.country.trim(),
       venueInfo: { mapUrl: form.mapUrl.trim(), transport: existing?.venueInfo?.transport || [], parking: existing?.venueInfo?.parking || [] },
       capacity: Math.max(0, Math.round(Number(form.capacity) || 0)),
-      price: general,
-      tierPrices: { general, ...(vip > 0 ? { vip } : {}), ...(elite > 0 ? { elite } : {}) },
+      price: fromPrice,
+      ticketOptions,
+      // Older screens read these; the ticket types above are what's sold.
+      tierPrices: { general: fromPrice },
       priceCurrency: form.priceCurrency,
       lineup: form.lineup.filter((l) => l.name.trim()),
       faqs: form.faqs.filter((f) => f.question.trim()),
-      organizerId: user.uid,
+      organizerId: orgUid,
       organizerName: org.companyName,
       organizerImage: org.logoUrl || "",
       organizerBio: String(org.description || "").slice(0, 400),
@@ -222,10 +304,13 @@ export default function OrgEventEditor({ eventId }: { eventId?: string }) {
   };
 
   const busy = !!saving;
+  const firstPrice = Number(form.tickets.find((t) => Number(t.price) > 0)?.price || 0);
   const pricesHint =
-    Number(form.general) > 0 && form.priceCurrency !== "USD"
-      ? `Buyers in other countries see this converted to their currency (about $${toUsd(Number(form.general), form.priceCurrency).toFixed(2)}).`
+    firstPrice > 0 && form.priceCurrency !== "USD"
+      ? `Buyers in other countries see prices converted to their currency (${form.priceCurrency} ${firstPrice} ≈ $${toUsd(firstPrice, form.priceCurrency).toFixed(2)}).`
       : "Buyers see prices converted to their own currency.";
+  const totalCapacity = Number(form.capacity) || 0;
+  const typeQuantities = form.tickets.reduce((s, t) => s + (Number(t.quantity) || 0), 0);
 
   return (
     <div className="space-y-6 text-left">
@@ -341,6 +426,65 @@ export default function OrgEventEditor({ eventId }: { eventId?: string }) {
           </EditorPanel>
 
           <EditorPanel
+            title="Ticket types"
+            sub="Add as many as you like — e.g. Early bird, Standard, VIP, Family (4 people). Each can have its own quantity and sales end."
+            action={
+              <button type="button" className={addRowBtnCls} onClick={() => set("tickets", [...form.tickets, blankTicket()])}>
+                <PlusCircle className="w-3.5 h-3.5" /> Add ticket type
+              </button>
+            }
+          >
+            {form.tickets.length === 0 && <Hint>No ticket types yet.</Hint>}
+            {form.tickets.map((row, i) => {
+              const sold = existing && row.id ? Number(soldByTier[row.id] || 0) : 0;
+              return (
+                <div key={i} className="bg-[#f7f7f7] p-3 border border-[#e4e4e4] space-y-2.5">
+                  <div className="grid grid-cols-12 gap-2">
+                    <label className="col-span-12 sm:col-span-6">
+                      <span className="text-[10px] font-bold text-[#666] block mb-1">Name *</span>
+                      <input className="w-full bg-white px-2.5 py-2 text-sm border border-[#e4e4e4] outline-none focus:border-black" value={row.name} onChange={(e) => setRow("tickets", i, { name: e.target.value })} placeholder="e.g. Early bird" />
+                    </label>
+                    <label className="col-span-6 sm:col-span-3">
+                      <span className="text-[10px] font-bold text-[#666] block mb-1">Price ({form.priceCurrency}) *</span>
+                      <input type="number" min={0} step="0.01" className="w-full bg-white px-2.5 py-2 text-sm border border-[#e4e4e4] outline-none focus:border-black" value={row.price} onChange={(e) => setRow("tickets", i, { price: e.target.value })} placeholder="0" />
+                    </label>
+                    <label className="col-span-6 sm:col-span-3">
+                      <span className="text-[10px] font-bold text-[#666] block mb-1">Quantity</span>
+                      <input type="number" min={0} className="w-full bg-white px-2.5 py-2 text-sm border border-[#e4e4e4] outline-none focus:border-black" value={row.quantity} onChange={(e) => setRow("tickets", i, { quantity: e.target.value })} placeholder="No limit" />
+                    </label>
+                    <label className="col-span-12 sm:col-span-5">
+                      <span className="text-[10px] font-bold text-[#666] block mb-1">Sales end (optional)</span>
+                      <input type="datetime-local" className="w-full bg-white px-2.5 py-2 text-sm border border-[#e4e4e4] outline-none focus:border-black" value={row.salesEnd} onChange={(e) => setRow("tickets", i, { salesEnd: e.target.value })} />
+                    </label>
+                    <label className="col-span-6 sm:col-span-3">
+                      <span className="text-[10px] font-bold text-[#666] block mb-1">People per ticket</span>
+                      <input type="number" min={1} max={20} className="w-full bg-white px-2.5 py-2 text-sm border border-[#e4e4e4] outline-none focus:border-black" value={row.groupSize} onChange={(e) => setRow("tickets", i, { groupSize: e.target.value })} placeholder="1" />
+                    </label>
+                    <div className="col-span-6 sm:col-span-4 flex items-end justify-end gap-1">
+                      <button type="button" onClick={() => moveTicket(i, -1)} disabled={i === 0} className="p-2 border border-[#e4e4e4] bg-white text-xs font-bold cursor-pointer disabled:opacity-30" title="Move up">↑</button>
+                      <button type="button" onClick={() => moveTicket(i, 1)} disabled={i === form.tickets.length - 1} className="p-2 border border-[#e4e4e4] bg-white text-xs font-bold cursor-pointer disabled:opacity-30" title="Move down">↓</button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (sold > 0 && !window.confirm(`${sold} ${row.name} ticket${sold === 1 ? " has" : "s have"} been sold. Remove this type from sale anyway? Those tickets stay valid.`)) return;
+                          removeRow("tickets", i);
+                        }}
+                        className="p-2 text-[#7a2f2f] hover:bg-[#f7ecec] cursor-pointer"
+                        title="Remove ticket type"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  <input className="w-full bg-white px-2.5 py-2 text-sm border border-[#e4e4e4] outline-none focus:border-black" value={row.note} onChange={(e) => setRow("tickets", i, { note: e.target.value })} placeholder="Short description (optional) — e.g. Includes a drink, front rows" />
+                  {sold > 0 && <Hint>{sold} sold so far.</Hint>}
+                </div>
+              );
+            })}
+            <Hint>{pricesHint} A sold-out or closed ticket type shows a waitlist on your event page.</Hint>
+          </EditorPanel>
+
+          <EditorPanel
             title="Line-up"
             sub="Optional — performers shown on your event page."
             action={
@@ -430,26 +574,20 @@ export default function OrgEventEditor({ eventId }: { eventId?: string }) {
           <EditorPanel title="Tickets">
             <Field label="Prices in">
               <select className={inputCls} value={form.priceCurrency} onChange={(e) => set("priceCurrency", e.target.value)}>
-                <option value="PKR">Pakistani rupees (PKR)</option>
                 <option value="GBP">British pounds (GBP)</option>
                 <option value="USD">US dollars (USD)</option>
+                <option value="PKR">Pakistani rupees (PKR)</option>
               </select>
             </Field>
-            <Field label="General admission *">
-              <input type="number" min={0} className={inputCls} value={form.general} onChange={(e) => set("general", e.target.value)} placeholder="0" />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="VIP">
-                <input type="number" min={0} className={inputCls} value={form.vip} onChange={(e) => set("vip", e.target.value)} placeholder="Optional" />
-              </Field>
-              <Field label="Elite">
-                <input type="number" min={0} className={inputCls} value={form.elite} onChange={(e) => set("elite", e.target.value)} placeholder="Optional" />
-              </Field>
-            </div>
-            <Hint>{pricesHint}</Hint>
-            <Field label="Capacity (tickets available) *">
+            <Field label="Total capacity (venue limit)">
               <input type="number" min={0} className={inputCls} value={form.capacity} onChange={(e) => set("capacity", e.target.value)} placeholder="e.g. 500" />
             </Field>
+            <Hint>
+              {totalCapacity > 0
+                ? `No more than ${totalCapacity} tickets sell in total, whatever the types allow.`
+                : "Leave empty if each ticket type has its own quantity."}
+              {totalCapacity > 0 && typeQuantities > totalCapacity ? ` Your ticket types add up to ${typeQuantities} — the total limit still applies.` : ""}
+            </Hint>
           </EditorPanel>
 
           <EditorPanel title="Category">

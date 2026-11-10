@@ -17,6 +17,7 @@ import {
   adminSetUserEmail,
 } from "../../services/backendService";
 import { getWordPressEvents } from "../../services/wordpressEventsService";
+import { migrateOrganizerPrivacy } from "../../services/organizerService";
 import { fetchAuthUsers, AuthUserInfo } from "../../services/adminUsersService";
 import { fetchCardPayments, CardPayment } from "../../services/adminPaymentsService";
 import { EventItem, getEventTimestamp, isPastEvent, passPeople, peoplePerPass, tierDisplayName, ticketSeat, withEventSlugs } from "../../types";
@@ -332,6 +333,21 @@ export function AdminProvider({ children, onLogout }: { children: React.ReactNod
     reload();
     loadWordPress();
   }, [reload, loadWordPress]);
+
+  // Once per visit: organisers' fee, review notes and application notes move
+  // off their public profiles into the private store (copied first), and old
+  // profiles without a status get the 'approved' they always meant. Needed
+  // before the newer security rules hide everything but approved profiles.
+  const privacyMoved = useRef(false);
+  useEffect(() => {
+    if (loading || privacyMoved.current || !data.organizers.length) return;
+    privacyMoved.current = true;
+    migrateOrganizerPrivacy(data.organizers).then(async (moved) => {
+      if (!moved) return;
+      const organizers = await getAllOrganizers();
+      setData((d) => ({ ...d, organizers }));
+    });
+  }, [loading, data.organizers]);
 
   // ---- sign-in accounts: real emails + sign-in methods from Firebase Auth.
   // Profiles saved without an email (older Google / Facebook sign-ups) are

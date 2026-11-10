@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowRight, Check, AlertCircle, Loader2 } from 'lucide-react';
 import mainLogo from '../../assets/images/Main Logo.png';
 import { sendFormEmail } from '../services/formEmailService';
+import { GlowField } from './Decor';
 
 interface FooterProps {
   onScrollToSection: (id: string) => void;
@@ -38,21 +39,22 @@ export default function Footer({ onScrollToSection, onSubscribe, onViewRefundPol
   return (
     <footer className="bg-black text-white" id="footer">
       {/* NEWSLETTER BAND */}
-      <div className="border-b border-white/15">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-16 flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+      <div className="border-b border-white/15 relative overflow-hidden">
+        <GlowField tone="dark" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-16 flex flex-col lg:flex-row lg:items-end justify-between gap-8 jz-above">
           <div className="max-w-md">
             <h3 className="font-display font-bold text-3xl sm:text-4xl leading-[0.95]">
-              Get your first ticket
+              Hear about new shows first
             </h3>
             <p className="text-white/60 text-sm mt-3">
-              Early access to on-sales, presale codes and lineup news — straight to your inbox.
+              One email when tickets for a new show go on sale. A couple of times a month at most, and you can unsubscribe whenever you like.
             </p>
           </div>
 
           <div className="w-full max-w-md">
             {subscribed ? (
               <div className="flex items-center gap-2 text-sm font-bold text-[#ffed00]">
-                <Check className="w-4 h-4" /> You're on the list.
+                <Check className="w-4 h-4" /> Thanks — you’re on the list.
               </div>
             ) : (
               <div>

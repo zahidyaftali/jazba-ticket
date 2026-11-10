@@ -4,7 +4,9 @@ import { USD_RATES } from './currencyRates.js';
 import { EMAIL_RE } from './sendEmail.js';
 import { newOrderId } from './orderId.js';
 import { WP_EVENT_PREFIX, fetchWordPressEvent, isWordPressEventOver } from './wordpressEvents.js';
-import { ticketsLeft } from './capacity.js';
+import { availabilityForCheckout, salesHaveEnded } from './availability.js';
+import { lookupStoredPromo, type DbPromo } from './promoCodes.js';
+import { serviceAccountFromEnv } from './firebaseAuthUsers.js';
 
 // Shared by the Vercel serverless functions (api/create-checkout-session.ts,
 // api/get-checkout-session.ts) and the Vite dev-server middleware
@@ -89,9 +91,12 @@ export function orderDiscountRate(
   tier: string,
   pricing: { price: number; offerPrice?: number },
   now = Date.now(),
+  stored: DbPromo | null = null,
 ): { rate: number; code: string; sale: number } {
   const sale = saleRate(eventId, pricing, now);
-  const codeRate = promoRate(promoCode, eventId, tier);
+  let codeRate = promoRate(promoCode, eventId, tier);
+  // An organiser's own code (checked against the database beforehand).
+  if (!codeRate && stored && (!stored.tiers.length || stored.tiers.includes(tier))) codeRate = stored.rate;
   return codeRate > sale ? { rate: codeRate, code: promoCode, sale: 0 } : { rate: sale, code: '', sale };
 }
 
@@ -160,10 +165,12 @@ interface EventPricing {
   /** The event page on this site — where Stripe's "back" link returns to. */
   path: string;
   /** Ticket packages on sale, keyed by tier id. */
-  tiers: Record<string, { price: number; name: string; offerPrice?: number }>;
+  tiers: Record<string, { price: number; name: string; offerPrice?: number; capacity?: number; salesEnd?: string }>;
   details: EventDetails;
   /** Tickets available in total (site events only); 0 = not limited. */
   capacity?: number;
+  /** The organiser's account id (site events made by an organiser). */
+  organizerId?: string;
 }
 
 /** Date line for a ticket, e.g. "15 November 2026". */
@@ -239,16 +246,32 @@ export async function fetchEventPricing(eventId: string, idToken: string): Promi
 
   const basePrice = Number(fsValue(f.price)) || 0;
   const tp = fsValue(f.tierPrices) || {};
-  // Same tier availability logic as getAvailableTiers() in src/types.ts.
+  // Same tier availability logic as getAvailableTiers() in src/types.ts:
+  // the event's own ticket types when it has them, else General/VIP/Elite.
   const tiers: EventPricing['tiers'] = {};
-  const general = Number(tp.general) || basePrice;
-  if (general > 0) tiers.general = { price: general, name: DEFAULT_TIER_NAMES.general };
-  if (Number(tp.vip) > 0) tiers.vip = { price: Number(tp.vip), name: DEFAULT_TIER_NAMES.vip };
-  if (Number(tp.elite) > 0) tiers.elite = { price: Number(tp.elite), name: DEFAULT_TIER_NAMES.elite };
+  const options: any[] = Array.isArray(fsValue(f.ticketOptions)) ? fsValue(f.ticketOptions) : [];
+  if (options.length) {
+    for (const o of options) {
+      if (!o || typeof o.id !== 'string' || !/^[a-z0-9-]{1,64}$/.test(o.id) || !(Number(o.price) > 0)) continue;
+      tiers[o.id] = {
+        price: Number(o.price),
+        name: String(o.name || o.id).slice(0, 80),
+        ...(Number(o.offerPrice) > 0 ? { offerPrice: Number(o.offerPrice) } : {}),
+        capacity: Math.max(0, Math.floor(Number(o.capacity) || 0)),
+        salesEnd: typeof o.salesEnd === 'string' ? o.salesEnd : '',
+      };
+    }
+  } else {
+    const general = Number(tp.general) || basePrice;
+    if (general > 0) tiers.general = { price: general, name: DEFAULT_TIER_NAMES.general };
+    if (Number(tp.vip) > 0) tiers.vip = { price: Number(tp.vip), name: DEFAULT_TIER_NAMES.vip };
+    if (Number(tp.elite) > 0) tiers.elite = { price: Number(tp.elite), name: DEFAULT_TIER_NAMES.elite };
+  }
 
   // The page redirects an id link to its readable /events/<slug> URL.
   return {
     capacity: Math.max(0, Math.floor(Number(fsValue(f.capacity)) || 0)),
+    organizerId: String(fsValue(f.organizerId) || ''),
     title: fsValue(f.title) || 'Event',
     path: `/events/${encodeURIComponent(eventId)}`,
     tiers,
@@ -260,6 +283,62 @@ export async function fetchEventPricing(eventId: string, idToken: string): Promi
       category: String(fsValue(f.category) || ''),
     },
   };
+}
+
+export interface PricedOrder {
+  event: EventPricing;
+  selected: EventPricing['tiers'][string];
+  discount: { rate: number; code: string; sale: number };
+  amountUsd: number;
+}
+
+/** Everything the server checks before taking money for an order: the
+ *  ticket type exists and is still on sale, there are enough tickets left
+ *  (in total and of that type), and the promo code — written in the code or
+ *  an organiser's own — really applies. Used by card and Easypaisa orders. */
+export async function priceOrder(input: {
+  eventId: string;
+  tier: string;
+  quantity: number;
+  promoCode: string;
+  idToken: string;
+  now?: number;
+}): Promise<PricedOrder> {
+  const now = input.now ?? Date.now();
+  const event = await fetchEventPricing(input.eventId, input.idToken);
+  const selected = Object.prototype.hasOwnProperty.call(event.tiers, input.tier) ? event.tiers[input.tier] : undefined;
+  if (!selected) throw new PaymentError('That ticket package is not available for this event.');
+  if (salesHaveEnded(selected.salesEnd, now)) throw new PaymentError(`Sales for ${selected.name} tickets have ended.`, 409);
+
+  const limited = !!event.capacity || Object.values(event.tiers).some((t) => (t.capacity || 0) > 0);
+  if (limited && !input.eventId.startsWith(WP_EVENT_PREFIX)) {
+    const avail = await availabilityForCheckout(input.eventId);
+    const left = avail ? (avail.tiers[input.tier]?.left ?? avail.left) : null;
+    if (left !== null && input.quantity > left) {
+      throw new PaymentError(
+        left <= 0
+          ? `Sorry — ${selected.name} tickets are sold out.`
+          : `Only ${left} ${selected.name} ticket${left === 1 ? '' : 's'} left — please choose fewer.`,
+        409,
+      );
+    }
+  }
+
+  let stored: DbPromo | null = null;
+  if (input.promoCode && !PROMO_CODES.has(input.promoCode)) {
+    try {
+      const sa = serviceAccountFromEnv(process.env);
+      if (sa || process.env.FIRESTORE_EMULATOR_HOST) {
+        const check = await lookupStoredPromo(sa, input.promoCode, input.eventId, event.organizerId || '');
+        if (check.ok === true) stored = (check as { ok: true; promo: DbPromo }).promo;
+      }
+    } catch (err: any) {
+      console.error('Promo code lookup failed:', err?.message || err);
+    }
+  }
+  const discount = orderDiscountRate(input.promoCode, input.eventId, input.tier, selected, now, stored);
+  const amountUsd = computeTotalUsd(selected.price, input.quantity, discount.rate);
+  return { event, selected, discount, amountUsd };
 }
 
 /** Compute the USD total exactly like the checkout page displays it —
@@ -319,25 +398,9 @@ export async function createCheckoutSession(
   if (!idToken) throw new PaymentError('You must be signed in to pay. Please log in and try again.', 401);
 
   const user = await verifyFirebaseUser(idToken);
-  const event = await fetchEventPricing(eventId, idToken);
-
-  const selected = Object.prototype.hasOwnProperty.call(event.tiers, tier) ? event.tiers[tier] : undefined;
-  if (!selected) throw new PaymentError('That ticket package is not available for this event.');
-
-  if (event.capacity) {
-    const left = await ticketsLeft(eventId, event.capacity);
-    if (left !== null && quantity > left) {
-      throw new PaymentError(
-        left <= 0 ? 'Sorry — this event is sold out.' : `Only ${left} ticket${left === 1 ? '' : 's'} left for this event — please choose fewer.`,
-        409,
-      );
-    }
-  }
-
-  const discount = orderDiscountRate(promoCode, eventId, tier, selected);
+  const { event, selected, discount, amountUsd } = await priceOrder({ eventId, tier, quantity, promoCode, idToken });
   const promoApplied = discount.code !== '';
   const salePercent = discount.sale ? `${Math.round(discount.sale * 100)}%` : '';
-  const amountUsd = computeTotalUsd(selected.price, quantity, discount.rate);
   if (amountUsd <= 0 || amountUsd > 10000) throw new PaymentError('Invalid payment amount.');
 
   // The e-ticket goes to the email typed at checkout (it starts out as the

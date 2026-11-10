@@ -1,11 +1,11 @@
 import React from "react";
-import { AlertTriangle, ArrowRight, CalendarPlus, Clock, Heart, Plus, ShoppingBag, Ticket, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarPlus, Check, Clock, Heart, Plus, ShoppingBag, Ticket, Wallet } from "lucide-react";
 import { Badge, DataTable, EmptyState, PageHeader, Panel, StatTile, StatusBadge, btnPrimary, fmtDateTime, tdCls, thCls } from "../../admin/ui";
 import { useOrg } from "../OrganizerContext";
 import { CurrencyPicker, ORG_EVENT_STATUS, SoldBar, eventDateText, useMoney } from "../orgUi";
 
 export default function OrgDashboardPage() {
-  const { org, me, events, eventsLoading, report, reportError, reportLoading, navigate } = useOrg();
+  const { org, me, events, eventsLoading, report, reportError, reportLoading, navigate, priv } = useOrg();
   const show = useMoney();
   const statsFor = (id: string) => report?.events.find((e) => e.id === id);
   const declined = events.filter((e) => e.status === "draft" && e.reviewNote);
@@ -53,6 +53,17 @@ export default function OrgDashboardPage() {
           </span>
         </div>
       )}
+
+      <SetupChecklist
+        steps={[
+          { done: !!org.logoUrl && String(org.description || "").length > 20, label: "Add your logo and a short story", to: "/organizer/profile" },
+          { done: events.length > 0, label: "Create your first event", to: "/organizer/events/new" },
+          { done: events.some((e) => e.status === "published"), label: "Get an event approved and on sale", to: "/organizer/events" },
+          { done: !!priv?.payout?.accountName, label: "Add your payout details", to: "/organizer/payouts" },
+          { done: false, optional: true, label: "Set up door scanning for your team", to: "/organizer/door-staff" },
+        ]}
+        onGo={navigate}
+      />
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <StatTile dark label="Gross ticket sales" icon={Wallet} value={t ? show(t.revenueUsd) : "—"} sub={t ? `${t.liveEvents} event${t.liveEvents === 1 ? "" : "s"} on sale` : undefined} />
@@ -178,5 +189,56 @@ export default function OrgDashboardPage() {
         </Panel>
       </div>
     </div>
+  );
+}
+
+
+/** "Get set up" — the few things a new organiser needs, ticked off as they go.
+ *  Hidden once the required steps are done. */
+function SetupChecklist({
+  steps,
+  onGo,
+}: {
+  steps: { done: boolean; label: string; to: string; optional?: boolean }[];
+  onGo: (to: string) => void;
+}) {
+  const required = steps.filter((s) => !s.optional);
+  const doneCount = required.filter((s) => s.done).length;
+  if (doneCount === required.length) return null;
+  const pct = Math.round((doneCount / required.length) * 100);
+  return (
+    <section className="bg-white border border-black">
+      <div className="px-5 py-4 border-b border-[#f2f2f2] flex items-center justify-between gap-4">
+        <div>
+          <h3 className="font-display font-bold text-sm">Get set up</h3>
+          <p className="text-[11px] text-[#8a8a8a] font-medium mt-0.5">
+            {doneCount} of {required.length} done — most organisers finish in under 15 minutes.
+          </p>
+        </div>
+        <div className="w-28 h-1.5 bg-[#efefef] shrink-0">
+          <div className="h-full bg-black transition-all duration-700" style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+      <ul className="divide-y divide-[#f2f2f2]">
+        {steps.map((step) => (
+          <li key={step.label}>
+            <button
+              type="button"
+              onClick={() => onGo(step.to)}
+              className="w-full flex items-center gap-3 px-5 py-3 text-left text-sm hover:bg-[#fafafa] cursor-pointer"
+            >
+              <span className={`w-6 h-6 flex items-center justify-center shrink-0 ${step.done ? "bg-black text-[#ffed00]" : "border border-[#c4c4c4]"}`}>
+                {step.done && <Check className="w-3.5 h-3.5" />}
+              </span>
+              <span className={`flex-1 ${step.done ? "text-[#8a8a8a] line-through" : "font-bold"}`}>
+                {step.label}
+                {step.optional && <span className="text-[11px] font-medium text-[#8a8a8a] no-underline ml-2">(optional)</span>}
+              </span>
+              {!step.done && <ArrowRight className="w-4 h-4 shrink-0" />}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

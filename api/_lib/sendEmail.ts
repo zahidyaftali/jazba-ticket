@@ -9,6 +9,8 @@ export interface SendEmailInput {
   to: string;
   /** Extra visible recipient(s), comma-separated. */
   cc?: string;
+  /** Hidden recipients, comma-separated (mailings to many people). */
+  bcc?: string;
   subject: string;
   html: string;
   /** Lets the admin hit "Reply" and land straight in the sender's inbox. */
@@ -57,6 +59,7 @@ export async function sendEmail(config: MailConfig, input: SendEmailInput): Prom
   const to = addressList(input.to, 'to');
   if (!to.length) throw new Error('Email not sent: no recipient.');
   const cc = addressList(input.cc, 'cc');
+  const bcc = addressList(input.bcc, 'bcc');
   const replyTo = addressList(input.replyTo, 'reply-to')[0];
 
   const transport = nodemailer.createTransport({
@@ -75,6 +78,7 @@ export async function sendEmail(config: MailConfig, input: SendEmailInput): Prom
     from: { name: 'Jazba Tickets', address: config.user },
     to,
     cc: cc.length ? cc : undefined,
+    bcc: bcc.length ? bcc : undefined,
     replyTo,
     subject: input.subject,
     html: input.html,

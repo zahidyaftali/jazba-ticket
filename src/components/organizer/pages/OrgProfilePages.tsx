@@ -3,7 +3,8 @@ import { ExternalLink, Heart, KeyRound, Loader2, LogOut } from "lucide-react";
 import { accountEmail, auth, sendPasswordResetEmail, updateProfile } from "../../../firebase";
 import { updateUserProfile } from "../../../services/backendService";
 import { updateMyOrganizer, type OrganizerDetails } from "../../../services/organizerService";
-import { EditorPanel, Field, PageHeader, btnOutline, btnPrimary, inputCls } from "../../admin/ui";
+import { EditorPanel, Field, PageHeader, Switch, btnOutline, btnPrimary, inputCls } from "../../admin/ui";
+import { saveOrganizerPrivate } from "../../../services/organizerToolsService";
 import { ImageUrlField } from "../../admin/media/ImageField";
 import OrganizerDetailsForm, { detailsFrom, detailsProblem } from "../OrganizerDetailsForm";
 import { useOrg } from "../OrganizerContext";
@@ -22,7 +23,7 @@ export function OrgProfilePage() {
     setError("");
     setSaving(true);
     try {
-      await updateMyOrganizer(user.uid, details);
+      await updateMyOrganizer(org.id || user.uid, details);
       setOrg({ ...org, ...details });
       notify("Profile saved — your public page is up to date.");
     } catch {
@@ -76,9 +77,50 @@ export function OrgProfilePage() {
   );
 }
 
+/** Email settings for the organiser account (private). */
+function NotificationSettings() {
+  const { org, orgUid, priv, setPriv, notify, fail } = useOrg();
+  const on = priv?.notifyOnSale !== false;
+  const [saving, setSaving] = useState(false);
+  const toggle = async () => {
+    setSaving(true);
+    try {
+      await saveOrganizerPrivate(org.id || orgUid, { notifyOnSale: !on });
+      setPriv({ ...(priv || {}), notifyOnSale: !on });
+      notify(!on ? "You’ll get an email for every order." : "Order emails turned off.");
+    } catch {
+      fail("Couldn’t change that setting.");
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <EditorPanel title="Emails" sub="Sent to your organiser contact email and your sign-in email.">
+      <label className="flex items-start justify-between gap-4 cursor-pointer">
+        <span>
+          <span className="font-bold text-sm block">An email for every order</span>
+          <span className="text-xs text-[#666]">Who bought, which tickets, and how many you’ve sold so far.</span>
+        </span>
+        <Switch checked={on} onChange={() => !saving && toggle()} label="Email me for every order" />
+      </label>
+      <p className="text-xs text-[#8a8a8a]">
+        You always get emails about your account and event reviews. When an event goes live, your followers are emailed about it once.
+      </p>
+    </EditorPanel>
+  );
+}
+
 /** The person's own sign-in account. */
 export function OrgAccountPage() {
-  const { me, setMe, user, notify, fail, onLogout } = useOrg();
+  const { me, setMe, user, notify, fail, onLogout, actingAsAdmin, org } = useOrg();
+  if (actingAsAdmin) {
+    return (
+      <div className="max-w-2xl space-y-6">
+        <PageHeader title="Account" sub={`${org.companyName}’s sign-in details are private to them. You can still change their email settings.`} />
+        <NotificationSettings />
+      </div>
+    );
+  }
   const [name, setName] = useState(me?.name || user.displayName || "");
   const [phone, setPhone] = useState(me?.phone || "");
   const [photo, setPhoto] = useState(me?.profileImage || "");
@@ -130,6 +172,7 @@ export function OrgAccountPage() {
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save account"}
         </button>
       </EditorPanel>
+      <NotificationSettings />
       <EditorPanel title="Security">
         <div className="flex flex-wrap gap-2">
           <button type="button" className={btnOutline} onClick={resetPassword}>

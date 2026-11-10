@@ -16,24 +16,30 @@ import {
 import { ArtistItem } from './ArtistsPage';
 import { EventItem } from '../types';
 import EventCard from './EventCard';
-import { auth } from '../firebase';
-import { followTarget, unfollowTarget, isFollowingTarget, getFollowerCount } from '../services/backendService';
+import { isPastEvent } from '../types';
+import { useFollow } from '../useFollow';
+import { eventFeaturesArtist } from '../artistEvents';
+import { eventSortTime } from '../eventDates';
+import { GlowField } from './Decor';
 
 interface ArtistDetailPageProps {
   artist: ArtistItem;
   allEvents: EventItem[];
   onBack: () => void;
-  onViewShowDetail: (showTitle: string) => void;
+  onViewShowDetail: (event: EventItem) => void;
   onBookEvent?: (event: EventItem) => void;
   onRequireLogin: () => void;
 }
 
 export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShowDetail, onBookEvent, onRequireLogin }: ArtistDetailPageProps) {
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followerCount, setFollowerCount] = useState(0);
-  const [followBusy, setFollowBusy] = useState(false);
+  const follow = useFollow('artist', artist.id, onRequireLogin);
+  const isFollowing = follow.following;
+  const followerCount = follow.count ?? 0;
+  const followBusy = follow.busy;
+  const handleToggleFollow = follow.toggle;
 
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'past' | 'about'>('upcoming');
+  // About first: who the artist is, then their dates.
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'past' | 'about'>('about');
   const [showContactModal, setShowContactModal] = useState(false);
   const [contactEmail, setContactEmail] = useState('');
   const [contactName, setContactName] = useState('');
@@ -43,61 +49,30 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
   const [sendError, setSendError] = useState('');
   const [copied, setCopied] = useState(false);
 
-  // Load real follow state & follower count for this artist
-  useEffect(() => {
-    let cancelled = false;
-    getFollowerCount('artist', artist.id).then((count) => {
-      if (!cancelled) setFollowerCount(count);
-    });
-    const user = auth.currentUser;
-    if (user) {
-      isFollowingTarget(user.uid, 'artist', artist.id).then((following) => {
-        if (!cancelled) setIsFollowing(following);
-      });
-    } else {
-      setIsFollowing(false);
-    }
-    return () => { cancelled = true; };
-  }, [artist]);
-
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
-    setActiveTab('upcoming');
-  }, [artist]);
-
-  const handleToggleFollow = async () => {
-    const user = auth.currentUser;
-    if (!user) {
-      onRequireLogin();
-      return;
-    }
-    if (followBusy) return;
-    setFollowBusy(true);
-    try {
-      if (isFollowing) {
-        await unfollowTarget(user.uid, 'artist', artist.id);
-        setIsFollowing(false);
-        setFollowerCount((c) => Math.max(0, c - 1));
-      } else {
-        await followTarget(user.uid, 'artist', artist.id);
-        setIsFollowing(true);
-        setFollowerCount((c) => c + 1);
-      }
-    } catch (err) {
-      console.error('Error updating follow state', err);
-    } finally {
-      setFollowBusy(false);
-    }
-  };
-
-  // Upcoming events in this artist's category — no unrelated fillers
+  // Only shows this artist is actually in (line-up, title or event text),
+  // soonest first. Shows that have happened go under Past shows.
+  const featured = useMemo(
+    () => allEvents.filter((evt) => eventFeaturesArtist(evt, artist.name)),
+    [artist.name, allEvents],
+  );
   const upcomingEvents = useMemo(
-    () => allEvents.filter((evt) => evt.category === artist.category).slice(0, 3),
-    [artist, allEvents],
+    () => featured.filter((evt) => !isPastEvent(evt)).sort((a, b) => eventSortTime(a) - eventSortTime(b)),
+    [featured],
+  );
+  const pastEvents = useMemo(
+    () => featured.filter((evt) => isPastEvent(evt)).sort((a, b) => eventSortTime(b) - eventSortTime(a)),
+    [featured],
   );
 
-  // Past shows exactly as entered in the admin (title / date / venue)
-  const pastShows = artist.pastShows || [];
+  // Past shows: what the admin entered, plus past events on this site that featured them.
+  const pastShows = useMemo(() => {
+    const entered = artist.pastShows || [];
+    const seen = new Set(entered.map((sh) => sh.title.trim().toLowerCase()));
+    const fromEvents = pastEvents
+      .filter((evt) => !seen.has(evt.title.trim().toLowerCase()))
+      .map((evt) => ({ title: evt.title, date: evt.fullDate || `${evt.date} ${evt.year || ''}`.trim(), venue: evt.location, event: evt }));
+    return [...entered.map((sh) => ({ ...sh, event: undefined as EventItem | undefined })), ...fromEvents];
+  }, [artist.pastShows, pastEvents]);
 
   // Hero stats — admin-managed; a stat is hidden when it hasn't been set
   const stats = useMemo(() => {
@@ -154,8 +129,9 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
     <div className="jz-page bg-white min-h-screen text-black" id={`artist-detail-${artist.id}`}>
 
       {/* ── HERO — black storytelling band ────────────────────── */}
-      <section className="bg-black text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-14 sm:py-20">
+      <section className="bg-black text-white relative overflow-hidden">
+        <GlowField tone="dark" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-14 sm:py-20 jz-above">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-10">
 
             {/* Identity block */}
@@ -246,9 +222,9 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
       <div className="border-b border-[#f2f2f2] bg-white sticky top-[60px] z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 flex">
           {([
-            { id: 'upcoming', label: 'Upcoming shows' },
-            ...(pastShows.length > 0 ? [{ id: 'past', label: 'Past shows' }] : []),
             { id: 'about', label: 'About & booking' },
+            { id: 'upcoming', label: upcomingEvents.length ? `Upcoming shows (${upcomingEvents.length})` : 'Upcoming shows' },
+            ...(pastShows.length > 0 ? [{ id: 'past', label: 'Past shows' }] : []),
           ] as { id: 'upcoming' | 'past' | 'about'; label: string }[]).map((tab) => (
             <button
               key={tab.id}
@@ -293,7 +269,7 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                         key={evt.id}
                         event={evt}
                         onBook={onBookEvent || (() => {})}
-                        onViewDetail={() => onViewShowDetail(evt.title)}
+                        onViewDetail={() => onViewShowDetail(evt)}
                       />
                     ))}
                   </div>
@@ -334,9 +310,19 @@ export default function ArtistDetailPage({ artist, allEvents, onBack, onViewShow
                           </span>
                         </div>
                       </div>
-                      <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-[#8a8a8a] border border-[#e4e4e4] px-3 py-1.5 w-fit">
-                        Completed
-                      </span>
+                      {show.event ? (
+                        <button
+                          type="button"
+                          onClick={() => onViewShowDetail(show.event!)}
+                          className="text-xs font-bold border border-black px-3 py-1.5 w-fit cursor-pointer hover:bg-[#f7f7f7] transition-colors"
+                        >
+                          View event
+                        </button>
+                      ) : (
+                        <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-[#8a8a8a] border border-[#e4e4e4] px-3 py-1.5 w-fit">
+                          Completed
+                        </span>
+                      )}
                     </div>
                   )) : (
                     <p className="py-10 text-sm text-[#666]">Show history will appear here.</p>

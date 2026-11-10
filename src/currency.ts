@@ -21,6 +21,15 @@ export function formatMoney(usdAmount: number, region: Region, opts?: { precise?
   return `${meta.symbol}${Math.round(value).toLocaleString()}`;
 }
 
+/** A USD amount in the region's currency, unrounded. */
+export function localAmount(usdAmount: number, region: Region): number {
+  return usdAmount * REGION_META[region].rate;
+}
+
+export function currencySymbolFor(region: Region): string {
+  return REGION_META[region].symbol;
+}
+
 export function currencyCodeFor(region: Region): string {
   return REGION_META[region].code;
 }

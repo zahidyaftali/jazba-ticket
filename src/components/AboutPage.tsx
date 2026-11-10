@@ -11,6 +11,7 @@ import {
   Check,
   MapPin,
 } from "lucide-react";
+import { Reveal, SectionHead, SoftBand } from "./Decor";
 
 const overline = "text-[10px] font-bold tracking-[0.18em] uppercase";
 
@@ -56,12 +57,12 @@ const HOW_IT_WORKS = [
       {
         step: "02",
         title: "Pay your way",
-        body: "Checkout detects your location and shows local prices and payment methods automatically.",
+        body: "Prices show in pounds, dollars or rupees depending on where you are. Pay by card, or by Easypaisa in Pakistan.",
       },
       {
         step: "03",
         title: "Walk straight in",
-        body: "Your barcode lands in your inbox and dashboard instantly. Show it at the door — printed or on your phone.",
+        body: "Your e-ticket arrives by email and stays in your account. Show the QR code at the door, on your phone or printed.",
       },
     ],
   },
@@ -95,13 +96,13 @@ const HOW_IT_WORKS = [
       },
       {
         step: "02",
-        title: "Sell everywhere",
-        body: "Your event appears across the platform with secure checkout in your buyers' local currency.",
+        title: "Sell and scan",
+        body: "Buyers check out in their own currency. On the night, you and your door team scan tickets with Jazba Scan.",
       },
       {
         step: "03",
-        title: "Track in real time",
-        body: "Live sales, scans at the gate, and revenue reports — with payouts on a schedule you can plan around.",
+        title: "See every sale",
+        body: "Orders, customers and tickets left, updated as they happen. We settle your earnings with you after the event.",
       },
     ],
   },
@@ -247,43 +248,32 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── HOW IT WORKS — black storytelling band ────────────── */}
-      <section className="bg-black text-white px-4 sm:px-6 md:px-8 py-20">
-        <div className="max-w-7xl mx-auto">
-          <span className={`${overline} text-[#ffed00]`}>How it works</span>
-          <h2 className="font-display font-bold text-3xl sm:text-4xl leading-[0.95] max-w-xl mt-3">
-            One platform, three ways in.
-          </h2>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 mt-12">
-            {HOW_IT_WORKS.map((group) => (
-              <div key={group.audience}>
-                <h3 className="font-display font-bold text-xl border-b border-white/15 pb-4">
-                  {group.audience}
-                </h3>
-                <div>
-                  {group.steps.map((s) => (
-                    <div
-                      key={s.step}
-                      className="flex gap-5 py-5 border-b border-white/15 last:border-b-0"
-                    >
-                      <span className="font-display font-bold text-lg text-[#ffed00] shrink-0">
-                        {s.step}
-                      </span>
-                      <div>
-                        <h4 className="font-bold text-base">{s.title}</h4>
-                        <p className="text-sm text-white/60 leading-relaxed mt-1.5">
-                          {s.body}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+      {/* ── HOW IT WORKS — soft glass band ───────────────────── */}
+      <SoftBand>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-16 sm:py-20">
+          <SectionHead eyebrow="How it works" title="Whether you’re coming, playing or putting it on" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+            {HOW_IT_WORKS.map((group, gi) => (
+              <React.Fragment key={group.audience}>
+                <Reveal delay={gi * 140} className="jz-glass p-6 sm:p-7 h-full">
+                  <h3 className="font-display font-bold text-xl">{group.audience}</h3>
+                  <ol className="mt-4">
+                    {group.steps.map((st, i) => (
+                      <li key={st.step} className="flex gap-4 py-4 border-t border-black/[0.06]">
+                        <span className="w-7 h-7 bg-black text-[#ffed00] text-xs font-bold flex items-center justify-center shrink-0">{i + 1}</span>
+                        <div>
+                          <h4 className="font-bold text-base">{st.title}</h4>
+                          <p className="text-sm text-[#555] leading-relaxed mt-1">{st.body}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </Reveal>
+              </React.Fragment>
             ))}
           </div>
         </div>
-      </section>
+      </SoftBand>
 
       {/* ── GUARANTEES — white catalogue band ─────────────────── */}
       <section className="px-4 sm:px-6 md:px-8 py-20">
@@ -293,11 +283,11 @@ export default function AboutPage() {
               The Jazba Tickets guarantee
             </span>
             <h2 className="font-display font-bold text-3xl sm:text-4xl leading-[0.95] mt-3">
-              In writing. Not just promises.
+              What every order comes with
             </h2>
             <p className="text-base text-[#222] leading-relaxed mt-5 max-w-md">
-              Every order on the platform is covered by the same six commitments
-              — printed on your receipt, honoured at the gate.
+              The same promises apply to every ticket you buy from us, whoever
+              is putting the event on.
             </p>
           </div>
           <div className="lg:col-span-7 border-t border-[#f2f2f2]">
@@ -348,7 +338,7 @@ export default function AboutPage() {
           <div>
             <Sparkles className="w-6 h-6 text-black" />
             <h2 className="font-display font-bold text-3xl sm:text-4xl leading-[0.95] mt-5 max-w-md">
-              Ready when you are.
+              Come and say hello.
             </h2>
             <p className="text-black/70 text-sm mt-4 max-w-md">
               Browse tonight's shows, book the artist for your own event, or get

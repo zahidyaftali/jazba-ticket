@@ -4,10 +4,19 @@ import { PageHeader, SearchInput, Toolbar, btnOutline, downloadCsv } from "../..
 import { useOrg } from "../OrganizerContext";
 import { CurrencyPicker } from "../orgUi";
 import { OrdersTable } from "./OrgEventsPage";
+import { resendOrganizerTicket } from "../../../services/organizerToolsService";
 
 /** Every order across the organiser's events. */
 export default function OrgOrdersPage() {
-  const { report, reportLoading, reportError, events } = useOrg();
+  const { report, reportLoading, reportError, events, toolOrgId, notify, fail } = useOrg();
+  const resend = async (orderId: string) => {
+    try {
+      const r = await resendOrganizerTicket(orderId, "", toolOrgId);
+      notify(`Ticket sent again to ${r.sentTo}.`);
+    } catch (err: any) {
+      fail(err?.message || "Couldn’t send the ticket.");
+    }
+  };
   const [q, setQ] = useState("");
   const [eventId, setEventId] = useState("");
   const orders = report?.orders || [];
@@ -18,8 +27,12 @@ export default function OrgOrdersPage() {
 
   const exportCsv = () =>
     downloadCsv("jazba-orders.csv", [
-      ["Order", "Event", "Name", "Email", "Ticket", "Quantity", "Paid", "Currency", "Status", "Ordered at"],
-      ...shown.map((o) => [o.id, o.eventTitle, o.buyerName, o.buyerEmail, o.tierName, o.quantity, o.currency === "USD" ? o.amountUsd.toFixed(2) : o.amountLocal, o.currency, o.status, o.createdAt]),
+      ["Order", "Event", "Name", "Email", "Phone", "Ticket", "Quantity", "Paid", "Currency", "Promo code", "Type", "Status", "Ordered at"],
+      ...shown.map((o) => [
+        o.id, o.eventTitle, o.buyerName, o.buyerEmail, o.phone || "", o.tierName, o.quantity,
+        o.complimentary ? 0 : o.currency === "USD" ? o.amountUsd.toFixed(2) : o.amountLocal, o.currency, o.promoCode || "",
+        o.complimentary ? "Free / issued" : o.source === "online" ? "Online" : "Issued", o.status, o.createdAt,
+      ]),
     ]);
 
   return (
@@ -53,7 +66,7 @@ export default function OrgOrdersPage() {
             ))}
           </select>
         </Toolbar>
-        <OrdersTable orders={shown} total={orders.length} loading={reportLoading} showEvent />
+        <OrdersTable orders={shown} total={orders.length} loading={reportLoading} showEvent onResend={resend} />
       </div>
     </div>
   );

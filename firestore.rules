@@ -70,9 +70,12 @@ service cloud.firestore {
       return hasRole('staff');
     }
 
+    // Organisers can check people in at their own events with Jazba Scan:
+    // the server keeps their own doorStaff/<uid> list of events, so they
+    // follow exactly the same rules as door staff.
     function isDoorStaffFor(eventId) {
       let path = /databases/$(database)/documents/doorStaff/$(request.auth.uid);
-      return isDoorStaff() && exists(path) && eventId in get(path).data.get('events', []);
+      return (isDoorStaff() || isOrganizer()) && exists(path) && eventId in get(path).data.get('events', []);
     }
 
     function isValidUser(data) {
@@ -135,8 +138,14 @@ service cloud.firestore {
         && data.get('status', 'approved') in ['pending', 'approved', 'rejected', 'suspended'];
     }
 
+    // Public profiles: approved ones (old admin-made ones have no status).
+    // An application in review, rejected or paused is seen only by its
+    // owner and admins. Private details live in organizerPrivate.
     match /organizers/{organizerId} {
-      allow read: if true;
+      allow get: if resource.data.get('status', 'approved') == 'approved' || isAdmin()
+        || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow list: if resource.data.status == 'approved' || isAdmin()
+        || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow create: if isValidId(organizerId) && (isAdmin() || (
         isOwner(organizerId) && isValidOrganizer(incoming())
         && incoming().userId == request.auth.uid
@@ -175,11 +184,19 @@ service cloud.firestore {
       return data.title is string && data.title.size() > 0 && data.title.size() <= 200
         && data.get('type', 'upcoming') == 'upcoming'
         && data.get('featured', false) == false
-        && data.get('everPublished', false) == false;
+        && data.get('everPublished', false) == false
+        && !data.keys().hasAny(['followersNotifiedAt'])
+        && data.get('ticketOptions', []) is list && data.get('ticketOptions', []).size() <= 30;
     }
 
     match /events/{eventId} {
-      allow read: if true;
+      // Events on sale are public; drafts and events in review are seen
+      // only by their organiser and admins (queries must ask for
+      // status == 'published', or for the organiser's own events).
+      allow get: if resource.data.get('status', '') == 'published' || isAdmin()
+        || (isSignedIn() && resource.data.get('organizerId', '') == request.auth.uid);
+      allow list: if resource.data.status == 'published' || isAdmin()
+        || (isSignedIn() && resource.data.organizerId == request.auth.uid);
       allow create: if isValidId(eventId) && (isAdmin() || (
         isOrganizer() && incoming().organizerId == request.auth.uid
         && incoming().status in ['draft', 'pending']
@@ -192,7 +209,9 @@ service cloud.firestore {
         && incoming().get('type', 'upcoming') == existing().get('type', 'upcoming')
         && incoming().get('featured', false) == existing().get('featured', false)
         && incoming().get('everPublished', false) == existing().get('everPublished', false)
+        && incoming().get('followersNotifiedAt', '') == existing().get('followersNotifiedAt', '')
         && incoming().title is string && incoming().title.size() > 0 && incoming().title.size() <= 200
+        && incoming().get('ticketOptions', []) is list && incoming().get('ticketOptions', []).size() <= 30
       ));
       allow delete: if isAdmin() || (
         isOrganizer() && existing().organizerId == request.auth.uid
@@ -258,7 +277,7 @@ service cloud.firestore {
       allow get: if isOwner(staffId) || isAdmin();
       allow list: if isAdmin();
       allow create, update: if isValidId(staffId) && isAdmin()
-        && incoming().keys().hasOnly(['uid', 'events', 'updatedAt', 'updatedBy'])
+        && incoming().keys().hasOnly(['uid', 'events', 'updatedAt', 'updatedBy', 'ownerId'])
         && incoming().events is list && incoming().events.size() <= 50;
       allow delete: if isAdmin();
     }
@@ -275,6 +294,86 @@ service cloud.firestore {
       allow read: if isSignedIn() && (resource.data.organizerId == request.auth.uid || isAdmin());
       allow create, update: if isValidId(payoutId) && isAdmin();
       allow delete: if isAdmin();
+    }
+
+    // ── Organiser private details ───────────────────────────────────────
+    // Bank details for payouts, sale-email setting and their application
+    // note: only the organiser and admins. The Jazba fee and review notes
+    // are set by admins only.
+    function isValidOrganizerPrivate(data) {
+      return data.keys().hasOnly(['payout', 'notifyOnSale', 'applicationNote', 'feePercent', 'reviewNote', 'updatedAt'])
+        && data.get('payout', {}) is map && data.get('payout', {}).size() <= 12
+        && data.get('notifyOnSale', true) is bool
+        && data.get('applicationNote', '') is string && data.get('applicationNote', '').size() <= 3000
+        && data.get('updatedAt', '') is string && data.get('updatedAt', '').size() <= 64;
+    }
+
+    match /organizerPrivate/{organizerId} {
+      allow get: if isAdmin() || isOwner(organizerId);
+      allow list: if isAdmin();
+      allow create: if isValidId(organizerId) && (isAdmin() || (
+        isOwner(organizerId) && isValidOrganizerPrivate(incoming())
+        && !incoming().keys().hasAny(['feePercent', 'reviewNote'])
+      ));
+      allow update: if isValidId(organizerId) && (isAdmin() || (
+        isOwner(organizerId) && isValidOrganizerPrivate(incoming())
+        && incoming().get('feePercent', -1) == existing().get('feePercent', -1)
+        && incoming().get('reviewNote', '') == existing().get('reviewNote', '')
+      ));
+      allow delete: if isAdmin();
+    }
+
+    // ── Discount codes ──────────────────────────────────────────────────
+    // An organiser's own codes: only they and admins can see or change
+    // them. How many times a code was used is counted by the server. The
+    // payment server checks a code works on that organiser's events only.
+    function isValidPromo(data, code) {
+      return data.keys().hasOnly(['code', 'organizerId', 'eventIds', 'tiers', 'percentOff', 'maxUses', 'uses',
+            'startsAt', 'endsAt', 'active', 'label', 'createdAt', 'updatedAt'])
+        && code.matches('^[A-Z0-9]{3,24}$') && data.code == code
+        && data.organizerId is string && data.organizerId.size() > 0 && data.organizerId.size() <= 128
+        && data.eventIds is list && data.eventIds.size() <= 30
+        && data.tiers is list && data.tiers.size() <= 30
+        && data.percentOff is int && data.percentOff >= 1 && data.percentOff <= 100
+        && data.maxUses is int && data.maxUses >= 0 && data.maxUses <= 100000
+        && data.uses is int && data.uses >= 0
+        && data.startsAt is string && data.startsAt.size() <= 40
+        && data.endsAt is string && data.endsAt.size() <= 40
+        && data.active is bool
+        && data.get('label', '') is string && data.get('label', '').size() <= 80;
+    }
+
+    match /promoCodes/{code} {
+      allow get, list: if isSignedIn() && (isAdmin() || resource.data.organizerId == request.auth.uid);
+      allow create: if isValidPromo(incoming(), code) && (isAdmin() || (
+        isOrganizer() && incoming().organizerId == request.auth.uid && incoming().uses == 0
+      ));
+      allow update: if isValidPromo(incoming(), code) && (isAdmin() || (
+        isOrganizer() && existing().organizerId == request.auth.uid
+        && incoming().organizerId == existing().organizerId
+        && incoming().uses == existing().uses
+      ));
+      allow delete: if isAdmin() || (isOrganizer() && existing().organizerId == request.auth.uid);
+    }
+
+    // ── Waitlists ───────────────────────────────────────────────────────
+    // Anyone can put their name down for a sold-out event (one entry per
+    // email per event: the entry id is eventId__email). Only admins read
+    // them here; organisers see their own events' lists through the server.
+    match /waitlist/{entryId} {
+      allow create: if isValidId(entryId)
+        && incoming().keys().hasOnly(['eventId', 'name', 'email', 'tier', 'userId', 'createdAt', 'status'])
+        && incoming().eventId is string && isValidId(incoming().eventId)
+        && entryId.matches('^' + incoming().eventId + '__[a-z0-9_-]{3,100}$')
+        && incoming().name is string && incoming().name.size() > 0 && incoming().name.size() <= 100
+        && incoming().email is string && incoming().email.size() <= 200
+        && incoming().email.matches('^[^@ ]+@[^@ ]+[.][^@ ]+$')
+        && incoming().get('tier', '') is string && incoming().get('tier', '').size() <= 64
+        && (incoming().get('userId', '') == '' || (isSignedIn() && incoming().userId == request.auth.uid))
+        && incoming().createdAt is string && incoming().createdAt.size() <= 40
+        && incoming().status == 'waiting'
+        && exists(/databases/$(database)/documents/events/$(incoming().eventId));
+      allow read, update, delete: if isAdmin();
     }
 
     // ── Notifications ───────────────────────────────────────────────────

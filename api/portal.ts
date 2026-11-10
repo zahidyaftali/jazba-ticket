@@ -8,6 +8,10 @@ import adminMedia from './_routes/admin-media.js';
 import adminPayments from './_routes/admin-payments.js';
 import adminSecurityRules from './_routes/admin-security-rules.js';
 import adminUsers from './_routes/admin-users.js';
+import availability from './_routes/availability.js';
+import myTicket from './_routes/my-ticket.js';
+import organizerTools from './_routes/organizer-tools.js';
+import promoCheck from './_routes/promo-check.js';
 import doorStaff from './_routes/door-staff.js';
 import organizerNotify from './_routes/organizer-notify.js';
 import organizerPortal from './_routes/organizer-portal.js';
@@ -17,6 +21,10 @@ const ROUTES: Record<string, (req: any, res: any) => Promise<void>> = {
   'admin-payments': adminPayments,
   'admin-security-rules': adminSecurityRules,
   'admin-users': adminUsers,
+  availability,
+  'my-ticket': myTicket,
+  'organizer-tools': organizerTools,
+  'promo-check': promoCheck,
   'door-staff': doorStaff,
   'organizer-notify': organizerNotify,
   'organizer-portal': organizerPortal,

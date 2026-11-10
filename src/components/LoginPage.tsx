@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { signInWithEmailAndPassword, GoogleAuthProvider, FacebookAuthProvider, signInWithPopup, getAdditionalUserInfo, sendPasswordResetEmail, auth, socialSignInErrorMessage, accountEmail } from '../firebase';
 import { createUserProfile } from '../services/backendService';
+import { GlowField, TicketDoodles } from './Decor';
 
 interface LoginPageProps {
   onBack: () => void;
@@ -147,10 +148,8 @@ export default function LoginPage({ onBack, onSuccess, onSwitchToSignup }: Login
     <div className="jz-page min-h-[85vh] bg-[#FAFBFD] text-neutral-900 font-sans relative flex items-center justify-center py-16 px-4 sm:px-6 overflow-hidden" id="login-page-root">
       
       {/* Background radial accent - matching home page colors but subtle and light */}
-      <div className="absolute inset-0 z-0 pointer-events-none select-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[400px] h-[400px] bg-[#E34718]/5 rounded-full blur-[100px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(rgba(227,71,24,0.02)_1px,transparent_1px)] [background-size:24px_24px] opacity-75" />
-      </div>
+      <GlowField tone="light" />
+      <TicketDoodles />
 
       {/* Main content column */}
       <div className="w-full max-w-md relative z-10 flex flex-col items-center">
@@ -168,7 +167,7 @@ export default function LoginPage({ onBack, onSuccess, onSwitchToSignup }: Login
         </div>
 
         {/* Polished Card */}
-        <div className="w-full bg-white   rounded-[2rem] p-8 sm:p-10 shadow-xs space-y-6 relative overflow-hidden transition-all duration-300">
+        <div className="w-full jz-glass p-7 sm:p-10 space-y-6 relative overflow-hidden transition-all duration-300 jz-rise">
           
           {showResetForm ? (
             <>
